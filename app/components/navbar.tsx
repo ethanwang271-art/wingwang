@@ -1,4 +1,3 @@
-// components/Navbar.tsx
 "use client";
 
 import Link from "next/link";
@@ -15,16 +14,7 @@ const pageLinks = [
 
 function MailIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="5" width="18" height="14" rx="2" />
       <path d="M3 7l9 6 9-6" />
     </svg>
@@ -33,16 +23,7 @@ function MailIcon() {
 
 function InstagramIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="3" width="18" height="18" rx="5" />
       <circle cx="12" cy="12" r="4" />
       <circle cx="17.5" cy="6.5" r="0.75" fill="currentColor" stroke="none" />
@@ -54,18 +35,17 @@ export default function Navbar() {
   const pathname = usePathname();
 
   const iconButton =
-    "rounded-full p-2 text-slate-600 transition hover:bg-slate-900/5 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white";
+    "rounded-full p-2 text-neutral-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
 
   return (
-    <div className="sticky top-0 z-50 border-b border-slate-900/10 bg-stone-100/90 backdrop-blur dark:border-white/10 dark:bg-slate-950/90">
-      <nav
-        aria-label="Main"
-        className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3"
-      >
-        {/* Left: site label */}
+    // h-16 is fixed so pages can size themselves with calc(100dvh - 4rem)
+    <header className="sticky top-0 z-50 h-16 border-b border-white/10 bg-black/80 text-white backdrop-blur">
+      <nav aria-label="Main" className="mx-auto flex h-full max-w-5xl items-center justify-between px-6">
+        {/* Left: site label (Comic Sans, with fallbacks for devices that don't have it) */}
         <Link
           href="/"
-          className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100"
+          className="text-xl font-bold tracking-tight"
+          style={{ fontFamily: '"Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive' }}
         >
           wingwang
         </Link>
@@ -82,8 +62,8 @@ export default function Navbar() {
                     aria-current={active ? "page" : undefined}
                     className={`rounded-md px-2 py-1.5 text-sm font-medium transition sm:px-3 ${
                       active
-                        ? "text-slate-900 underline decoration-amber-500 decoration-2 underline-offset-8 dark:text-white"
-                        : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                        ? "text-white underline decoration-white decoration-2 underline-offset-8"
+                        : "text-neutral-400 hover:text-white"
                     }`}
                   >
                     {link.label}
@@ -93,25 +73,16 @@ export default function Navbar() {
             })}
           </ul>
 
-          <span
-            className="mx-1 hidden h-5 w-px bg-slate-900/15 sm:block dark:bg-white/15"
-            aria-hidden="true"
-          />
+          <span className="mx-1 hidden h-5 w-px bg-white/20 sm:block" aria-hidden="true" />
 
           <a href={`mailto:${EMAIL}`} aria-label="Email me" className={iconButton}>
             <MailIcon />
           </a>
-          <a
-            href={INSTAGRAM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Instagram"
-            className={iconButton}
-          >
+          <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className={iconButton}>
             <InstagramIcon />
           </a>
         </div>
       </nav>
-    </div>
+    </header>
   );
 }
