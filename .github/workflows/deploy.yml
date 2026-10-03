@@ -1,0 +1,22 @@
+name: Deploy to server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # Skip in forks of this repo, where no runner exists
+    if: ${{ !github.event.repository.fork }}
+    runs-on: [self-hosted, linux, client-site]
+    timeout-minutes: 30
+    steps:
+      - run: /usr/local/bin/site-deploy
