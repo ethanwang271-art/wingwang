@@ -249,7 +249,8 @@ export default function Home() {
         <div className="hl-blob absolute left-[42%] top-[4%] h-64 w-64 rounded-full bg-white/10 blur-3xl" style={{ animationDelay: "-9s" }} />
       </div>
 
-      <div className="mx-auto grid max-w-5xl items-center gap-12 px-6 py-12 md:min-h-[calc(100dvh-4rem)] md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-16">
+      {/* the 3rem in the min-height leaves room for the footer so the page doesn't scroll on desktop */}
+      <div className="mx-auto grid max-w-5xl items-center gap-12 px-6 py-12 md:min-h-[calc(100dvh-4rem-3rem)] md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-16">
         {/* Left: photo + intro text */}
         <div className="mx-auto w-full max-w-sm md:max-w-none">
           <div className="hl-photo">
@@ -300,6 +301,10 @@ export default function Home() {
           <GlassTile href={`mailto:${EMAIL}`} title="Contact" description="Say hello" icon={MailIcon} wide className="col-span-2 h-28" delay={800} />
         </div>
       </div>
+
+      <footer className="px-6 pb-6 pt-2 text-center text-xs text-neutral-500">
+        © 2026 Ethan Wang. All rights reserved.
+      </footer>
     </main>
   );
 }
