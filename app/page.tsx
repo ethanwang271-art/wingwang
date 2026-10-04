@@ -285,11 +285,11 @@ export default function Home() {
 
           <div className="mt-8">
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-              <Words text="Hi, I'm Ethan." />
+              <Words text="hi im ethan" />
             </h1>
             <div className="hl-line mt-4 h-px w-24 bg-white/50" />
             <p className="mt-4 max-w-sm text-lg text-neutral-400">
-              <Words text="Welcome to my corner of the internet. Take a look around." start={4} />
+              <Words text="16 yr old tryna do something" start={4} />
             </p>
           </div>
         </div>
