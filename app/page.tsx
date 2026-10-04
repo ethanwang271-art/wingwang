@@ -132,15 +132,11 @@ const PAGE_CSS = `
 .hl-float { animation: hl-float 6s ease-in-out infinite; }
 .hl-photo { animation: hl-photo-in .9s cubic-bezier(.34,1.56,.64,1) backwards; }
 
-/* frosted frame around the photo */
+/* the photo's frame: just spacing, the scroll line draws the outline around it */
 .hl-frame {
+  position: relative;
   border-radius: 2.25rem;
   padding: .5rem;
-  background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.04));
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255,255,255,.2);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.5), 0 24px 60px -12px rgba(0,0,0,.7);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -270,97 +266,192 @@ const BEATS = [
 ] as const;
 
 /* ---------- Scroll line ----------
-   A thick curved line that draws itself as you scroll (like lusion.co).
-   It stays hidden on the home screen, then sweeps in from the left edge the moment you scroll,
-   swings down the page, and stops at the top of the photo frame.
+   A thick white line that draws itself as you scroll (like lusion.co).
+   It stays hidden on the home screen, sweeps in from the left edge when you scroll, and runs down the
+   left edge (looping a couple of times) while the big intro text is on screen, so it never crosses the
+   words. Once the text is gone it curves across to your photo, thins out, and becomes the photo's
+   frame: it splits at the top of the photo and draws the outline around it in both directions,
+   lighting up as it touches.
    The tip eases after your scrolling, so it keeps gliding a moment after you stop. */
 
 // ---- tweak these ----
 const LINE_COLOR = "255,255,255"; // r,g,b of the line
-const LINE_OPACITY = 0.55;        // 1 = solid white, lower = see-through (keeps white text readable on top of it)
-const LINE_HEAD = 0.72;           // where the tip sits in the window (0 = top, 1 = bottom)
-const LINE_SWING = 0.34;          // how far it swings left/right, as a share of page width
-const LINE_MAX_SWING = 420;       // ...but never more than this many px
-const LINE_WAVE = 1.1;            // height of one left/right swing, as a share of the window height
+const LINE_OPACITY = 1;           // 1 = solid white
+const LINE_HEAD = 0.8;            // where the tip sits in the window (0 = top, 1 = bottom). Higher = the line reaches the photo sooner
+const LINE_WAVE = 0.8;            // height of one wobble down the edge, as a share of the window height
 const LINE_SMOOTH = 4.5;          // higher = the tip catches up with your scrolling faster
-const LINE_ENTRY = 0.9;           // height of the first sweep in from the left, as a share of the window height
+const LINE_ENTRY = 0.6;           // height of the first sweep in from the left, as a share of the window height
+const LINE_LOOPS = 2;             // loop-de-loops while it runs down the left edge (0 = none, max 2)
+const LINE_TAPER = 1.0;           // how far before the photo the line starts thinning (share of window height)
+const FRAME_W = 2.5;              // thickness of the frame outline (the line thins down to this)
+const FRAME_DRAW = 0.3;           // how much scrolling (share of window height) the outline takes to draw around the photo
+const INTRO_VH = 4.2;             // the intro's height in window heights: keep in step with INTRO_HEIGHT ("420vh")
 
 type LineBuilt = {
   xs: number[];
   ys: number[];
+  vy: number[];  // like ys, but always heading down (a loop counts as a plain stretch): used to match scrolling to the line
   cum: number[]; // length of the line up to each point
   total: number;
-  d: string;
+  hw: number[];  // half the line's thickness at each point
+  lx: number[]; ly: number[]; // left edge of the line at each point
+  rx: number[]; ry: number[]; // right edge
+  ls: string[]; rs: string[]; // the same edges as text, ready for the path
 };
 
-// Build the whole line as lots of tiny straight steps (so it looks perfectly smooth).
-//   y0 = where it starts (at the left edge), fx / yF = where it ends (top of the photo frame)
-function buildLine(W: number, vh: number, y0: number, fx: number, yF: number, pad: number): LineBuilt {
-  const cx = W / 2;
-  const A = Math.min(W * LINE_SWING, LINE_MAX_SWING);
-  const L = clamp(vh * LINE_ENTRY, 450, 800);
+// Build the whole line as lots of tiny steps (so it looks perfectly smooth), then give it a
+// thickness that thins out towards the end.
+//   y0 = where it starts (off the left edge), fx / fy = where it ends (top-centre of the photo frame)
+// The line hugs the left edge while the big intro text is on screen (so it never crosses the words),
+// does a couple of loops there, then curves across to the photo once the text has gone.
+function buildLine(W: number, vh: number, y0: number, fx: number, fy: number, pad: number, stroke: number): LineBuilt {
+  const xb = clamp(W * 0.045, 22, 90);  // how far from the left edge the line runs
+  const amp = clamp(W * 0.02, 8, 30);   // small sideways wobble while it runs down the edge
+  const lb = clamp(W * 0.03, 24, 46);   // loop size (lb > la is what makes the line cross itself)
+  const la = lb * 0.45;
+  const span = 2 * Math.PI * la;        // how tall one loop is
+
+  const L = clamp(vh * LINE_ENTRY, 350, 600);
   const y1 = y0 + L;
-  const end = Math.max(yF, y1 + 300);
+  // below this y the intro text has faded out, so the line is free to cross to the middle
+  const yClear = vh * (INTRO_VH - 0.4) + 110;
+  const yT = Math.max(y1 + 200, fy - clamp(fy - yClear, 240, vh * 0.75));
 
   const xs: number[] = [-pad];
   const ys: number[] = [y0];
+  const vy: number[] = [y0];
+  const add = (x: number, y: number, v: number = y) => { xs.push(x); ys.push(y); vy.push(v); };
 
-  // 1) sweep in from the left edge and turn down into the middle
+  // 1) sweep in from the left edge and turn down along it
   const steps1 = Math.max(60, Math.ceil(L / 3));
-  const P1x = cx * 0.85, P1y = y0 + L * 0.3, P2y = y1 - L * 0.35;
+  const P1x = xb * 0.6, P1y = y0 + L * 0.3, P2y = y1 - L * 0.35;
   for (let s = 1; s <= steps1; s++) {
     const t = s / steps1, m = 1 - t;
-    xs.push(-pad * (m * m * m) + P1x * (3 * m * m * t) + cx * (3 * m * t * t + t * t * t));
-    ys.push(y0 * (m * m * m) + P1y * (3 * m * m * t) + P2y * (3 * m * t * t) + y1 * (t * t * t));
+    add(
+      -pad * (m * m * m) + P1x * (3 * m * m * t) + xb * (3 * m * t * t + t * t * t),
+      y0 * (m * m * m) + P1y * (3 * m * m * t) + P2y * (3 * m * t * t) + y1 * (t * t * t),
+    );
   }
+  let px = xb, py = y1;
 
-  // 2) swings down the page, ending right at the photo frame. S-curves that are vertical at both
-  //    ends, so they join without kinks.
-  const n = Math.max(2, Math.round((end - y1) / clamp(vh * LINE_WAVE, 480, 900)));
-  const h = (end - y1) / n;
-  const base = fx < cx ? 1 : -1; // the swing just before the frame is on the opposite side to it
-  let px = cx, py = y1;
-  for (let i = 1; i <= n; i++) {
-    const nx = i === n ? fx : cx + A * base * ((n - 1 - i) % 2 === 0 ? 1 : -1);
-    const ny = y1 + h * i;
+  // an S-curve to (nx, ny) that is vertical at both ends, so pieces join without kinks
+  const swing = (nx: number, ny: number) => {
+    const h = ny - py;
     const steps = Math.max(8, Math.ceil(h / 4));
     for (let s = 1; s <= steps; s++) {
       const t = s / steps, m = 1 - t;
-      xs.push(px * (m * m * m + 3 * m * m * t) + nx * (3 * m * t * t + t * t * t));
-      ys.push(
+      add(
+        px * (m * m * m + 3 * m * m * t) + nx * (3 * m * t * t + t * t * t),
         m * m * m * py + 3 * m * m * t * (py + h / 2) + 3 * m * t * t * (ny - h / 2) + t * t * t * ny,
       );
     }
     px = nx;
     py = ny;
+  };
+
+  // gentle wobble down the edge until y = yTarget, ending back on the edge
+  const waves = (yTarget: number) => {
+    const gap = yTarget - py;
+    if (gap <= 0) return;
+    if (gap < 150) {
+      const steps = Math.max(2, Math.ceil(gap / 6));
+      for (let s = 1; s <= steps; s++) add(px, py + (gap * s) / steps);
+      py = yTarget;
+      return;
+    }
+    const n = 2 * Math.max(1, Math.round(gap / clamp(vh * LINE_WAVE, 400, 800) / 2));
+    const h = gap / n;
+    for (let i = 1; i <= n; i++) swing(i % 2 ? xb + amp : xb, py + h);
+  };
+
+  // a loop-de-loop: a stretched wave that doubles back on itself (starts and ends on the edge)
+  const loop = () => {
+    const yS = py, cxL = xb + lb, N = 90;
+    for (let k = 1; k <= N; k++) {
+      const th = -Math.PI + (2 * Math.PI * k) / N;
+      add(cxL + lb * Math.cos(th), yS + la * (th + Math.PI) - lb * Math.sin(th), yS + (span * k) / N);
+    }
+    px = xb;
+    py = yS + span;
+  };
+
+  // 2) down the edge, with loops
+  const M = yT - y1;
+  const nLoops = LINE_LOOPS >= 2 && M > 2 * span + 700 ? 2 : LINE_LOOPS >= 1 && M > span + 400 ? 1 : 0;
+  const at = nLoops === 2 ? [0.3, 0.7] : [0.5];
+  for (let k = 0; k < nLoops; k++) {
+    waves(y1 + M * at[k] - span / 2);
+    loop();
   }
+  waves(yT);
+
+  // 3) across to the top-centre of the photo frame
+  swing(fx, Math.max(fy, py + 200));
 
   const cum = [0];
   for (let i = 1; i < xs.length; i++) {
     cum.push(cum[i - 1] + Math.hypot(xs[i] - xs[i - 1], ys[i] - ys[i - 1]));
   }
-  const d = xs.map((x, i) => `${i ? "L" : "M"}${x.toFixed(1)} ${ys[i].toFixed(1)}`).join("");
-  return { xs, ys, cum, total: cum[cum.length - 1], d };
+  const total = cum[cum.length - 1];
+  const last = xs.length - 1;
+
+  // 4) thickness: full width, then thinning down to the frame's thickness over the last stretch
+  const taper = vh * LINE_TAPER;
+  const hw: number[] = [], lx: number[] = [], ly: number[] = [], rx: number[] = [], ry: number[] = [];
+  const ls: string[] = [], rs: string[] = [];
+  for (let i = 0; i <= last; i++) {
+    const t = clamp((total - cum[i]) / taper, 0, 1);
+    const s = t * t * (3 - 2 * t);
+    const half = 0.5 * (FRAME_W + (stroke - FRAME_W) * s);
+    const i0 = Math.max(0, i - 1), i1 = Math.min(last, i + 1);
+    const tx = xs[i1] - xs[i0], ty = ys[i1] - ys[i0];
+    const len = Math.hypot(tx, ty) || 1;
+    const nx = -ty / len, ny = tx / len;
+    hw.push(half);
+    lx.push(xs[i] + nx * half); ly.push(ys[i] + ny * half);
+    rx.push(xs[i] - nx * half); ry.push(ys[i] - ny * half);
+    ls.push(`${lx[i].toFixed(1)} ${ly[i].toFixed(1)}`);
+    rs.push(`${rx[i].toFixed(1)} ${ry[i].toFixed(1)}`);
+  }
+  return { xs, ys, vy, cum, total, hw, lx, ly, rx, ry, ls, rs };
+}
+
+// the outline around the photo, as two halves that both start at the top-centre
+function frameOutline(w: number, h: number, r0: number) {
+  const r = Math.min(r0, w / 2, h / 2);
+  const c = w / 2;
+  return {
+    cw: `M${c} 0H${w - r}A${r} ${r} 0 0 1 ${w} ${r}V${h - r}A${r} ${r} 0 0 1 ${w - r} ${h}H${c}`,
+    ccw: `M${c} 0H${r}A${r} ${r} 0 0 0 0 ${r}V${h - r}A${r} ${r} 0 0 0 ${r} ${h}H${c}`,
+  };
 }
 
 function ScrollLine() {
   const svgRef = useRef<SVGSVGElement>(null);
   const groupRef = useRef<SVGGElement>(null);
-  const lineRef = useRef<SVGPathElement>(null);
+  const polyRef = useRef<SVGPathElement>(null);
+  const tipRef = useRef<SVGCircleElement>(null);
 
   useEffect(() => {
-    const svg = svgRef.current, group = groupRef.current, line = lineRef.current;
-    if (!svg || !group || !line) return;
+    const svg = svgRef.current, group = groupRef.current, poly = polyRef.current, tip = tipRef.current;
+    if (!svg || !group || !poly || !tip) return;
     const host = svg.parentElement; // the <main>
     if (!host) return;
 
+    // the photo frame and its outline (they live inside the page, see the JSX in Home)
+    const frameEl = host.querySelector<HTMLElement>("[data-line-target]");
+    const outSvg = host.querySelector<SVGSVGElement>("[data-frame-svg]");
+    const outCw = host.querySelector<SVGPathElement>("[data-frame-cw]");
+    const outCcw = host.querySelector<SVGPathElement>("[data-frame-ccw]");
+
     const st = { b: null as LineBuilt | null };
-    let lastW = 0, lastH = 0, lastVh = 0, lastFx = -1, lastFy = -1;
+    let lastW = 0, lastH = 0, lastVh = 0, lastFx = -1, lastFy = -1, lastFw = -1, lastFh = -1;
+    let lastFi = -1, lastGlow = -1;
     let raf = 0, last = performance.now(), cur = -1;
 
     // where the photo frame is, measured from layout (ignores its entrance animation)
     const locate = () => {
-      const el = host.querySelector<HTMLElement>("[data-line-target]");
+      const el = frameEl;
       if (!el) return null;
       let x = 0, y = 0;
       let node: HTMLElement | null = el;
@@ -370,34 +461,55 @@ function ScrollLine() {
         node = node.offsetParent as HTMLElement | null;
       }
       if (node !== host) return null;
-      return { fx: x + el.offsetWidth / 2, fy: y };
+      return { fx: x + el.offsetWidth / 2, fy: y, fw: el.offsetWidth, fh: el.offsetHeight };
     };
 
-    // (re)build the line whenever the page size or the frame position changes
-    const rebuild = (w: number, h: number, vh: number, fx: number, fy: number) => {
-      lastW = w; lastH = h; lastVh = vh; lastFx = fx; lastFy = fy;
+    // (re)build the line whenever the page size or the frame changes
+    const rebuild = (w: number, h: number, vh: number, fx: number, fy: number, fw: number, fh: number) => {
+      lastW = w; lastH = h; lastVh = vh; lastFx = fx; lastFy = fy; lastFw = fw; lastFh = fh;
+      lastFi = -1;
       const stroke = clamp(w * 0.017, 10, 24);
       // the tip sits at `vh * LINE_HEAD` on screen when you haven't scrolled, so start exactly there:
       // nothing shows until the first scroll
       const pageTop = host.getBoundingClientRect().top + window.scrollY;
       const y0 = vh * LINE_HEAD - pageTop;
-      st.b = buildLine(w, vh, y0, fx, fy + 6, stroke * 3);
-      line.setAttribute("d", st.b.d);
-      line.setAttribute("stroke-width", String(stroke));
+      st.b = buildLine(w, vh, y0, fx, fy, stroke * 3, stroke);
+
+      if (frameEl && outCw && outCcw && fw > 0 && fh > 0) {
+        const radius = parseFloat(getComputedStyle(frameEl).borderTopLeftRadius) || 36;
+        const o = frameOutline(fw, fh, radius);
+        outCw.setAttribute("d", o.cw);
+        outCcw.setAttribute("d", o.ccw);
+      }
     };
 
-    // draw the line up to point `fi` (can be a fraction)
+    // draw the line up to point `fi` (can be a fraction), as a ribbon that gets thinner towards the end
     const paint = (b: LineBuilt, fi: number) => {
       const i = clamp(Math.floor(fi), 0, b.xs.length - 2);
       const t = clamp(fi - i, 0, 1);
-      const len = b.cum[i] + (b.cum[i + 1] - b.cum[i]) * t;
-      line.style.strokeDasharray = `${len.toFixed(1)} ${(b.total + 50).toFixed(1)}`;
-      line.style.opacity = len > 1 ? "1" : "0";
+      const lerp = (arr: number[]) => arr[i] + (arr[i + 1] - arr[i]) * t;
+
+      const parts: string[] = ["M" + b.ls[0]];
+      for (let j = 1; j <= i; j++) parts.push("L" + b.ls[j]);
+      parts.push(`L${lerp(b.lx).toFixed(1)} ${lerp(b.ly).toFixed(1)}`);
+      parts.push(`L${lerp(b.rx).toFixed(1)} ${lerp(b.ry).toFixed(1)}`);
+      for (let j = i; j >= 0; j--) parts.push("L" + b.rs[j]);
+      parts.push("Z");
+      poly.setAttribute("d", parts.join(""));
+
+      // round tip
+      tip.setAttribute("cx", lerp(b.xs).toFixed(1));
+      tip.setAttribute("cy", lerp(b.ys).toFixed(1));
+      tip.setAttribute("r", lerp(b.hw).toFixed(2));
+
+      const show = fi > 0.5 ? "1" : "0";
+      poly.style.opacity = show;
+      tip.style.opacity = show;
     };
 
     // turn "how far down the page the tip is" into a position along the line
     const indexAt = (b: LineBuilt, headY: number) => {
-      const { ys } = b;
+      const ys = b.vy;
       const lastI = ys.length - 1;
       if (headY <= ys[0]) return 0;
       if (headY >= ys[lastI]) return lastI;
@@ -415,14 +527,15 @@ function ScrollLine() {
       const w = host.clientWidth;
       const h = host.offsetHeight;
       const vh = window.innerHeight;
-      const f = locate() ?? { fx: w * 0.3, fy: h * 0.8 };
+      const f = locate() ?? { fx: w * 0.3, fy: h * 0.8, fw: 0, fh: 0 };
 
       if (
         w > 10 && h > 10 &&
         (!st.b || w !== lastW || Math.abs(h - lastH) > 2 || Math.abs(vh - lastVh) > 150 ||
-          Math.abs(f.fx - lastFx) > 2 || Math.abs(f.fy - lastFy) > 2)
+          Math.abs(f.fx - lastFx) > 2 || Math.abs(f.fy - lastFy) > 2 ||
+          Math.abs(f.fw - lastFw) > 2 || Math.abs(f.fh - lastFh) > 2)
       ) {
-        rebuild(w, h, vh, f.fx, f.fy);
+        rebuild(w, h, vh, f.fx, f.fy, f.fw, f.fh);
       }
 
       const b = st.b;
@@ -433,7 +546,35 @@ function ScrollLine() {
 
         const target = -top + vh * LINE_HEAD;
         cur = cur < 0 ? target : cur + (target - cur) * (1 - Math.exp(-dt * LINE_SMOOTH));
-        paint(b, indexAt(b, cur));
+
+        const fi = indexAt(b, cur);
+        if (Math.abs(fi - lastFi) > 0.02) {
+          lastFi = fi;
+          paint(b, fi);
+        }
+
+        // once the line touches the photo, the outline draws around it from the touch point and lights up
+        if (outCw && outCcw && outSvg) {
+          const headMax = lastH - vh * (1 - LINE_HEAD); // lowest the tip can ever get
+          const dist = Math.min(vh * FRAME_DRAW, Math.max(60, headMax - lastFy) * 0.7);
+          const p = clamp((cur - lastFy) / dist, 0, 1);
+          const g = p * p * (3 - 2 * p);
+          const dash = `${g.toFixed(4)} 2`;
+          const vis = g > 0.002 ? "1" : "0";
+          outCw.style.strokeDasharray = dash;
+          outCcw.style.strokeDasharray = dash;
+          outCw.style.opacity = vis;
+          outCcw.style.opacity = vis;
+
+          const glow = smooth(lastFy - 40, lastFy + 140, cur);
+          if (Math.abs(glow - lastGlow) > 0.01) {
+            lastGlow = glow;
+            outSvg.style.filter =
+              glow > 0.01
+                ? `drop-shadow(0 0 ${(2 + glow * 10).toFixed(1)}px rgba(255,255,255,${(0.25 + glow * 0.65).toFixed(2)}))`
+                : "none";
+          }
+        }
       }
       raf = requestAnimationFrame(frame);
     };
@@ -442,6 +583,7 @@ function ScrollLine() {
   }, []);
 
   // A fixed window-sized layer under the navbar. The line inside it moves with the page.
+  const fill = `rgba(${LINE_COLOR},${LINE_OPACITY})`;
   return (
     <svg
       ref={svgRef}
@@ -450,14 +592,8 @@ function ScrollLine() {
       style={{ position: "fixed", left: 0, top: NAVBAR, width: "100%", height: `calc(100dvh - ${NAVBAR}px)` }}
     >
       <g ref={groupRef}>
-        <path
-          ref={lineRef}
-          fill="none"
-          stroke={`rgba(${LINE_COLOR},${LINE_OPACITY})`}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ opacity: 0 }}
-        />
+        <path ref={polyRef} fill={fill} style={{ opacity: 0 }} />
+        <circle ref={tipRef} fill={fill} style={{ opacity: 0 }} />
       </g>
     </svg>
   );
@@ -634,8 +770,12 @@ export default function Home() {
           {/* Left: photo */}
           <div className="mx-auto w-full max-w-sm md:max-w-none">
             <div className="hl-photo">
-              <div className="hl-float">
+              <div>
                 <div className="hl-frame" data-line-target>
+                  <svg data-frame-svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
+                    <path data-frame-cw fill="none" stroke="#fff" strokeWidth={FRAME_W} strokeLinecap="round" pathLength={1} style={{ opacity: 0 }} />
+                    <path data-frame-ccw fill="none" stroke="#fff" strokeWidth={FRAME_W} strokeLinecap="round" pathLength={1} style={{ opacity: 0 }} />
+                  </svg>
                   <div className="relative aspect-[4/5] overflow-hidden rounded-[1.75rem] bg-neutral-900">
                     {photoOk ? (
                       <Image
