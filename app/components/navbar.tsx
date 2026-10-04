@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 // TODO: replace these with your real details
 const INSTAGRAM_URL = "https://instagram.com/etnwingwang";
+const LINKEDIN_URL = "https://www.linkedin.com/in/ethan-wang-9206563a1/"; // <- put your LinkedIn profile link here
 const EMAIL = "ethan@wingwang.ca";
 
 const pageLinks = [
@@ -27,6 +28,18 @@ function InstagramIcon() {
       <rect x="3" y="3" width="18" height="18" rx="5" />
       <circle cx="12" cy="12" r="4" />
       <circle cx="17.5" cy="6.5" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function LinkedInIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <path d="M8 11v5" />
+      <circle cx="8" cy="8" r="0.75" fill="currentColor" stroke="none" />
+      <path d="M12 16v-5" />
+      <path d="M12 13.25a2.25 2.25 0 0 1 4.5 0V16" />
     </svg>
   );
 }
@@ -80,6 +93,9 @@ export default function Navbar() {
           </a>
           <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className={iconButton}>
             <InstagramIcon />
+          </a>
+          <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className={iconButton}>
+            <LinkedInIcon />
           </a>
         </div>
       </nav>
