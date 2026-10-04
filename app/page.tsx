@@ -266,31 +266,31 @@ const BEATS = [
 ] as const;
 
 /* ---------- Scroll line ----------
-   A thick white line that draws itself as you scroll (like lusion.co).
-   It stays hidden on the home screen, sweeps in from the left edge when you scroll, and runs down the
-   left edge (looping a couple of times) while the big intro text is on screen, so it never crosses the
-   words. Once the text is gone it curves across to your photo, thins out, and becomes the photo's
-   frame: it splits at the top of the photo and draws the outline around it in both directions,
-   lighting up as it touches.
+   A grey line that draws itself as you scroll (like lusion.co).
+   It stays hidden on the home screen, sweeps in from the left edge when you scroll, swings left and
+   right down the page, thins out as it nears your photo, and becomes the photo's border: it splits at
+   the top of the photo and draws the outline around it in both directions, lighting up (grey to
+   glowing white) as it touches.
    The tip eases after your scrolling, so it keeps gliding a moment after you stop. */
 
 // ---- tweak these ----
-const LINE_COLOR = "255,255,255"; // r,g,b of the line
-const LINE_OPACITY = 1;           // 1 = solid white
+const LINE_GRAY = 150;            // how light the grey line is (0 = black, 255 = white). The frame outline starts this grey and lights up to white
+const LINE_COLOR = `${LINE_GRAY},${LINE_GRAY},${LINE_GRAY}`; // r,g,b of the line
+const LINE_OPACITY = 1;           // 1 = solid
 const LINE_HEAD = 0.8;            // where the tip sits in the window (0 = top, 1 = bottom). Higher = the line reaches the photo sooner
-const LINE_WAVE = 0.8;            // height of one wobble down the edge, as a share of the window height
+const LINE_SWING = 0.34;          // how far it swings left/right, as a share of page width
+const LINE_MAX_SWING = 420;       // ...but never more than this many px
+const LINE_WAVE = 1.1;            // height of one left/right swing, as a share of the window height
 const LINE_SMOOTH = 4.5;          // higher = the tip catches up with your scrolling faster
-const LINE_ENTRY = 0.6;           // height of the first sweep in from the left, as a share of the window height
-const LINE_LOOPS = 2;             // loop-de-loops while it runs down the left edge (0 = none, max 2)
-const LINE_TAPER = 1.0;           // how far before the photo the line starts thinning (share of window height)
+const LINE_ENTRY = 0.9;           // height of the first sweep in from the left, as a share of the window height
+const LINE_TAPER = 1.2;           // how far before the photo the line starts thinning (share of window height)
 const FRAME_W = 2.5;              // thickness of the frame outline (the line thins down to this)
 const FRAME_DRAW = 0.3;           // how much scrolling (share of window height) the outline takes to draw around the photo
-const INTRO_VH = 4.2;             // the intro's height in window heights: keep in step with INTRO_HEIGHT ("420vh")
 
 type LineBuilt = {
   xs: number[];
   ys: number[];
-  vy: number[];  // like ys, but always heading down (a loop counts as a plain stretch): used to match scrolling to the line
+  vy: number[];  // y at each point, used to match scrolling to the line
   cum: number[]; // length of the line up to each point
   total: number;
   hw: number[];  // half the line's thickness at each point
@@ -301,92 +301,46 @@ type LineBuilt = {
 
 // Build the whole line as lots of tiny steps (so it looks perfectly smooth), then give it a
 // thickness that thins out towards the end.
-//   y0 = where it starts (off the left edge), fx / fy = where it ends (top-centre of the photo frame)
-// The line hugs the left edge while the big intro text is on screen (so it never crosses the words),
-// does a couple of loops there, then curves across to the photo once the text has gone.
-function buildLine(W: number, vh: number, y0: number, fx: number, fy: number, pad: number, stroke: number): LineBuilt {
-  const xb = clamp(W * 0.045, 22, 90);  // how far from the left edge the line runs
-  const amp = clamp(W * 0.02, 8, 30);   // small sideways wobble while it runs down the edge
-  const lb = clamp(W * 0.03, 24, 46);   // loop size (lb > la is what makes the line cross itself)
-  const la = lb * 0.45;
-  const span = 2 * Math.PI * la;        // how tall one loop is
-
-  const L = clamp(vh * LINE_ENTRY, 350, 600);
+//   y0 = where it starts (off the left edge), fx / yF = where it ends (top-centre of the photo frame)
+function buildLine(W: number, vh: number, y0: number, fx: number, yF: number, pad: number, stroke: number): LineBuilt {
+  const cx = W / 2;
+  const A = Math.min(W * LINE_SWING, LINE_MAX_SWING);
+  const L = clamp(vh * LINE_ENTRY, 450, 800);
   const y1 = y0 + L;
-  // below this y the intro text has faded out, so the line is free to cross to the middle
-  const yClear = vh * (INTRO_VH - 0.4) + 110;
-  const yT = Math.max(y1 + 200, fy - clamp(fy - yClear, 240, vh * 0.75));
+  const end = Math.max(yF, y1 + 300);
 
   const xs: number[] = [-pad];
   const ys: number[] = [y0];
-  const vy: number[] = [y0];
-  const add = (x: number, y: number, v: number = y) => { xs.push(x); ys.push(y); vy.push(v); };
 
-  // 1) sweep in from the left edge and turn down along it
+  // 1) sweep in from the left edge and turn down into the middle
   const steps1 = Math.max(60, Math.ceil(L / 3));
-  const P1x = xb * 0.6, P1y = y0 + L * 0.3, P2y = y1 - L * 0.35;
+  const P1x = cx * 0.85, P1y = y0 + L * 0.3, P2y = y1 - L * 0.35;
   for (let s = 1; s <= steps1; s++) {
     const t = s / steps1, m = 1 - t;
-    add(
-      -pad * (m * m * m) + P1x * (3 * m * m * t) + xb * (3 * m * t * t + t * t * t),
-      y0 * (m * m * m) + P1y * (3 * m * m * t) + P2y * (3 * m * t * t) + y1 * (t * t * t),
-    );
+    xs.push(-pad * (m * m * m) + P1x * (3 * m * m * t) + cx * (3 * m * t * t + t * t * t));
+    ys.push(y0 * (m * m * m) + P1y * (3 * m * m * t) + P2y * (3 * m * t * t) + y1 * (t * t * t));
   }
-  let px = xb, py = y1;
 
-  // an S-curve to (nx, ny) that is vertical at both ends, so pieces join without kinks
-  const swing = (nx: number, ny: number) => {
-    const h = ny - py;
+  // 2) swings down the page, ending right at the photo frame. S-curves that are vertical at both
+  //    ends, so they join without kinks.
+  const n = Math.max(2, Math.round((end - y1) / clamp(vh * LINE_WAVE, 480, 900)));
+  const h = (end - y1) / n;
+  const base = fx < cx ? 1 : -1; // the swing just before the frame is on the opposite side to it
+  let px = cx, py = y1;
+  for (let i = 1; i <= n; i++) {
+    const nx = i === n ? fx : cx + A * base * ((n - 1 - i) % 2 === 0 ? 1 : -1);
+    const ny = y1 + h * i;
     const steps = Math.max(8, Math.ceil(h / 4));
     for (let s = 1; s <= steps; s++) {
       const t = s / steps, m = 1 - t;
-      add(
-        px * (m * m * m + 3 * m * m * t) + nx * (3 * m * t * t + t * t * t),
+      xs.push(px * (m * m * m + 3 * m * m * t) + nx * (3 * m * t * t + t * t * t));
+      ys.push(
         m * m * m * py + 3 * m * m * t * (py + h / 2) + 3 * m * t * t * (ny - h / 2) + t * t * t * ny,
       );
     }
     px = nx;
     py = ny;
-  };
-
-  // gentle wobble down the edge until y = yTarget, ending back on the edge
-  const waves = (yTarget: number) => {
-    const gap = yTarget - py;
-    if (gap <= 0) return;
-    if (gap < 150) {
-      const steps = Math.max(2, Math.ceil(gap / 6));
-      for (let s = 1; s <= steps; s++) add(px, py + (gap * s) / steps);
-      py = yTarget;
-      return;
-    }
-    const n = 2 * Math.max(1, Math.round(gap / clamp(vh * LINE_WAVE, 400, 800) / 2));
-    const h = gap / n;
-    for (let i = 1; i <= n; i++) swing(i % 2 ? xb + amp : xb, py + h);
-  };
-
-  // a loop-de-loop: a stretched wave that doubles back on itself (starts and ends on the edge)
-  const loop = () => {
-    const yS = py, cxL = xb + lb, N = 90;
-    for (let k = 1; k <= N; k++) {
-      const th = -Math.PI + (2 * Math.PI * k) / N;
-      add(cxL + lb * Math.cos(th), yS + la * (th + Math.PI) - lb * Math.sin(th), yS + (span * k) / N);
-    }
-    px = xb;
-    py = yS + span;
-  };
-
-  // 2) down the edge, with loops
-  const M = yT - y1;
-  const nLoops = LINE_LOOPS >= 2 && M > 2 * span + 700 ? 2 : LINE_LOOPS >= 1 && M > span + 400 ? 1 : 0;
-  const at = nLoops === 2 ? [0.3, 0.7] : [0.5];
-  for (let k = 0; k < nLoops; k++) {
-    waves(y1 + M * at[k] - span / 2);
-    loop();
   }
-  waves(yT);
-
-  // 3) across to the top-centre of the photo frame
-  swing(fx, Math.max(fy, py + 200));
 
   const cum = [0];
   for (let i = 1; i < xs.length; i++) {
@@ -395,7 +349,7 @@ function buildLine(W: number, vh: number, y0: number, fx: number, fy: number, pa
   const total = cum[cum.length - 1];
   const last = xs.length - 1;
 
-  // 4) thickness: full width, then thinning down to the frame's thickness over the last stretch
+  // 3) thickness: full width, then thinning down to the frame's thickness over the last stretch
   const taper = vh * LINE_TAPER;
   const hw: number[] = [], lx: number[] = [], ly: number[] = [], rx: number[] = [], ry: number[] = [];
   const ls: string[] = [], rs: string[] = [];
@@ -413,7 +367,7 @@ function buildLine(W: number, vh: number, y0: number, fx: number, fy: number, pa
     ls.push(`${lx[i].toFixed(1)} ${ly[i].toFixed(1)}`);
     rs.push(`${rx[i].toFixed(1)} ${ry[i].toFixed(1)}`);
   }
-  return { xs, ys, vy, cum, total, hw, lx, ly, rx, ry, ls, rs };
+  return { xs, ys, vy: ys, cum, total, hw, lx, ly, rx, ry, ls, rs };
 }
 
 // the outline around the photo, as two halves that both start at the top-centre
@@ -569,6 +523,9 @@ function ScrollLine() {
           const glow = smooth(lastFy - 40, lastFy + 140, cur);
           if (Math.abs(glow - lastGlow) > 0.01) {
             lastGlow = glow;
+            const c = Math.round(LINE_GRAY + glow * (255 - LINE_GRAY));
+            outCw.style.stroke = `rgb(${c},${c},${c})`;
+            outCcw.style.stroke = `rgb(${c},${c},${c})`;
             outSvg.style.filter =
               glow > 0.01
                 ? `drop-shadow(0 0 ${(2 + glow * 10).toFixed(1)}px rgba(255,255,255,${(0.25 + glow * 0.65).toFixed(2)}))`
