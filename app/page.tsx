@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import Lenis from "lenis";
 
 // TODO: your email for the "Contact me" button
 const EMAIL = "ethan@wingwang.ca";
@@ -142,6 +143,14 @@ const PAGE_CSS = `
 @media (prefers-reduced-motion: reduce) {
   .hl-word, .hl-line, .hl-blob, .hl-float, .hl-photo { animation: none; }
 }
+`;
+
+// what Lenis needs so the browser doesn't fight its smooth scrolling
+const LENIS_CSS = `
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+.lenis.lenis-smooth iframe { pointer-events: none; }
 `;
 
 const INTRO_CSS = `
@@ -571,6 +580,21 @@ export default function Home() {
   const hintRef = useRef<HTMLDivElement>(null);
   const revealRef = useRef<HTMLElement>(null);
 
+  // Lenis smooth scrolling (only on this page: it switches itself off when you leave)
+  useEffect(() => {
+    const lenis = new Lenis({ lerp: 0.001, smoothWheel: true }); // lower lerp = floatier, higher = snappier
+    let raf = 0;
+    const loop = (time: number) => {
+      lenis.raf(time);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      lenis.destroy();
+    };
+  }, []);
+
   // Scroll-driven intro: progress p (0..1) is how far through the intro you've scrolled.
   useEffect(() => {
     const box = introRef.current;
@@ -652,7 +676,7 @@ export default function Home() {
       {/* the curved line that follows your scrolling (sits behind everything else) */}
       <ScrollLine />
 
-      <style>{PAGE_CSS + GLASS_CSS + INTRO_CSS}</style>
+      <style>{PAGE_CSS + GLASS_CSS + INTRO_CSS + LENIS_CSS}</style>
 
       {/* 1) Intro: a tall block with a sticky stage. Scrolling through it swaps the three lines. */}
       <section ref={introRef} className="relative" style={{ height: INTRO_HEIGHT }}>
