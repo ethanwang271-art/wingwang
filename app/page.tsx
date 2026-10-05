@@ -1,7 +1,7 @@
 "use client";
 // app/page.tsx  (everything for the home page lives in this one file)
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Lenis from "lenis";
@@ -133,11 +133,33 @@ const PAGE_CSS = `
 .hl-float { animation: hl-float 6s ease-in-out infinite; }
 .hl-photo { animation: hl-photo-in .9s cubic-bezier(.34,1.56,.64,1) backwards; }
 
-/* the photo's frame: just spacing, the scroll line draws the outline around it */
-.hl-frame {
+/* a vintage polaroid: same outer size as the old frame (4:5), thick bottom border, no caption */
+.polaroid {
   position: relative;
-  border-radius: 2.25rem;
-  padding: .5rem;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  padding: 5.5% 5.5% 0;
+  border-radius: 3px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.55), rgba(255,255,255,0) 40%),
+    linear-gradient(160deg, #f1ecdf, #e4dccb);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.35),
+    inset 0 0 32px rgba(140,105,50,.22),
+    0 2px 4px rgba(0,0,0,.5),
+    0 40px 70px -24px rgba(0,0,0,.9);
+  transform: rotate(-2.2deg);
+  transition: transform .7s cubic-bezier(.34,1.56,.64,1);
+}
+.polaroid:hover { transform: rotate(0deg) scale(1.02); }
+/* the photo window: sized so the polaroid's bottom border is about 4x the side borders */
+.polaroid-window {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 0.913;
+  background: #171717;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -147,7 +169,7 @@ const PAGE_CSS = `
 
 // ---- tweak these (smooth scrolling) ----
 const LENIS_LERP = 0.12;  // higher = snappier, the page catches up to your scrolling faster; lower = floatier glide (try 0.06 to 0.2)
-const LENIS_WHEEL = 4;  // higher = each flick of the wheel or trackpad travels further (1 = normal)
+const LENIS_WHEEL = 3;    // higher = each flick of the wheel or trackpad travels further (1 = normal)
 
 // what Lenis needs so the browser doesn't fight its smooth scrolling
 const LENIS_CSS = `
@@ -191,13 +213,13 @@ const POP_SPOTS = [
 ];
 
 function GlassTile({ href, title, description, icon, wide, className = "", delay = 0, pics = [], dir = "up" }: TileProps) {
-  const onMove = (e: PointerEvent<HTMLAnchorElement>) => {
+  const onMove = (e: ReactPointerEvent<HTMLAnchorElement>) => {
     const el = e.currentTarget;
     const r = el.getBoundingClientRect();
     el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
     el.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
   };
-  const onLeave = (e: PointerEvent<HTMLAnchorElement>) => {
+  const onLeave = (e: ReactPointerEvent<HTMLAnchorElement>) => {
     e.currentTarget.style.removeProperty("--mx");
     e.currentTarget.style.removeProperty("--my");
   };
@@ -275,30 +297,29 @@ const INTRO_HEIGHT = "420vh"; // how much scrolling the three lines take
 const BEATS = [
   { in: [-1, 0], out: [0.2, 0.32] },    // hi
   { in: [0.28, 0.4], out: [0.58, 0.7] }, // my names ethan
-  { in: [0.66, 0.78], out: [0.93, 0.995] }, // im a student tryna do something
+  { in: [0.66, 0.78], out: [0.93, 0.995] }, // welcome to my site
 ] as const;
 
+// ---- colours ----
+const PAGE_BLACK = "11,13,15";    // r,g,b of the page's black (taken from your swatch)
+const BLUE = "0,64,203";          // r,g,b of the blue (taken from your swatch). Used by the line, the glow and the cursor
+
 /* ---------- Scroll line ----------
-   A grey line that draws itself as you scroll (like lusion.co).
+   A blue line that draws itself as you scroll (like lusion.co).
    It stays hidden on the home screen, sweeps in from the left edge when you scroll, swings left and
-   right down the page, thins out as it nears your photo, and becomes the photo's border: it splits at
-   the top of the photo and draws the outline around it in both directions, lighting up (grey to
-   glowing white) as it touches.
+   right down the page, then heads off to the left and ends there, just above your photo.
    The tip eases after your scrolling, so it keeps gliding a moment after you stop. */
 
 // ---- tweak these ----
-const LINE_GRAY = 150;            // how light the grey line is (0 = black, 255 = white). The frame outline starts this grey and lights up to white
-const LINE_COLOR = `${LINE_GRAY},${LINE_GRAY},${LINE_GRAY}`; // r,g,b of the line
+const LINE_COLOR = BLUE;          // r,g,b of the line (same blue as the glow and cursor)
 const LINE_OPACITY = 1;           // 1 = solid
-const LINE_HEAD = 0.8;            // where the tip sits in the window (0 = top, 1 = bottom). Higher = the line reaches the photo sooner
+const LINE_HEAD = 0.8;            // where the tip sits in the window (0 = top, 1 = bottom). Higher = the line gets to the end sooner
 const LINE_SWING = 0.34;          // how far it swings left/right, as a share of page width
 const LINE_MAX_SWING = 420;       // ...but never more than this many px
 const LINE_WAVE = 1.1;            // height of one left/right swing, as a share of the window height
 const LINE_SMOOTH = 4.5;          // higher = the tip catches up with your scrolling faster
 const LINE_ENTRY = 0.9;           // height of the first sweep in from the left, as a share of the window height
-const LINE_TAPER = 1.2;           // how far before the photo the line starts thinning (share of window height)
-const FRAME_W = 2.5;              // thickness of the frame outline (the line thins down to this)
-const FRAME_DRAW = 0.3;           // how much scrolling (share of window height) the outline takes to draw around the photo
+const LINE_EXIT = 0.1;            // how far above the photo the line crosses to the left and ends (share of window height)
 
 type LineBuilt = {
   xs: number[];
@@ -312,15 +333,14 @@ type LineBuilt = {
   ls: string[]; rs: string[]; // the same edges as text, ready for the path
 };
 
-// Build the whole line as lots of tiny steps (so it looks perfectly smooth), then give it a
-// thickness that thins out towards the end.
-//   y0 = where it starts (off the left edge), fx / yF = where it ends (top-centre of the photo frame)
-function buildLine(W: number, vh: number, y0: number, fx: number, yF: number, pad: number, stroke: number): LineBuilt {
+// Build the whole line as lots of tiny steps (so it looks perfectly smooth).
+//   y0 = where it starts (off the left edge), fy = the top of the photo (the line ends a bit above it)
+function buildLine(W: number, vh: number, y0: number, fy: number, pad: number, stroke: number): LineBuilt {
   const cx = W / 2;
   const A = Math.min(W * LINE_SWING, LINE_MAX_SWING);
   const L = clamp(vh * LINE_ENTRY, 450, 800);
   const y1 = y0 + L;
-  const end = Math.max(yF, y1 + 300);
+  const end = Math.max(fy - vh * LINE_EXIT, y1 + 400);
 
   const xs: number[] = [-pad];
   const ys: number[] = [y0];
@@ -334,14 +354,13 @@ function buildLine(W: number, vh: number, y0: number, fx: number, yF: number, pa
     ys.push(y0 * (m * m * m) + P1y * (3 * m * m * t) + P2y * (3 * m * t * t) + y1 * (t * t * t));
   }
 
-  // 2) swings down the page, ending right at the photo frame. S-curves that are vertical at both
-  //    ends, so they join without kinks.
+  // 2) swings down the page. S-curves that are vertical at both ends, so they join without kinks.
+  //    The last swing lands on the right side, ready to sweep across to the left.
   const n = Math.max(2, Math.round((end - y1) / clamp(vh * LINE_WAVE, 480, 900)));
   const h = (end - y1) / n;
-  const base = fx < cx ? 1 : -1; // the swing just before the frame is on the opposite side to it
   let px = cx, py = y1;
-  for (let i = 1; i <= n; i++) {
-    const nx = i === n ? fx : cx + A * base * ((n - 1 - i) % 2 === 0 ? 1 : -1);
+  for (let i = 1; i < n; i++) {
+    const nx = cx + A * ((n - 1 - i) % 2 === 0 ? 1 : -1);
     const ny = y1 + h * i;
     const steps = Math.max(8, Math.ceil(h / 4));
     for (let s = 1; s <= steps; s++) {
@@ -355,6 +374,18 @@ function buildLine(W: number, vh: number, y0: number, fx: number, yF: number, pa
     py = ny;
   }
 
+  // 3) the end: sweep across to the left and off the edge of the screen
+  {
+    const hh = end - py;
+    const Q1x = px, Q1y = py + hh * 0.55, Q2x = px * 0.25, Q2y = end, Q3x = -pad;
+    const steps = Math.max(60, Math.ceil((px + pad) / 4));
+    for (let s = 1; s <= steps; s++) {
+      const t = s / steps, m = 1 - t;
+      xs.push(px * (m * m * m) + Q1x * (3 * m * m * t) + Q2x * (3 * m * t * t) + Q3x * (t * t * t));
+      ys.push(py * (m * m * m) + Q1y * (3 * m * m * t) + Q2y * (3 * m * t * t) + end * (t * t * t));
+    }
+  }
+
   const cum = [0];
   for (let i = 1; i < xs.length; i++) {
     cum.push(cum[i - 1] + Math.hypot(xs[i] - xs[i - 1], ys[i] - ys[i - 1]));
@@ -362,14 +393,11 @@ function buildLine(W: number, vh: number, y0: number, fx: number, yF: number, pa
   const total = cum[cum.length - 1];
   const last = xs.length - 1;
 
-  // 3) thickness: full width, then thinning down to the frame's thickness over the last stretch
-  const taper = vh * LINE_TAPER;
+  // 4) give the line its thickness (as a ribbon: a left edge and a right edge)
+  const half = stroke / 2;
   const hw: number[] = [], lx: number[] = [], ly: number[] = [], rx: number[] = [], ry: number[] = [];
   const ls: string[] = [], rs: string[] = [];
   for (let i = 0; i <= last; i++) {
-    const t = clamp((total - cum[i]) / taper, 0, 1);
-    const s = t * t * (3 - 2 * t);
-    const half = 0.5 * (FRAME_W + (stroke - FRAME_W) * s);
     const i0 = Math.max(0, i - 1), i1 = Math.min(last, i + 1);
     const tx = xs[i1] - xs[i0], ty = ys[i1] - ys[i0];
     const len = Math.hypot(tx, ty) || 1;
@@ -381,16 +409,6 @@ function buildLine(W: number, vh: number, y0: number, fx: number, yF: number, pa
     rs.push(`${rx[i].toFixed(1)} ${ry[i].toFixed(1)}`);
   }
   return { xs, ys, vy: ys, cum, total, hw, lx, ly, rx, ry, ls, rs };
-}
-
-// the outline around the photo, as two halves that both start at the top-centre
-function frameOutline(w: number, h: number, r0: number) {
-  const r = Math.min(r0, w / 2, h / 2);
-  const c = w / 2;
-  return {
-    cw: `M${c} 0H${w - r}A${r} ${r} 0 0 1 ${w} ${r}V${h - r}A${r} ${r} 0 0 1 ${w - r} ${h}H${c}`,
-    ccw: `M${c} 0H${r}A${r} ${r} 0 0 0 0 ${r}V${h - r}A${r} ${r} 0 0 0 ${r} ${h}H${c}`,
-  };
 }
 
 function ScrollLine() {
@@ -405,52 +423,40 @@ function ScrollLine() {
     const host = svg.parentElement; // the <main>
     if (!host) return;
 
-    // the photo frame and its outline (they live inside the page, see the JSX in Home)
-    const frameEl = host.querySelector<HTMLElement>("[data-line-target]");
-    const outSvg = host.querySelector<SVGSVGElement>("[data-frame-svg]");
-    const outCw = host.querySelector<SVGPathElement>("[data-frame-cw]");
-    const outCcw = host.querySelector<SVGPathElement>("[data-frame-ccw]");
+    // the polaroid (the line ends just above it)
+    const photoEl = host.querySelector<HTMLElement>("[data-line-target]");
 
     const st = { b: null as LineBuilt | null };
-    let lastW = 0, lastH = 0, lastVh = 0, lastFx = -1, lastFy = -1, lastFw = -1, lastFh = -1;
-    let lastFi = -1, lastGlow = -1;
+    let lastW = 0, lastH = 0, lastVh = 0, lastFy = -1;
+    let lastFi = -1;
     let raf = 0, last = performance.now(), cur = -1;
 
-    // where the photo frame is, measured from layout (ignores its entrance animation)
+    // where the top of the photo is, measured from layout (ignores its tilt and entrance animation)
     const locate = () => {
-      const el = frameEl;
+      const el = photoEl;
       if (!el) return null;
-      let x = 0, y = 0;
+      let y = 0;
       let node: HTMLElement | null = el;
       while (node && node !== host) {
-        x += node.offsetLeft;
         y += node.offsetTop;
         node = node.offsetParent as HTMLElement | null;
       }
-      if (node !== host) return null;
-      return { fx: x + el.offsetWidth / 2, fy: y, fw: el.offsetWidth, fh: el.offsetHeight };
+      return node === host ? y : null;
     };
 
-    // (re)build the line whenever the page size or the frame changes
-    const rebuild = (w: number, h: number, vh: number, fx: number, fy: number, fw: number, fh: number) => {
-      lastW = w; lastH = h; lastVh = vh; lastFx = fx; lastFy = fy; lastFw = fw; lastFh = fh;
+    // (re)build the line whenever the page size or the photo position changes
+    const rebuild = (w: number, h: number, vh: number, fy: number) => {
+      lastW = w; lastH = h; lastVh = vh; lastFy = fy;
       lastFi = -1;
       const stroke = clamp(w * 0.017, 10, 24);
       // the tip sits at `vh * LINE_HEAD` on screen when you haven't scrolled, so start exactly there:
       // nothing shows until the first scroll
       const pageTop = host.getBoundingClientRect().top + window.scrollY;
       const y0 = vh * LINE_HEAD - pageTop;
-      st.b = buildLine(w, vh, y0, fx, fy, stroke * 3, stroke);
-
-      if (frameEl && outCw && outCcw && fw > 0 && fh > 0) {
-        const radius = parseFloat(getComputedStyle(frameEl).borderTopLeftRadius) || 36;
-        const o = frameOutline(fw, fh, radius);
-        outCw.setAttribute("d", o.cw);
-        outCcw.setAttribute("d", o.ccw);
-      }
+      st.b = buildLine(w, vh, y0, fy, stroke * 3, stroke);
     };
 
-    // draw the line up to point `fi` (can be a fraction), as a ribbon that gets thinner towards the end
+    // draw the line up to point `fi` (can be a fraction)
     const paint = (b: LineBuilt, fi: number) => {
       const i = clamp(Math.floor(fi), 0, b.xs.length - 2);
       const t = clamp(fi - i, 0, 1);
@@ -494,15 +500,13 @@ function ScrollLine() {
       const w = host.clientWidth;
       const h = host.offsetHeight;
       const vh = window.innerHeight;
-      const f = locate() ?? { fx: w * 0.3, fy: h * 0.8, fw: 0, fh: 0 };
+      const fy = locate() ?? h * 0.8;
 
       if (
         w > 10 && h > 10 &&
-        (!st.b || w !== lastW || Math.abs(h - lastH) > 2 || Math.abs(vh - lastVh) > 150 ||
-          Math.abs(f.fx - lastFx) > 2 || Math.abs(f.fy - lastFy) > 2 ||
-          Math.abs(f.fw - lastFw) > 2 || Math.abs(f.fh - lastFh) > 2)
+        (!st.b || w !== lastW || Math.abs(h - lastH) > 2 || Math.abs(vh - lastVh) > 150 || Math.abs(fy - lastFy) > 2)
       ) {
-        rebuild(w, h, vh, f.fx, f.fy, f.fw, f.fh);
+        rebuild(w, h, vh, fy);
       }
 
       const b = st.b;
@@ -518,32 +522,6 @@ function ScrollLine() {
         if (Math.abs(fi - lastFi) > 0.02) {
           lastFi = fi;
           paint(b, fi);
-        }
-
-        // once the line touches the photo, the outline draws around it from the touch point and lights up
-        if (outCw && outCcw && outSvg) {
-          const headMax = lastH - vh * (1 - LINE_HEAD); // lowest the tip can ever get
-          const dist = Math.min(vh * FRAME_DRAW, Math.max(60, headMax - lastFy) * 0.7);
-          const p = clamp((cur - lastFy) / dist, 0, 1);
-          const g = p * p * (3 - 2 * p);
-          const dash = `${g.toFixed(4)} 2`;
-          const vis = g > 0.002 ? "1" : "0";
-          outCw.style.strokeDasharray = dash;
-          outCcw.style.strokeDasharray = dash;
-          outCw.style.opacity = vis;
-          outCcw.style.opacity = vis;
-
-          const glow = smooth(lastFy - 40, lastFy + 140, cur);
-          if (Math.abs(glow - lastGlow) > 0.01) {
-            lastGlow = glow;
-            const c = Math.round(LINE_GRAY + glow * (255 - LINE_GRAY));
-            outCw.style.stroke = `rgb(${c},${c},${c})`;
-            outCcw.style.stroke = `rgb(${c},${c},${c})`;
-            outSvg.style.filter =
-              glow > 0.01
-                ? `drop-shadow(0 0 ${(2 + glow * 10).toFixed(1)}px rgba(255,255,255,${(0.25 + glow * 0.65).toFixed(2)}))`
-                : "none";
-          }
         }
       }
       raf = requestAnimationFrame(frame);
@@ -566,6 +544,139 @@ function ScrollLine() {
         <circle ref={tipRef} fill={fill} style={{ opacity: 0 }} />
       </g>
     </svg>
+  );
+}
+
+/* ---------- Blue side glow + custom cursor ---------- */
+
+// ---- tweak these ----
+const GLOW_X = 100;               // which side the glow comes from: 100 = right edge, 0 = left edge
+const GLOW_STRENGTH = 0.42;       // 0 = off, 1 = very strong
+const CURSOR_DOT = 8;             // size of the dot in px
+const CURSOR_RING = 38;           // size of the ring in px
+const CURSOR_FOLLOW = 9;          // how quickly the ring catches up with the dot (lower = lazier, more delay)
+const CURSOR_HOVER_SCALE = 1.7;   // the ring grows this much over links and buttons (1 = never grows)
+
+// a blue glow that bleeds in from one side of the screen, like the orange one on sunny.patel
+const SIDE_GLOW = `radial-gradient(ellipse 60% 90% at ${GLOW_X}% 55%, rgba(${BLUE},${GLOW_STRENGTH}), transparent 70%)`;
+
+// hide the normal arrow (only on devices with a real mouse); it comes back when you leave this page
+const CURSOR_CSS = `
+@media (hover: hover) and (pointer: fine) {
+  html, html * { cursor: none !important; }
+}
+`;
+
+// the "Contact me" button: dark blue-tinted box, blue border, monospace text
+const CONTACT_CSS = `
+.contact-btn {
+  display: inline-block;
+  padding: .75rem 1.5rem;
+  border-radius: .6rem;
+  border: 1px solid rgba(${BLUE}, .75);
+  background: rgba(${BLUE}, .14);
+  color: #e9edf9;
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1rem;
+  letter-spacing: .01em;
+  text-decoration: none;
+  transition: transform .3s ease, background .3s ease, border-color .3s ease, box-shadow .3s ease;
+}
+.contact-btn:hover, .contact-btn:focus-visible {
+  transform: translateY(-2px);
+  background: rgba(${BLUE}, .3);
+  border-color: rgb(${BLUE});
+  box-shadow: 0 0 28px rgba(${BLUE}, .4);
+  outline: none;
+}
+`;
+
+// make the whole page (and anything on it that uses plain black) the same black
+const BG_CSS = `
+html, body, .bg-black { background-color: rgb(${PAGE_BLACK}) !important; }
+`;
+
+function Cursor() {
+  const dotRef = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    const dot = dotRef.current, ring = ringRef.current;
+    if (!dot || !ring) return;
+
+    let mx = -100, my = -100;   // the mouse (the dot sits exactly here)
+    let rx = -100, ry = -100;   // the ring, which drifts after it
+    let sc = 1, hover = false, down = false, seen = false;
+    let raf = 0, last = performance.now();
+
+    const show = (on: boolean) => {
+      dot.style.opacity = on ? "1" : "0";
+      ring.style.opacity = on ? "1" : "0";
+    };
+
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      mx = e.clientX;
+      my = e.clientY;
+      if (!seen) {
+        seen = true;
+        rx = mx; ry = my; // appear in place instead of flying in from the corner
+        show(true);
+      }
+      const t = e.target as Element | null;
+      hover = !!t?.closest?.("a, button, [role='button'], input, textarea, select, label, summary");
+    };
+    const onLeave = () => { seen = false; show(false); };
+    const onDown = () => { down = true; };
+    const onUp = () => { down = false; };
+
+    const frame = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+
+      // the ring eases towards the dot, so it lags while you move and settles when you stop
+      const k = 1 - Math.exp(-dt * CURSOR_FOLLOW);
+      rx += (mx - rx) * k;
+      ry += (my - ry) * k;
+      const want = (hover ? CURSOR_HOVER_SCALE : 1) * (down ? 0.8 : 1);
+      sc += (want - sc) * (1 - Math.exp(-dt * 14));
+
+      dot.style.transform = `translate3d(${mx}px,${my}px,0) translate(-50%,-50%)`;
+      ring.style.transform = `translate3d(${rx}px,${ry}px,0) translate(-50%,-50%) scale(${sc.toFixed(3)})`;
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointerup", onUp);
+    document.documentElement.addEventListener("mouseleave", onLeave);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+      document.documentElement.removeEventListener("mouseleave", onLeave);
+    };
+  }, []);
+
+  const base: CSSProperties = {
+    position: "fixed",
+    left: 0,
+    top: 0,
+    zIndex: 9999,
+    pointerEvents: "none",
+    borderRadius: "9999px",
+    opacity: 0,
+    willChange: "transform",
+    transition: "opacity .25s ease",
+  };
+  return (
+    <>
+      <div ref={ringRef} aria-hidden="true" style={{ ...base, width: CURSOR_RING, height: CURSOR_RING, border: "1px solid rgba(255,255,255,.25)" }} />
+      <div ref={dotRef} aria-hidden="true" style={{ ...base, width: CURSOR_DOT, height: CURSOR_DOT, background: `rgb(${BLUE})`, boxShadow: `0 0 10px rgba(${BLUE},.9)` }} />
+    </>
   );
 }
 
@@ -676,21 +787,25 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="relative bg-black text-white">
+    <main className="relative text-white" style={{ background: `rgb(${PAGE_BLACK})` }}>
+      {/* blue glow bleeding in from the side (fixed, so it stays put while you scroll) */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none"
+        style={{ position: "fixed", left: 0, right: 0, bottom: 0, top: NAVBAR, background: SIDE_GLOW }}
+      />
+
       {/* the curved line that follows your scrolling (sits behind everything else) */}
       <ScrollLine />
 
-      <style>{PAGE_CSS + GLASS_CSS + INTRO_CSS + LENIS_CSS}</style>
+      {/* dot + trailing ring cursor */}
+      <Cursor />
+
+      <style>{PAGE_CSS + GLASS_CSS + INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + BG_CSS}</style>
 
       {/* 1) Intro: a tall block with a sticky stage. Scrolling through it swaps the three lines. */}
       <section ref={introRef} className="relative" style={{ height: INTRO_HEIGHT }}>
         <div ref={stageRef} className="sticky top-16 h-[calc(100dvh-4rem)] w-full overflow-hidden">
-          {/* soft glow behind the text */}
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-            <div className="hl-blob absolute left-[12%] top-[18%] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-            <div className="hl-blob absolute bottom-[10%] right-[10%] h-96 w-96 rounded-full bg-neutral-300/10 blur-3xl" style={{ animationDelay: "-6s" }} />
-          </div>
-
           {/* line 1: hi (huge) */}
           <div
             ref={(el) => { beatEls.current[0] = el; }}
@@ -719,7 +834,7 @@ export default function Home() {
             style={{ opacity: 0, visibility: "hidden" }}
           >
             <p className="max-w-4xl text-balance font-bold leading-[1] tracking-tight" style={{ fontSize: "clamp(2rem, 6.2vw, 5.5rem)" }}>
-              im a student tryna do something
+              welcome to my site
             </p>
           </div>
 
@@ -744,45 +859,32 @@ export default function Home() {
 
       {/* 2) Photo + buttons */}
       <section ref={revealRef} className="rv relative isolate -mt-[25vh] overflow-hidden">
-        {/* Soft shapes behind the glass so the blur has something to catch */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-          <div className="hl-blob absolute right-[6%] top-[22%] h-72 w-72 rounded-full bg-white/25 blur-3xl" />
-          <div className="hl-blob absolute bottom-[8%] left-[8%] h-80 w-80 rounded-full bg-neutral-300/15 blur-3xl" style={{ animationDelay: "-5s" }} />
-          <div className="hl-blob absolute left-[42%] top-[4%] h-64 w-64 rounded-full bg-white/10 blur-3xl" style={{ animationDelay: "-9s" }} />
-        </div>
-
         <div className="mx-auto grid max-w-5xl items-center gap-12 px-6 py-16 md:min-h-[calc(100dvh-4rem-4.5rem)] md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-16">
-          {/* Left: photo */}
+          {/* Left: your photo in a vintage polaroid (no caption) */}
           <div className="mx-auto w-full max-w-sm md:max-w-none">
             <div className="hl-photo">
-              <div>
-                <div className="hl-frame" data-line-target>
-                  <svg data-frame-svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
-                    <path data-frame-cw fill="none" stroke="#fff" strokeWidth={FRAME_W} strokeLinecap="round" pathLength={1} style={{ opacity: 0 }} />
-                    <path data-frame-ccw fill="none" stroke="#fff" strokeWidth={FRAME_W} strokeLinecap="round" pathLength={1} style={{ opacity: 0 }} />
-                  </svg>
-                  <div className="relative aspect-[4/5] overflow-hidden rounded-[1.75rem] bg-neutral-900">
-                    {photoOk ? (
-                      <Image
-                        src="/ethan.jpg"
-                        alt="Photo of me"
-                        fill
-                        sizes="(min-width: 768px) 40vw, 90vw"
-                        className="object-cover"
-                        onError={() => setPhotoOk(false)}
-                      />
-                    ) : (
-                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-6 text-center text-neutral-500">
-                        <svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                          <circle cx="12" cy="8" r="4" />
-                          <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" strokeLinecap="round" />
-                        </svg>
-                        <p className="text-sm">
-                          Add your photo at <code>public/ethan.jpg</code>
-                        </p>
-                      </div>
-                    )}
-                  </div>
+              <div className="polaroid" data-line-target>
+                <div className="polaroid-window">
+                  {photoOk ? (
+                    <Image
+                      src="/ethan.jpg"
+                      alt="Photo of me"
+                      fill
+                      sizes="(min-width: 768px) 40vw, 90vw"
+                      className="object-cover"
+                      onError={() => setPhotoOk(false)}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-6 text-center text-neutral-500">
+                      <svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" strokeLinecap="round" />
+                      </svg>
+                      <p className="text-sm">
+                        Add your photo at <code>public/ethan.jpg</code>
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -799,10 +901,7 @@ export default function Home() {
         </div>
 
         <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 px-6 pb-6 pt-2 text-xs text-neutral-500">
-          <a
-            href={`mailto:${EMAIL}`}
-            className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          >
+          <a href={`mailto:${EMAIL}`} className="contact-btn">
             Contact me
           </a>
           <span>© 2026 Ethan Wang. All rights reserved.</span>
