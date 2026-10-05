@@ -145,6 +145,10 @@ const PAGE_CSS = `
 }
 `;
 
+// ---- tweak these (smooth scrolling) ----
+const LENIS_LERP = 0.12;  // higher = snappier, the page catches up to your scrolling faster; lower = floatier glide (try 0.06 to 0.2)
+const LENIS_WHEEL = 2.4;  // higher = each flick of the wheel or trackpad travels further (1 = normal)
+
 // what Lenis needs so the browser doesn't fight its smooth scrolling
 const LENIS_CSS = `
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
@@ -271,7 +275,7 @@ const INTRO_HEIGHT = "420vh"; // how much scrolling the three lines take
 const BEATS = [
   { in: [-1, 0], out: [0.2, 0.32] },    // hi
   { in: [0.28, 0.4], out: [0.58, 0.7] }, // my names ethan
-  { in: [0.66, 0.78], out: [0.93, 0.995] }, // welcome to my site
+  { in: [0.66, 0.78], out: [0.93, 0.995] }, // im a student tryna do something
 ] as const;
 
 /* ---------- Scroll line ----------
@@ -582,7 +586,7 @@ export default function Home() {
 
   // Lenis smooth scrolling (only on this page: it switches itself off when you leave)
   useEffect(() => {
-    const lenis = new Lenis({ lerp: 0.001, smoothWheel: true }); // lower lerp = floatier, higher = snappier
+    const lenis = new Lenis({ lerp: LENIS_LERP, wheelMultiplier: LENIS_WHEEL, smoothWheel: true });
     let raf = 0;
     const loop = (time: number) => {
       lenis.raf(time);
@@ -715,7 +719,7 @@ export default function Home() {
             style={{ opacity: 0, visibility: "hidden" }}
           >
             <p className="max-w-4xl text-balance font-bold leading-[1] tracking-tight" style={{ fontSize: "clamp(2rem, 6.2vw, 5.5rem)" }}>
-              welcome to my site
+              im a student tryna do something
             </p>
           </div>
 
