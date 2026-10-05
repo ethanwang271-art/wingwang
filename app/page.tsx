@@ -147,7 +147,7 @@ const PAGE_CSS = `
 
 // ---- tweak these (smooth scrolling) ----
 const LENIS_LERP = 0.12;  // higher = snappier, the page catches up to your scrolling faster; lower = floatier glide (try 0.06 to 0.2)
-const LENIS_WHEEL = 2.4;  // higher = each flick of the wheel or trackpad travels further (1 = normal)
+const LENIS_WHEEL = 4;  // higher = each flick of the wheel or trackpad travels further (1 = normal)
 
 // what Lenis needs so the browser doesn't fight its smooth scrolling
 const LENIS_CSS = `
