@@ -7,6 +7,9 @@ import Link from "next/link";
 
 type Folder = { id: string; title: string; description: string; cover: string; count: number };
 
+// The auto-generated "A collection of 11 photos." text is hidden; only a description you wrote yourself shows
+const realDescription = (d?: string) => (d && !/^a collection of \d+ photos?\.?$/i.test(d.trim()) ? d.trim() : "");
+
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const mod = (a: number, m: number) => ((a % m) + m) % m;
 
@@ -36,7 +39,7 @@ function Words({ text }: { text: string }) {
 const CSS = `
 .pc-tile {
   position: absolute; inset: 0; isolation: isolate; overflow: hidden; display: block; color: #fff;
-  border-radius: 22px; background: #111;
+  border-radius: 22px; background: rgb(11,13,15);
   transition: transform .6s cubic-bezier(.22,1,.36,1), box-shadow .6s ease;
   animation: pc-in .9s cubic-bezier(.34,1.56,.64,1) backwards; animation-delay: var(--d, 0ms);
 }
@@ -421,6 +424,7 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
 
   const renderSlot = (sl: Slot, top: boolean) => {
     const f = sl.folder;
+    const desc = realDescription(f?.description);
     const slots = top ? tSlot : bSlot;
     const imgs = top ? tImg : bImg;
     return (
@@ -453,7 +457,7 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
             </span>
             <span className={`pc-cap ${top ? "pc-cap-top" : ""}`}>
               <span className={top ? "pc-t1" : "pc-t2"}>{f.title}</span>
-              {f.description && <span className={top ? "pc-s1" : "pc-s2"}>{f.description}</span>}
+              {desc && <span className={top ? "pc-s1" : "pc-s2"}>{desc}</span>}
             </span>
           </Link>
         ) : (
@@ -469,7 +473,7 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
       tabIndex={0}
       role="region"
       aria-label="Photo folders. Swipe, or use the left and right arrow keys."
-      className="pc-root relative mx-auto flex min-h-[calc(100dvh-4rem)] w-full select-none flex-col justify-center gap-6 overflow-x-clip py-6 outline-none"
+      className="pc-root relative mx-auto flex min-h-[calc(100dvh-4rem)] w-full select-none flex-col justify-center gap-6 overflow-x-clip bg-[#0b0d0f] py-6 outline-none"
     >
       <style>{CSS}</style>
 
