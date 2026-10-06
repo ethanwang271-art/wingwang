@@ -52,7 +52,7 @@ export default function Navbar() {
 
   return (
     // h-16 is fixed so pages can size themselves with calc(100dvh - 4rem)
-    <header className="sticky top-0 z-50 h-16 border-b border-white/10 bg-black/80 text-white backdrop-blur">
+    <header className="sticky top-0 z-50 h-16 border-b border-white/10 bg-[#0b0d0f]/80 text-white backdrop-blur">
       <nav aria-label="Main" className="mx-auto flex h-full max-w-5xl items-center justify-between px-6">
         {/* Left: site label (Comic Sans, with fallbacks for devices that don't have it) */}
         <Link

@@ -16,7 +16,7 @@ export default async function FolderPage({ params }: { params: Promise<{ folder:
   const desc = /^a collection of \d+ photos?\.?$/i.test(data.description.trim()) ? "" : data.description;
 
   return (
-    <main className="min-h-[calc(100dvh-4rem)] bg-black text-white">
+    <main className="min-h-[calc(100dvh-4rem)] bg-[#0b0d0f] text-white">
       <div className="mx-auto max-w-5xl px-4 pb-20 pt-8 sm:px-6 sm:pt-10">
         <Link
           href="/photos"

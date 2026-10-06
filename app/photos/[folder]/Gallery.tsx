@@ -31,7 +31,7 @@ const CSS = `
 }
 .fp-reveal.fp-on { opacity: 1; transform: none; }
 
-.lb { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.92);
+.lb { position: fixed; inset: 0; z-index: 100; background: rgba(11,13,15,.92);
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: lb-fade .3s ease backwards; }
 .lb.lb-out { opacity: 0; transition: opacity .22s ease; }
 .lb-frame { animation: lb-fade .3s ease backwards; will-change: transform; }

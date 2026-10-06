@@ -302,7 +302,7 @@ const BEATS = [
 
 // ---- colours ----
 const PAGE_BLACK = "11,13,15";    // r,g,b of the page's black (taken from your swatch)
-const BLUE = "0,64,203";          // r,g,b of the blue (taken from your swatch). Used by the line, the glow and the cursor
+const BLUE = "100,159,255";       // r,g,b of the blue (taken from your new swatch, #649FFF). Used by the line, the glow, the button and the cursor
 
 /* ---------- Scroll line ----------
    A blue line that draws itself as you scroll (like lusion.co).
