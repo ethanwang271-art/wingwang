@@ -9,8 +9,8 @@ const LINKEDIN_URL = "https://www.linkedin.com/in/ethan-wang-9206563a1/"; // <- 
 const EMAIL = "ethan@wingwang.ca";
 
 const pageLinks = [
-  { href: "/photos", label: "Photos" },
-  { href: "/videos", label: "Videos" },
+  { href: "/photos", label: "photos" },
+  { href: "/videos", label: "videos" },
 ];
 
 function MailIcon() {
@@ -44,6 +44,8 @@ function LinkedInIcon() {
   );
 }
 
+// The name must start with a capital letter: React (and the hooks lint rule) only treat
+// capitalised functions as components, and usePathname is a hook.
 export default function Navbar() {
   const pathname = usePathname();
 

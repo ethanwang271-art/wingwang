@@ -9,6 +9,9 @@ import Lenis from "lenis";
 // TODO: your email for the "Contact me" button
 const EMAIL = "ethan@wingwang.ca";
 
+// TODO: paste the link to your Google Doc resume here (in Google Docs: Share -> set to "Anyone with the link" -> Copy link)
+const RESUME_URL = "https://docs.google.com/document/d/PASTE_YOUR_DOC_ID_HERE/edit";
+
 const GLASS_CSS = `
 .glass-tile {
   position: relative;
@@ -570,18 +573,22 @@ const CURSOR_CSS = `
 // the "Contact me" button: dark blue-tinted box, blue border, monospace text
 const CONTACT_CSS = `
 .contact-btn {
-  display: inline-block;
-  padding: .75rem 1.5rem;
-  border-radius: .6rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem 1rem;
+  border-radius: .5rem;
   border: 1px solid rgba(${BLUE}, .75);
   background: rgba(${BLUE}, .14);
   color: #e9edf9;
   font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 1rem;
+  font-size: .875rem;
   letter-spacing: .01em;
   text-decoration: none;
   transition: transform .3s ease, background .3s ease, border-color .3s ease, box-shadow .3s ease;
 }
+.contact-arrow { width: 1em; height: 1em; flex-shrink: 0; transition: transform .3s ease; }
+.contact-btn:hover .contact-arrow, .contact-btn:focus-visible .contact-arrow { transform: translate(2px, -2px); }
 .contact-btn:hover, .contact-btn:focus-visible {
   transform: translateY(-2px);
   background: rgba(${BLUE}, .3);
@@ -595,6 +602,16 @@ const CONTACT_CSS = `
 const BG_CSS = `
 html, body, .bg-black { background-color: rgb(${PAGE_BLACK}) !important; }
 `;
+
+// small up-right arrow shown on the Résumé and Contact me buttons
+function ArrowUpRight() {
+  return (
+    <svg viewBox="0 0 24 24" className="contact-arrow" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 17L17 7" />
+      <path d="M8 7h9v9" />
+    </svg>
+  );
+}
 
 function Cursor() {
   const dotRef = useRef<HTMLDivElement>(null);
@@ -901,8 +918,13 @@ export default function Home() {
         </div>
 
         <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 px-6 pb-6 pt-2 text-xs text-neutral-500">
+          <a href={RESUME_URL} target="_blank" rel="noopener noreferrer" className="contact-btn">
+            Résumé
+            <ArrowUpRight />
+          </a>
           <a href={`mailto:${EMAIL}`} className="contact-btn">
             Contact me
+            <ArrowUpRight />
           </a>
           <span>© 2026 Ethan Wang. All rights reserved.</span>
         </footer>
