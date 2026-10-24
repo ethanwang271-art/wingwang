@@ -10,7 +10,7 @@ import Lenis from "lenis";
 const EMAIL = "ethan@wingwang.ca";
 
 // TODO: paste the link to your Google Doc resume here (in Google Docs: Share -> set to "Anyone with the link" -> Copy link)
-const RESUME_URL = "https://docs.google.com/document/d/PASTE_YOUR_DOC_ID_HERE/edit";
+const RESUME_URL = "https://docs.google.com/document/d/1GPkXz4uP63ArL1-Wk0-hQU1j4F1xY5CJKLFAr5DVoiI/edit?usp=sharing";
 
 const GLASS_CSS = `
 .glass-tile {
