@@ -1,7 +1,7 @@
 "use client";
 // app/page.tsx  (everything for the home page lives in this one file)
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Lenis from "lenis";
@@ -11,6 +11,29 @@ const EMAIL = "ethan@wingwang.ca";
 
 // TODO: paste the link to your Google Doc resume here (in Google Docs: Share -> set to "Anyone with the link" -> Copy link)
 const RESUME_URL = "https://docs.google.com/document/d/1GPkXz4uP63ArL1-Wk0-hQU1j4F1xY5CJKLFAr5DVoiI/edit?usp=sharing";
+
+// ---- About me section: edit these ----
+const ABOUT_TITLE = "who am i?";
+// Each line in quotes is one paragraph. Change them, add more, or delete some.
+const ABOUT_TEXT = [
+  "hi my name is ethan i do things",
+  "the site is not finished dont mind the big contact right under this",
+];
+
+// ---- Contact section: edit these ----
+const CONTACT_TITLE = "contact";
+const CONTACT_BLURB = "Tell me a little about what you're working on and I'll get back to you soon.";
+const PHONE: string = ""; // optional, for example "647-555-0123". Leave it empty to hide the phone line
+// TODO: put your real links here (any with an empty link "" is hidden)
+const SOCIALS: { label: string; href: string }[] = [
+  { label: "Instagram", href: "https://instagram.com/" },
+  { label: "LinkedIn", href: "https://linkedin.com/" },
+];
+
+// ---- "who am i?" shake (it wobbles while you scroll past it) ----
+const SHAKE_PX = 3;        // how far each letter jiggles at most, in px
+const SHAKE_DEG = 2;       // how much each letter tilts at most, in degrees
+const SHAKE_SPEED = 2500;  // scroll speed (px per second) at which the shake is at full strength: lower = shakes more easily
 
 const GLASS_CSS = `
 .glass-tile {
@@ -183,15 +206,16 @@ const LENIS_CSS = `
 `;
 
 const INTRO_CSS = `
-/* the photo + buttons section waits (paused at its first frame) until it scrolls into view */
+/* the photo + buttons section (and the about section) wait, paused at their first frame, until they scroll into view */
 .hl-head { animation: hl-rise .9s cubic-bezier(.22,1,.36,1) .2s backwards; }
-.rv .hl-photo, .rv .glass-tile, .rv .hl-head { animation-play-state: paused; }
-.rv.rv-in .hl-photo, .rv.rv-in .glass-tile, .rv.rv-in .hl-head { animation-play-state: running; }
+.about-p { animation: hl-rise .9s cubic-bezier(.22,1,.36,1) backwards; animation-delay: calc(var(--i, 0) * 120ms + 350ms); }
+.rv .hl-photo, .rv .glass-tile, .rv .hl-head, .rv .about-p { animation-play-state: paused; }
+.rv.rv-in .hl-photo, .rv.rv-in .glass-tile, .rv.rv-in .hl-head, .rv.rv-in .about-p { animation-play-state: running; }
 
 @keyframes sc-hint { 0% { transform: scaleY(0); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } 51% { transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
 .sc-hint { animation: sc-hint 2.2s cubic-bezier(.65,0,.35,1) infinite; }
 .ig-in { animation: hl-rise 1.1s cubic-bezier(.22,1,.36,1) .25s backwards; }
-@media (prefers-reduced-motion: reduce) { .sc-hint, .ig-in, .hl-head { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sc-hint, .ig-in, .hl-head, .about-p { animation: none; } }
 `;
 
 /* ---------- Liquid glass tile ---------- */
@@ -598,6 +622,57 @@ const CONTACT_CSS = `
 }
 `;
 
+// the contact section: big left column, glass form card on the right
+const FORM_CSS = `
+.cf-eyebrow { font-size: .8rem; letter-spacing: .25em; text-transform: uppercase; color: rgba(255,255,255,.45); }
+.cf-card {
+  border-radius: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(145deg, rgba(255,255,255,.09), rgba(255,255,255,.03));
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.25), 0 30px 70px -20px rgba(0,0,0,.8);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+}
+@media (min-width: 640px) { .cf-card { padding: 2rem; border-radius: 2.25rem; } }
+.cf-label { display: block; margin-bottom: .5rem; font-size: .95rem; color: rgba(255,255,255,.6); }
+.cf-input {
+  display: block; width: 100%;
+  border-radius: 1.1rem;
+  padding: .95rem 1.1rem;
+  background: rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.1);
+  color: #fff;
+  font: inherit; font-size: 1.05rem;
+  outline: none;
+  transition: border-color .25s ease, box-shadow .25s ease, background .25s ease;
+}
+.cf-input::placeholder { color: rgba(255,255,255,.35); }
+.cf-input:focus { border-color: rgba(${BLUE}, .8); box-shadow: 0 0 0 3px rgba(${BLUE}, .22); background: rgba(0,0,0,.5); }
+textarea.cf-input { resize: vertical; min-height: 9rem; }
+.cf-send {
+  display: block; width: 100%;
+  border: 0; border-radius: 9999px;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(#ffffff, #ececec);
+  color: rgb(${PAGE_BLACK});
+  font: inherit; font-size: 1.05rem; font-weight: 500;
+  box-shadow: 0 10px 30px -12px rgba(255,255,255,.35);
+  transition: transform .3s ease, box-shadow .3s ease;
+}
+.cf-send:hover, .cf-send:focus-visible { transform: translateY(-2px); box-shadow: 0 16px 40px -10px rgba(${BLUE}, .6); outline: none; }
+.cf-pill {
+  display: inline-block;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,.18);
+  padding: .6rem 1.2rem;
+  color: rgba(255,255,255,.85);
+  text-decoration: none;
+  transition: background .3s ease, border-color .3s ease, transform .3s ease;
+}
+.cf-pill:hover, .cf-pill:focus-visible { background: rgba(255,255,255,.08); border-color: rgba(${BLUE}, .8); transform: translateY(-2px); outline: none; }
+`;
+
 // make the whole page (and anything on it that uses plain black) the same black
 const BG_CSS = `
 html, body, .bg-black { background-color: rgb(${PAGE_BLACK}) !important; }
@@ -710,7 +785,8 @@ export default function Home() {
   const beatEls = useRef<(HTMLDivElement | null)[]>([]);
   const dotEls = useRef<(HTMLSpanElement | null)[]>([]);
   const hintRef = useRef<HTMLDivElement>(null);
-  const revealRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const aboutTitleRef = useRef<HTMLHeadingElement>(null);
 
   // Lenis smooth scrolling (only on this page: it switches itself off when you leave)
   useEffect(() => {
@@ -786,25 +862,78 @@ export default function Home() {
     return () => { alive = false; };
   }, []);
 
-  // Start the photo + buttons entrance when that section scrolls into view
+  // Start each section's entrance (photo + buttons, about, contact) when it scrolls into view
   useEffect(() => {
-    const el = revealRef.current;
-    if (!el) return;
+    const root = mainRef.current;
+    if (!root) return;
+    const els: HTMLElement[] = Array.from(root.querySelectorAll<HTMLElement>(".rv"));
     const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.classList.add("rv-in");
-          io.disconnect();
-        }
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("rv-in");
+            io.unobserve(entry.target);
+          }
+        });
       },
       { threshold: 0.2 },
     );
-    io.observe(el);
+    els.forEach((el) => io.observe(el));
     return () => io.disconnect();
   }, []);
 
+  // "who am i?" wobbles while you scroll: each letter jiggles a little, more the faster you scroll
+  useEffect(() => {
+    const title = aboutTitleRef.current;
+    if (!title) return;
+    const chars: HTMLElement[] = Array.from(title.querySelectorAll<HTMLElement>(".shake-ch"));
+    let raf = 0, last = performance.now(), lastY = window.scrollY, vs = 0, shaking = false;
+
+    const frame = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      const y = window.scrollY;
+      const v = Math.abs(y - lastY) / Math.max(dt, 0.001);
+      lastY = y;
+      vs += (v - vs) * (1 - Math.exp(-dt * 8)); // smooth, so it ramps up and settles instead of twitching
+
+      const r = title.getBoundingClientRect();
+      const inView = r.bottom > 0 && r.top < window.innerHeight;
+      const amp = inView ? Math.pow(clamp(vs / SHAKE_SPEED, 0, 1), 0.8) : 0;
+
+      if (amp > 0.01) {
+        shaking = true;
+        const t = now / 1000;
+        chars.forEach((el, i) => {
+          const x = Math.sin(t * 38 + i * 1.7) * amp * SHAKE_PX;
+          const yy = Math.cos(t * 31 + i * 2.3) * amp * SHAKE_PX * 0.7;
+          const rot = Math.sin(t * 27 + i * 1.1) * amp * SHAKE_DEG;
+          el.style.transform = `translate3d(${x.toFixed(2)}px,${yy.toFixed(2)}px,0) rotate(${rot.toFixed(2)}deg)`;
+        });
+      } else if (shaking) {
+        shaking = false;
+        chars.forEach((el) => { el.style.transform = ""; });
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // the contact form has no server behind it, so "Send message" opens your email app with everything filled in
+  const onSend = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const name = String(f.get("name") ?? "").trim();
+    const email = String(f.get("email") ?? "").trim();
+    const message = String(f.get("message") ?? "").trim();
+    const subject = `Message from ${name || "your website"}`;
+    const body = `${message}\n\n${name}${email ? ` (${email})` : ""}`;
+    window.location.href = `mailto:${EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
   return (
-    <main className="relative text-white" style={{ background: `rgb(${PAGE_BLACK})` }}>
+    <main ref={mainRef} className="relative text-white" style={{ background: `rgb(${PAGE_BLACK})` }}>
       {/* blue glow bleeding in from the side (fixed, so it stays put while you scroll) */}
       <div
         aria-hidden="true"
@@ -818,7 +947,7 @@ export default function Home() {
       {/* dot + trailing ring cursor */}
       <Cursor />
 
-      <style>{PAGE_CSS + GLASS_CSS + INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + BG_CSS}</style>
+      <style>{PAGE_CSS + GLASS_CSS + INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + FORM_CSS + BG_CSS}</style>
 
       {/* 1) Intro: a tall block with a sticky stage. Scrolling through it swaps the three lines. */}
       <section ref={introRef} className="relative" style={{ height: INTRO_HEIGHT }}>
@@ -875,7 +1004,7 @@ export default function Home() {
       </section>
 
       {/* 2) Photo + buttons */}
-      <section ref={revealRef} className="rv relative isolate -mt-[25vh] overflow-hidden">
+      <section className="rv relative isolate -mt-[25vh] overflow-hidden">
         <div className="mx-auto grid max-w-5xl items-center gap-12 px-6 py-16 md:min-h-[calc(100dvh-4rem-4.5rem)] md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-16">
           {/* Left: your photo in a vintage polaroid (no caption) */}
           <div className="mx-auto w-full max-w-sm md:max-w-none">
@@ -916,19 +1045,99 @@ export default function Home() {
             </div>
           </div>
         </div>
-
-        <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 px-6 pb-6 pt-2 text-xs text-neutral-500">
-          <a href={RESUME_URL} target="_blank" rel="noopener noreferrer" className="contact-btn">
-            Résumé
-            <ArrowUpRight />
-          </a>
-          <a href={`mailto:${EMAIL}`} className="contact-btn">
-            Contact me
-            <ArrowUpRight />
-          </a>
-          <span>© 2026 Ethan Wang. All rights reserved.</span>
-        </footer>
       </section>
+
+      {/* 3) About me: a big title with your text underneath (edit ABOUT_TITLE / ABOUT_TEXT at the top of this file) */}
+      <section className="rv relative mx-auto max-w-5xl px-6 py-24 md:py-32">
+        <h2
+          ref={aboutTitleRef}
+          aria-label={ABOUT_TITLE}
+          className="hl-head max-w-4xl text-5xl font-bold leading-[1.02] tracking-tight sm:text-6xl md:text-7xl"
+        >
+          {ABOUT_TITLE.split(" ").map((word, wi, words) => (
+            <span key={wi} aria-hidden="true">
+              <span className="inline-block whitespace-nowrap">
+                {word.split("").map((ch, ci) => (
+                  <span key={ci} className="shake-ch inline-block will-change-transform">{ch}</span>
+                ))}
+              </span>
+              {wi < words.length - 1 ? " " : ""}
+            </span>
+          ))}
+        </h2>
+        <div className="mt-10 max-w-2xl space-y-6 text-lg leading-relaxed text-neutral-400 sm:text-xl">
+          {ABOUT_TEXT.map((paragraph, i) => (
+            <p key={i} className="about-p" style={{ "--i": i } as CSSProperties}>
+              {paragraph}
+            </p>
+          ))}
+        </div>
+      </section>
+
+      {/* 4) Contact: details on the left, a glass form card on the right (edit CONTACT_*, PHONE and SOCIALS at the top of this file) */}
+      <section id="contact" className="rv relative mx-auto max-w-5xl px-6 pb-24 pt-8 md:pb-32">
+        <div className="grid items-start gap-12 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-16">
+          {/* left: title, short blurb, email, phone, socials */}
+          <div>
+            <h2 className="hl-head text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl">{CONTACT_TITLE}</h2>
+            <p className="about-p mt-6 max-w-md text-lg leading-relaxed text-neutral-400" style={{ "--i": 0 } as CSSProperties}>
+              {CONTACT_BLURB}
+            </p>
+
+            <div className="about-p mt-10" style={{ "--i": 1 } as CSSProperties}>
+              <p className="cf-eyebrow">email</p>
+              <a href={`mailto:${EMAIL}`} className="mt-3 inline-block text-xl text-white transition hover:text-neutral-300">
+                {EMAIL}
+              </a>
+            </div>
+
+            {PHONE && (
+              <div className="about-p mt-8" style={{ "--i": 2 } as CSSProperties}>
+                <p className="cf-eyebrow">phone</p>
+                <a href={`tel:${PHONE.replace(/[^+\d]/g, "")}`} className="mt-3 inline-block text-xl text-white transition hover:text-neutral-300">
+                  {PHONE}
+                </a>
+              </div>
+            )}
+
+            <div className="about-p mt-10 flex flex-wrap gap-3" style={{ "--i": 3 } as CSSProperties}>
+              {SOCIALS.filter((s) => s.href).map((s) => (
+                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" className="cf-pill">
+                  {s.label}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* right: the form */}
+          <form onSubmit={onSend} className="cf-card about-p" style={{ "--i": 2 } as CSSProperties}>
+            <div className="space-y-5">
+              <div>
+                <label htmlFor="cf-name" className="cf-label">Name</label>
+                <input id="cf-name" name="name" type="text" required autoComplete="name" placeholder="Your name" className="cf-input" />
+              </div>
+              <div>
+                <label htmlFor="cf-email" className="cf-label">Email</label>
+                <input id="cf-email" name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="cf-input" />
+              </div>
+              <div>
+                <label htmlFor="cf-message" className="cf-label">Message</label>
+                <textarea id="cf-message" name="message" required rows={5} placeholder="Tell me about your project" className="cf-input" />
+              </div>
+            </div>
+            <button type="submit" className="cf-send mt-6">Send message</button>
+            <p className="mt-3 text-center text-xs text-neutral-500">This opens your email app with your message ready to send.</p>
+          </form>
+        </div>
+      </section>
+
+      <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 px-6 pb-6 pt-2 text-xs text-neutral-500">
+        <a href={RESUME_URL} target="_blank" rel="noopener noreferrer" className="contact-btn">
+          Résumé
+          <ArrowUpRight />
+        </a>
+        <span>© 2026 Ethan Wang. All rights reserved.</span>
+      </footer>
     </main>
   );
 }

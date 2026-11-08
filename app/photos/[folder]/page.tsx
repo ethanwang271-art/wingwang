@@ -28,7 +28,8 @@ export default async function FolderPage({ params }: { params: Promise<{ folder:
           Photos
         </Link>
 
-        <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">{data.title}</h1>
+        {/* the folder's own name, exactly as written (so lowercase stays lowercase) */}
+        <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">{name}</h1>
         {desc && <p className="mt-2 text-base text-neutral-400 sm:text-lg">{desc}</p>}
 
         <div className="mt-8 sm:mt-10">

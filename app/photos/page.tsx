@@ -9,7 +9,7 @@ export default function PhotosPage() {
   const folders = getFolders();
 
   return (
-    <main className="min-h-[calc(100dvh-4rem)] bg-black text-white">
+    <main className="min-h-[calc(100dvh-4rem)] bg-[#0b0d0f] text-white">
       {folders.length === 0 ? (
         <div className="mx-auto max-w-5xl px-6 py-12">
           <h1 className="text-4xl font-bold tracking-tight">Photos</h1>

@@ -20,8 +20,51 @@ const INTRO = "a slowly growing process, stay tuned for more!";
 // How fast the carousel drifts on its own, in pages per second (0.1 = one page every 10 s). 0 turns it off.
 const AUTO_SPEED = 0.1;
 
-// Shown in the empty bottom slot when you have an odd number of folders
+// Shown in an empty slot (for example when one shelf has fewer folders than the other)
 const PLACEHOLDER = "more soon :)";
+
+// ---- choose what goes on each shelf ----
+// Write each folder's name exactly like the folder in public/photos/ (capital letters don't matter when matching).
+// The order you list them in is the order they appear, left to right.
+// Any folder you don't list still shows up: it is added to whichever shelf is shorter.
+// Leave both lists empty and it goes back to alternating top, bottom, top, bottom.
+// Your folders right now: norway '25, OASIS, san francisco '23, senior sunrise,
+// senior volleyball team '26-27, summer '26  (copy a name from here, remove the // in front, done)
+const TOP_SHELF: string[] = [
+  "summer '26",
+  "norway '25",
+  "san francisco '23",
+];
+const BOTTOM_SHELF: string[] = [
+  "senior volleyball team '26-27",
+  "OASIS",
+  "senior sunrise",
+];
+
+// The name shown on each card. It is the folder's own name, exactly as you typed it, so your
+// lowercase names stay lowercase. (To rename a card, rename its folder.)
+const nameOf = (f: Folder) => f.id;
+
+function arrange(folders: Folder[]) {
+  const key = (s: string) => s.trim().toLowerCase();
+  const byKey = new Map(folders.map((f) => [key(f.id), f]));
+  const used = new Set<string>();
+  const pick = (names: string[]) =>
+    names.flatMap((name) => {
+      const f = byKey.get(key(name));
+      if (!f || used.has(f.id)) return [];
+      used.add(f.id);
+      return [f];
+    });
+
+  const top: Folder[] = pick(TOP_SHELF);
+  const bottom: Folder[] = pick(BOTTOM_SHELF);
+  for (const f of folders) {
+    if (used.has(f.id)) continue;
+    (top.length <= bottom.length ? top : bottom).push(f);
+  }
+  return { top, bottom };
+}
 
 function Words({ text }: { text: string }) {
   return (
@@ -94,19 +137,20 @@ type Slot = { v: number; page: number; clone: boolean; folder?: Folder };
 export default function FolderCarousel({ folders }: { folders: Folder[] }) {
   const n = folders.length;
 
-  // Each page = one wide card on the top track + one smaller tile on the bottom track.
-  // Page p shows folders[2p] on top and folders[2p + 1] below.
-  const P = Math.max(1, Math.ceil(n / 2));
+  // Each page = one wide card on the top shelf + one smaller tile on the bottom shelf.
+  // Page p shows top[p] on the top shelf and bottom[p] below it (see TOP_SHELF / BOTTOM_SHELF above).
+  const { top, bottom } = arrange(folders);
+  const P = Math.max(1, top.length, bottom.length);
   const loop = P > 1;
   // In loop mode each track mounts enough copies to always fill the screen, so wrapping is seamless.
   const LT = loop ? P * Math.ceil(5 / P) : 1;
   const LB = loop ? P * Math.ceil(9 / P) : 1;
 
   const topSlots: Slot[] = Array.from({ length: LT }, (_, v) => ({
-    v, page: v % P, clone: v >= P, folder: folders[2 * (v % P)],
+    v, page: v % P, clone: v >= P, folder: top[v % P],
   }));
   const botSlots: Slot[] = Array.from({ length: LB }, (_, v) => ({
-    v, page: v % P, clone: v >= P, folder: folders[2 * (v % P) + 1],
+    v, page: v % P, clone: v >= P, folder: bottom[v % P],
   }));
 
   const [active, setActive] = useState(0);
@@ -422,14 +466,14 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
 
   if (n === 0) return null;
 
-  const renderSlot = (sl: Slot, top: boolean) => {
+  const renderSlot = (sl: Slot, isTop: boolean) => {
     const f = sl.folder;
     const desc = realDescription(f?.description);
-    const slots = top ? tSlot : bSlot;
-    const imgs = top ? tImg : bImg;
+    const slots = isTop ? tSlot : bSlot;
+    const imgs = isTop ? tImg : bImg;
     return (
       <div
-        key={`${top ? "t" : "b"}${sl.v}`}
+        key={`${isTop ? "t" : "b"}${sl.v}`}
         ref={(el) => { slots.current[sl.v] = el; }}
         className="absolute will-change-transform"
         style={{ visibility: "hidden" }}
@@ -440,8 +484,8 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
             draggable={false}
             aria-hidden={sl.clone || undefined}
             tabIndex={sl.clone ? -1 : undefined}
-            aria-label={`${f.title}, ${f.count} ${f.count === 1 ? "photo" : "photos"}`}
-            style={{ "--d": `${150 + (sl.page % 5) * 100 + (top ? 0 : 80)}ms` } as CSSProperties}
+            aria-label={`${nameOf(f)}, ${f.count} ${f.count === 1 ? "photo" : "photos"}`}
+            style={{ "--d": `${150 + (sl.page % 5) * 100 + (isTop ? 0 : 80)}ms` } as CSSProperties}
             className="pc-tile"
           >
             <span ref={(el) => { imgs.current[sl.v] = el; }} className="absolute inset-0 block will-change-transform">
@@ -451,13 +495,13 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
                 fill
                 draggable={false}
                 priority={sl.v === 0}
-                sizes={top ? "90vw" : "(min-width: 640px) 40vw, 62vw"}
+                sizes={isTop ? "90vw" : "(min-width: 640px) 40vw, 62vw"}
                 className="object-cover"
               />
             </span>
-            <span className={`pc-cap ${top ? "pc-cap-top" : ""}`}>
-              <span className={top ? "pc-t1" : "pc-t2"}>{f.title}</span>
-              {desc && <span className={top ? "pc-s1" : "pc-s2"}>{desc}</span>}
+            <span className={`pc-cap ${isTop ? "pc-cap-top" : ""}`}>
+              <span className={isTop ? "pc-t1" : "pc-t2"}>{nameOf(f)}</span>
+              {desc && <span className={isTop ? "pc-s1" : "pc-s2"}>{desc}</span>}
             </span>
           </Link>
         ) : (
