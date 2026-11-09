@@ -1,13 +1,10 @@
 "use client";
 // app/page.tsx  (everything for the home page lives in this one file)
 
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Lenis from "lenis";
-
-// TODO: your email for the "Contact me" button
-const EMAIL = "ethan@wingwang.ca";
 
 // TODO: paste the link to your Google Doc resume here (in Google Docs: Share -> set to "Anyone with the link" -> Copy link)
 const RESUME_URL = "https://docs.google.com/document/d/1GPkXz4uP63ArL1-Wk0-hQU1j4F1xY5CJKLFAr5DVoiI/edit?usp=sharing";
@@ -20,15 +17,7 @@ const ABOUT_TEXT = [
   "the site is not finished dont mind the big contact right under this",
 ];
 
-// ---- Contact section: edit these ----
-const CONTACT_TITLE = "contact";
-const CONTACT_BLURB = "Tell me a little about what you're working on and I'll get back to you soon.";
-const PHONE: string = ""; // optional, for example "647-555-0123". Leave it empty to hide the phone line
-// TODO: put your real links here (any with an empty link "" is hidden)
-const SOCIALS: { label: string; href: string }[] = [
-  { label: "Instagram", href: "https://instagram.com/" },
-  { label: "LinkedIn", href: "https://linkedin.com/" },
-];
+// (the contact details, socials and form now live on their own page: app/contact/page.tsx)
 
 // ---- "who am i?" shake (it wobbles while you scroll past it) ----
 const SHAKE_PX = 3;        // how far each letter jiggles at most, in px
@@ -594,7 +583,7 @@ const CURSOR_CSS = `
 }
 `;
 
-// the "Contact me" button: dark blue-tinted box, blue border, monospace text
+// the Résumé and Contact me buttons: dark blue-tinted box, blue border, monospace text
 const CONTACT_CSS = `
 .contact-btn {
   display: inline-flex;
@@ -620,57 +609,6 @@ const CONTACT_CSS = `
   box-shadow: 0 0 28px rgba(${BLUE}, .4);
   outline: none;
 }
-`;
-
-// the contact section: big left column, glass form card on the right
-const FORM_CSS = `
-.cf-eyebrow { font-size: .8rem; letter-spacing: .25em; text-transform: uppercase; color: rgba(255,255,255,.45); }
-.cf-card {
-  border-radius: 2rem;
-  padding: 1.5rem;
-  background: linear-gradient(145deg, rgba(255,255,255,.09), rgba(255,255,255,.03));
-  border: 1px solid rgba(255,255,255,.12);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.25), 0 30px 70px -20px rgba(0,0,0,.8);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
-}
-@media (min-width: 640px) { .cf-card { padding: 2rem; border-radius: 2.25rem; } }
-.cf-label { display: block; margin-bottom: .5rem; font-size: .95rem; color: rgba(255,255,255,.6); }
-.cf-input {
-  display: block; width: 100%;
-  border-radius: 1.1rem;
-  padding: .95rem 1.1rem;
-  background: rgba(0,0,0,.35);
-  border: 1px solid rgba(255,255,255,.1);
-  color: #fff;
-  font: inherit; font-size: 1.05rem;
-  outline: none;
-  transition: border-color .25s ease, box-shadow .25s ease, background .25s ease;
-}
-.cf-input::placeholder { color: rgba(255,255,255,.35); }
-.cf-input:focus { border-color: rgba(${BLUE}, .8); box-shadow: 0 0 0 3px rgba(${BLUE}, .22); background: rgba(0,0,0,.5); }
-textarea.cf-input { resize: vertical; min-height: 9rem; }
-.cf-send {
-  display: block; width: 100%;
-  border: 0; border-radius: 9999px;
-  padding: 1rem 1.5rem;
-  background: linear-gradient(#ffffff, #ececec);
-  color: rgb(${PAGE_BLACK});
-  font: inherit; font-size: 1.05rem; font-weight: 500;
-  box-shadow: 0 10px 30px -12px rgba(255,255,255,.35);
-  transition: transform .3s ease, box-shadow .3s ease;
-}
-.cf-send:hover, .cf-send:focus-visible { transform: translateY(-2px); box-shadow: 0 16px 40px -10px rgba(${BLUE}, .6); outline: none; }
-.cf-pill {
-  display: inline-block;
-  border-radius: 9999px;
-  border: 1px solid rgba(255,255,255,.18);
-  padding: .6rem 1.2rem;
-  color: rgba(255,255,255,.85);
-  text-decoration: none;
-  transition: background .3s ease, border-color .3s ease, transform .3s ease;
-}
-.cf-pill:hover, .cf-pill:focus-visible { background: rgba(255,255,255,.08); border-color: rgba(${BLUE}, .8); transform: translateY(-2px); outline: none; }
 `;
 
 // make the whole page (and anything on it that uses plain black) the same black
@@ -862,7 +800,7 @@ export default function Home() {
     return () => { alive = false; };
   }, []);
 
-  // Start each section's entrance (photo + buttons, about, contact) when it scrolls into view
+  // Start each section's entrance (photo + buttons, about) when it scrolls into view
   useEffect(() => {
     const root = mainRef.current;
     if (!root) return;
@@ -920,18 +858,6 @@ export default function Home() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // the contact form has no server behind it, so "Send message" opens your email app with everything filled in
-  const onSend = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const name = String(f.get("name") ?? "").trim();
-    const email = String(f.get("email") ?? "").trim();
-    const message = String(f.get("message") ?? "").trim();
-    const subject = `Message from ${name || "your website"}`;
-    const body = `${message}\n\n${name}${email ? ` (${email})` : ""}`;
-    window.location.href = `mailto:${EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
-
   return (
     <main ref={mainRef} className="relative text-white" style={{ background: `rgb(${PAGE_BLACK})` }}>
       {/* blue glow bleeding in from the side (fixed, so it stays put while you scroll) */}
@@ -947,7 +873,7 @@ export default function Home() {
       {/* dot + trailing ring cursor */}
       <Cursor />
 
-      <style>{PAGE_CSS + GLASS_CSS + INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + FORM_CSS + BG_CSS}</style>
+      <style>{PAGE_CSS + GLASS_CSS + INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + BG_CSS}</style>
 
       {/* 1) Intro: a tall block with a sticky stage. Scrolling through it swaps the three lines. */}
       <section ref={introRef} className="relative" style={{ height: INTRO_HEIGHT }}>
@@ -1074,68 +1000,16 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4) Contact: details on the left, a glass form card on the right (edit CONTACT_*, PHONE and SOCIALS at the top of this file) */}
-      <section id="contact" className="rv relative mx-auto max-w-5xl px-6 pb-24 pt-8 md:pb-32">
-        <div className="grid items-start gap-12 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-16">
-          {/* left: title, short blurb, email, phone, socials */}
-          <div>
-            <h2 className="hl-head text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl">{CONTACT_TITLE}</h2>
-            <p className="about-p mt-6 max-w-md text-lg leading-relaxed text-neutral-400" style={{ "--i": 0 } as CSSProperties}>
-              {CONTACT_BLURB}
-            </p>
-
-            <div className="about-p mt-10" style={{ "--i": 1 } as CSSProperties}>
-              <p className="cf-eyebrow">email</p>
-              <a href={`mailto:${EMAIL}`} className="mt-3 inline-block text-xl text-white transition hover:text-neutral-300">
-                {EMAIL}
-              </a>
-            </div>
-
-            {PHONE && (
-              <div className="about-p mt-8" style={{ "--i": 2 } as CSSProperties}>
-                <p className="cf-eyebrow">phone</p>
-                <a href={`tel:${PHONE.replace(/[^+\d]/g, "")}`} className="mt-3 inline-block text-xl text-white transition hover:text-neutral-300">
-                  {PHONE}
-                </a>
-              </div>
-            )}
-
-            <div className="about-p mt-10 flex flex-wrap gap-3" style={{ "--i": 3 } as CSSProperties}>
-              {SOCIALS.filter((s) => s.href).map((s) => (
-                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" className="cf-pill">
-                  {s.label}
-                </a>
-              ))}
-            </div>
-          </div>
-
-          {/* right: the form */}
-          <form onSubmit={onSend} className="cf-card about-p" style={{ "--i": 2 } as CSSProperties}>
-            <div className="space-y-5">
-              <div>
-                <label htmlFor="cf-name" className="cf-label">Name</label>
-                <input id="cf-name" name="name" type="text" required autoComplete="name" placeholder="Your name" className="cf-input" />
-              </div>
-              <div>
-                <label htmlFor="cf-email" className="cf-label">Email</label>
-                <input id="cf-email" name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="cf-input" />
-              </div>
-              <div>
-                <label htmlFor="cf-message" className="cf-label">Message</label>
-                <textarea id="cf-message" name="message" required rows={5} placeholder="Tell me about your project" className="cf-input" />
-              </div>
-            </div>
-            <button type="submit" className="cf-send mt-6">Send message</button>
-            <p className="mt-3 text-center text-xs text-neutral-500">This opens your email app with your message ready to send.</p>
-          </form>
-        </div>
-      </section>
-
+      {/* footer: the two blue buttons side by side (Résumé opens your Google Doc, Contact me opens the /contact page) */}
       <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 px-6 pb-6 pt-2 text-xs text-neutral-500">
         <a href={RESUME_URL} target="_blank" rel="noopener noreferrer" className="contact-btn">
           Résumé
           <ArrowUpRight />
         </a>
+        <Link href="/contact" className="contact-btn">
+          Contact me
+          <ArrowUpRight />
+        </Link>
         <span>© 2026 Ethan Wang. All rights reserved.</span>
       </footer>
     </main>
