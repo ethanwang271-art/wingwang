@@ -13,19 +13,19 @@ const RESUME_URL = "https://docs.google.com/document/d/1GPkXz4uP63ArL1-Wk0-hQU1j
 const ABOUT_TITLE = "who am i?";
 // Each line in quotes is one paragraph. Change them, add more, or delete some.
 const ABOUT_TEXT = [
-  "This is your about me section. Change this text in ABOUT_TEXT near the top of app/page.tsx: who you are, what you shoot, what you're into.",
-  "Add as many paragraphs as you like. Each line in quotes is one paragraph on the page.",
+  "hi my names ethan",
+  "site is not finished :(",
 ];
 
 // ---- What's in the revolver's chambers: edit these ----
 // The cylinder has 6 chambers. The first one is "who am i?" above; these are chambers 2 to 6 (keep it to 5).
 // `link` is optional: a page on your site ("/photos") or a full web address. Delete the link line to have no button.
 const CHAMBERS: { title: string; text: string; link?: { label: string; href: string } }[] = [
-  { title: "photos", text: "Change this text in CHAMBERS near the top of app/page.tsx.", link: { label: "see my photos", href: "/photos" } },
-  { title: "videos", text: "Change this text in CHAMBERS near the top of app/page.tsx." },
-  { title: "résumé", text: "Change this text in CHAMBERS near the top of app/page.tsx.", link: { label: "open my résumé", href: RESUME_URL } },
-  { title: "contact", text: "Change this text in CHAMBERS near the top of app/page.tsx.", link: { label: "contact me", href: "/contact" } },
-  { title: "more soon", text: "Change this text in CHAMBERS near the top of app/page.tsx." },
+  { title: "photos", text: "i like taking photos", link: { label: "see my photos", href: "/photos" } },
+  { title: "videos", text: "work in progress. stay tuned :D" },
+  { title: "résumé", text: "for work", link: { label: "open my résumé", href: RESUME_URL } },
+  { title: "contact", text: "contact me hereee", link: { label: "contact me", href: "/contact" } },
+  { title: "more soon", text: ":)" },
 ];
 
 // ---- "who am i?" shake (it wobbles while you scroll past it) ----
