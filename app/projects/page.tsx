@@ -15,34 +15,14 @@ import Link from "next/link";
 //   link         optional: where clicking the card goes (a full web address, or a page on your site).
 //                Leave it "" to make the card not clickable.
 const PROJECTS: { title: string; date: string; description: string; media: string; link: string }[] = [
-  {
-    title: "project one",
-    date: "mar '26",
-    description: "One or two sentences about what it is and what it does. Change this in PROJECTS at the top of app/projects/page.tsx.",
-    media: "",
-    link: "",
-  },
-  {
-    title: "project two",
-    date: "feb '26",
-    description: "One or two sentences about what it is and what it does.",
-    media: "",
-    link: "",
-  },
-  {
-    title: "project three",
-    date: "jan '26",
-    description: "One or two sentences about what it is and what it does.",
-    media: "",
-    link: "",
-  },
-  {
-    title: "project four",
-    date: "dec '25",
-    description: "One or two sentences about what it is and what it does.",
-    media: "",
-    link: "",
-  },
+  // Copy this block (without the // at the start of each line) to add a project:
+  // {
+  //   title: "my project",
+  //   date: "mar '26",
+  //   description: "One or two sentences about what it is and what it does.",
+  //   media: "/projects/my-project.jpg",
+  //   link: "",
+  // },
 ];
 
 // ---- colours (same as the rest of the site) ----
@@ -116,10 +96,12 @@ export default function ProjectsPage() {
     <main className="min-h-[calc(100dvh-4rem)] text-white" style={{ background: `rgb(${PAGE_BLACK})` }}>
       <style>{CSS}</style>
       <div className="mx-auto max-w-6xl px-6 pb-24 pt-12 sm:pt-16">
-        <h1 className="flex items-center gap-4 text-3xl font-bold tracking-tight sm:text-4xl">
-          <span className="block h-5 w-5 rounded-full bg-white sm:h-6 sm:w-6" aria-hidden="true" />
-          projects
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">projects</h1>
+
+        {/* while there are no projects in PROJECTS yet */}
+        {PROJECTS.length === 0 && (
+          <p className="pj-card mt-6 text-lg text-neutral-400 sm:text-xl">coming soon</p>
+        )}
 
         <div className="mt-10 grid gap-x-12 gap-y-16 sm:mt-12 md:grid-cols-2 md:gap-y-24">
           {PROJECTS.map((p, i) => {
