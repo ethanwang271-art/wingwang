@@ -23,10 +23,13 @@ const ABOUT_TEXT = [
 const CHAMBERS: { title: string; text: string; link?: { label: string; href: string } }[] = [
   { title: "photos", text: "i like taking photos", link: { label: "see my photos", href: "/photos" } },
   { title: "videos", text: "work in progress. stay tuned :D" },
-  { title: "résumé", text: "for work", link: { label: "open my résumé", href: RESUME_URL } },
+  { title: "projects", text: "things i've made", link: { label: "see my projects", href: "/projects" } },
   { title: "contact", text: "contact me hereee", link: { label: "contact me", href: "/contact" } },
   { title: "more soon", text: ":)" },
 ];
+
+// how big the titles next to the cylinder are: grows with the screen width, from 36px (2.25rem) up to 96px (6rem)
+const CHAMBER_TITLE_SIZE = "clamp(2.25rem, 5.6vw, 6rem)";
 
 // ---- "who am i?" shake (it wobbles while you scroll past it) ----
 const SHAKE_PX = 3;        // how far each letter jiggles at most, in px
@@ -96,18 +99,14 @@ const NAVBAR = 64;            // navbar height in px (h-16)
 const PAGE_BLACK = "11,13,15";    // r,g,b of the page's black (taken from your swatch)
 const BLUE = "100,159,255";       // r,g,b of the blue (taken from your new swatch, #649FFF). Used by the line, the glow, the button and the cursor
 
-/* ---------- Blue side glow + custom cursor ---------- */
+/* ---------- Custom cursor ---------- */
 
 // ---- tweak these ----
-const GLOW_X = 100;               // which side the glow comes from: 100 = right edge, 0 = left edge
-const GLOW_STRENGTH = 0.42;       // 0 = off, 1 = very strong
 const CURSOR_DOT = 8;             // size of the dot in px
 const CURSOR_RING = 38;           // size of the ring in px
 const CURSOR_FOLLOW = 9;          // how quickly the ring catches up with the dot (lower = lazier, more delay)
 const CURSOR_HOVER_SCALE = 1.7;   // the ring grows this much over links and buttons (1 = never grows)
 
-// a blue glow that bleeds in from one side of the screen, like the orange one on sunny.patel
-const SIDE_GLOW = `radial-gradient(ellipse 60% 90% at ${GLOW_X}% 55%, rgba(${BLUE},${GLOW_STRENGTH}), transparent 70%)`;
 
 // hide the normal arrow (only on devices with a real mouse); it comes back when you leave this page
 const CURSOR_CSS = `
@@ -286,7 +285,7 @@ type Chunk = {
   pts: Pt[]; nrm: Pt[]; h: number;
   x: number; y: number; z: number; vx: number; vy: number; vz: number;
   rx: number; ry: number; rz: number; wx: number; wy: number; wz: number;
-  life: number; max: number; tone: number; side: number; far: boolean;
+  life: number; max: number; tone: number; side: number; far: boolean; g: number; // g = how heavy it falls (1 = normal)
 };
 type Puff = { x: number; y: number; vx: number; vy: number; r: number; grow: number; life: number; max: number };
 
@@ -369,13 +368,15 @@ function strokePartial(ctx: CanvasRenderingContext2D, pts: Pt[], cum: number[], 
 const WALL_FOCAL = 560;                             // how strong the perspective is (lower = more dramatic)
 const WALL_LIGHT = { x: -0.42, y: -0.62, z: -0.66 }; // the light comes from the top left, in front of the wall
 const WALL_GRAVITY = 1500;
+const WALL_CRUMBLE = 2.6;                           // how fast the wall's chunks drop at the end (1 = normal gravity, higher = heavier)
 const WALL_MAX_PIXELS = 1_700_000;                    // lower = runs faster, a little less sharp
 
 // Break the area around (x, y) into pieces, the way real concrete shatters: small pieces near the hit,
 // bigger ones further out. (This is a Voronoi pattern: every piece is the area closest to one random point.)
-function makeCells(x: number, y: number, radius: number, count: number, power: number, r: () => number): Cell[] {
+// spacing = the smallest gap between piece centres, as a share of the radius (smaller = more, smaller pieces)
+function makeCells(x: number, y: number, radius: number, count: number, power: number, r: () => number, spacing = 0.085): Cell[] {
   const sites: Pt[] = [{ x: x + (r() - 0.5) * radius * 0.06, y: y + (r() - 0.5) * radius * 0.06 }];
-  const minD = radius * 0.085;
+  const minD = radius * spacing;
   let tries = 0;
   while (sites.length < count && tries < count * 12) {
     tries++;
@@ -580,7 +581,7 @@ function makeBody(pts: Pt[], cx: number, cy: number, h: number): Chunk {
   });
   return {
     pts: local, nrm, h, x: cx, y: cy, z: 0, vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0, wx: 0, wy: 0, wz: 0,
-    life: 1, max: 1, tone: 22, side: 70, far: false,
+    life: 1, max: 1, tone: 22, side: 70, far: false, g: 1,
   };
 }
 
@@ -899,15 +900,17 @@ function startWall(
     const dx = c.cx - p.x, dy = c.cy - p.y, d = Math.hypot(dx, dy) || 1;
     const b = makeBody(c.pts, c.cx, c.cy, collapse.thick);
     b.z = collapse.thick / 2;
-    b.vx = (dx / d) * rand(40, 220);
-    b.vy = (dy / d) * rand(20, 140) - rand(0, 160);
-    b.vz = -rand(80, 320);
-    b.wx = rand(-3, 3); b.wy = rand(-3, 3); b.wz = rand(-1.5, 1.5);
-    b.max = b.life = 2.4;
+    // no upward pop: it just lets go and drops, tipping forward a little
+    b.vx = (dx / d) * rand(10, 90);
+    b.vy = rand(60, 220);
+    b.vz = rand(-40, 30);
+    b.wx = rand(-0.9, 0.9); b.wy = rand(-0.6, 0.6); b.wz = rand(-0.8, 0.8);
+    b.g = WALL_CRUMBLE;
+    b.max = b.life = 1.6;
     b.tone = rand(18, 30);
     b.side = rand(50, 80);
     bodies.push(b);
-    if (Math.random() < 0.25) spawnPuffs(c.cx, c.cy, 1, 150);
+    if (Math.random() < 0.05) spawnPuffs(c.cx, c.cy, 1, 80);
   };
 
   // the last hit: cracks run across the whole wall and it crumbles, starting where you clicked
@@ -917,10 +920,10 @@ function startWall(
     dirty = true;
     const far = Math.max(Math.hypot(x, y), Math.hypot(W - x, y), Math.hypot(x, H - y), Math.hypot(W - x, H - y));
     const size = Math.max(0.7, Math.min(1.25, Math.min(W, H) / 800));
-    const cells = makeCells(x, y, far * 1.25, 70, 1.1, rng(4242 + Math.floor(x * 5 + y * 11)));
+    const cells = makeCells(x, y, far * 1.25, 170, 1.1, rng(4242 + Math.floor(x * 5 + y * 11)), 0.05);
     const order: number[] = [], when: number[] = [];
     cells.forEach((c, i) => {
-      when.push((c.d / far) * 0.5); // the break spreads outwards from the hit
+      when.push((c.d / far) * 0.28); // the break spreads outwards from the hit
       const onScreen = c.pts.some((q) => q.x > -50 && q.x < W + 50 && q.y > -50 && q.y < H + 50);
       if (c.pts.length >= 3 && onScreen) order.push(i);
     });
@@ -933,8 +936,8 @@ function startWall(
     root.style.background = "transparent";
     root.style.pointerEvents = "none";
     prompt.style.opacity = "0";
-    spawnPuffs(x, y, 8, 300);
-    spawnChips(x, y, 12, 1.25);
+    spawnPuffs(x, y, 4, 200);
+    spawnChips(x, y, 10, 0.8);
     shakeT = 0.3;
     shakeAmp = 12;
     onBreak();
@@ -995,7 +998,7 @@ function startWall(
       const b = bodies[i];
       b.life -= dt;
       if (b.life <= 0 || WALL_FOCAL + b.z < 60 || (!b.far && b.y > H + 200)) { bodies.splice(i, 1); continue; }
-      b.vy += WALL_GRAVITY * dt;
+      b.vy += WALL_GRAVITY * b.g * dt;
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.z += b.vz * dt;
@@ -1023,7 +1026,7 @@ function startWall(
       if (changed) c.path = cellsPath(c.patch.cells, c.patch.out);
       if (!gone && c.next >= c.order.length) {
         gone = true; // every piece has let go: no wall left
-        timers.push(window.setTimeout(finish, 1600));
+        timers.push(window.setTimeout(finish, 1000));
       }
       if (gone && bodies.length === 0 && puffs.length === 0) finish();
     }
@@ -1157,7 +1160,7 @@ function WallIntro({ onBreak, onDone }: { onBreak: () => void; onDone: () => voi
     >
       <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
 
-      {/* the big message in the middle, in the same font as the wingwang logo (it goes away on the first hit) */}
+      {/* the big message in the middle, in the same font as "who am i?" (it goes away on the first hit) */}
       <div
         ref={promptRef}
         style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", padding: "0 1.5rem", pointerEvents: "none", transition: "opacity .45s ease" }}
@@ -1165,8 +1168,8 @@ function WallIntro({ onBreak, onDone }: { onBreak: () => void; onDone: () => voi
         <p
           ref={promptTextRef}
           style={{
-            margin: 0, textAlign: "center", fontFamily: '"Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive', fontWeight: 700, lineHeight: 1,
-            letterSpacing: "-0.02em", fontSize: "clamp(3.5rem, 12vw, 10rem)", color: WALL_TEXT_COLOR,
+            margin: 0, textAlign: "center", fontFamily: "Arial, Helvetica, sans-serif", fontWeight: 700, lineHeight: 1.02,
+            letterSpacing: "-0.025em", fontSize: "clamp(3.5rem, 12vw, 10rem)", color: WALL_TEXT_COLOR,
           }}
         >
           {WALL_PROMPT}
@@ -1179,15 +1182,15 @@ function WallIntro({ onBreak, onDone }: { onBreak: () => void; onDone: () => voi
 /* ---------- The revolver behind the wall ---------- */
 
 const REVOLVER_HEIGHT = "760vh";            // how much scrolling the whole revolver part takes (more = slower)
-const REVOLVER_FACE = 0.14;                 // how much of that scrolling it takes to turn and face you (0.14 = the first 14%)
-const REVOLVER_FACE_ANGLE = 12;             // once zoomed in, how far the cylinder stays turned to the side, in degrees (0 = dead on)
-const REVOLVER_ZOOM = 0.44;                 // how big the cylinder is once zoomed in (0.44 = its radius is 44% of the screen height)
+const REVOLVER_FACE = 0.14;                 // how much of that scrolling it takes to turn and zoom in on the cylinder (0.14 = the first 14%)
+const REVOLVER_START_SIZE = 0.55;           // how big the whole revolver is at the start (1 = as wide as fits)
+const REVOLVER_ZOOM = 1.25;                 // how big the cylinder is once zoomed in (1.25 = 125% of the screen height, so a little runs off the top and bottom). Half of it hangs off the right edge
 const REVOLVER_DRAG = 3;                    // dragging the cylinder sideways turns it too: higher = it turns further per drag
 const REVOLVER_SPIN = 1;                    // 1 or -1: which way the cylinder turns when you scroll down
 const REVOLVER_FLIP = true;                 // true = barrel points left, grip on the right. false = barrel right, grip left
-const REVOLVER_YAW = 24;                    // how far it's turned towards you so you can see it's 3D, in degrees (0 = flat side view)
-const REVOLVER_TILT = 10;                   // how much you look down on it, in degrees
-const REVOLVER_MOUSE = 10;                  // how much it turns to follow the mouse, in degrees (0 = not at all)
+const REVOLVER_YAW = 0;                     // how far it's turned towards you at the start, in degrees (0 = flat side view)
+const REVOLVER_TILT = 0;                    // how much you look down on it at the start, in degrees
+const REVOLVER_MOUSE = 6;                   // how much it leans to follow the mouse at the start, in degrees (0 = not at all)
 const REVOLVER_LINE = BLUE;                 // r,g,b of the gun's lines
 const REVOLVER_ROUND_LINE = "255,190,110";  // r,g,b of the cartridges' lines
 const REVOLVER_LIT = "255,255,255";         // r,g,b of the cartridge whose info is showing
@@ -1209,7 +1212,7 @@ function mixRgb(a: string, b: string, t: number): string {
 // (barrel, cylinder, cartridges). Then every point is turned, put in perspective and drawn on a flat canvas.
 type V3 = { x: number; y: number; z: number };
 type Line3 = { pts: V3[]; closed: boolean; col: string; w: number }; // w = how bright (1 = normal)
-type Model = { lines: Line3[]; faces: { pts: V3[]; col: string; w?: number }[] };
+type Model = { lines: Line3[]; faces: { pts: V3[]; col: string; w?: number }[]; labels: { p: V3; text: string; a: number }[] };
 
 // turn an outline written like an SVG path ("M x y L x y Q ... C ... Z") into points.
 // corner[i] = that point is the end of a piece (where the edges across the thickness get drawn)
@@ -1290,16 +1293,18 @@ function lathe(m: Model, prof: [number, number, boolean][], cy: number, cz: numb
       return { x, y: cy + r * Math.sin(a), z: cz + r * Math.cos(a) };
     });
   for (const [x, r, on] of prof) if (on && r > 0) m.lines.push({ pts: ring(x, r), closed: true, col, w });
-  // the two edges along the side that make its outline from where you're looking
+  // the two edges along the side that make its outline from where you're looking.
+  // Looking straight down its length (end on) there's no side to see, so they fade out.
   const as = Math.atan2(-view.z, view.y);
+  const sw = w * smooth(0.12, 0.45, Math.hypot(view.y, view.z));
   const side = (a: number) => prof.map(([x, r]) => ({ x, y: cy + r * Math.sin(a), z: cz + r * Math.cos(a) }));
   const s1 = side(as), s2 = side(as + Math.PI);
-  m.lines.push({ pts: s1, closed: false, col, w }, { pts: s2, closed: false, col, w });
-  m.faces.push({ pts: [...s1, ...s2.reverse()], col });
+  m.lines.push({ pts: s1, closed: false, col, w: sw }, { pts: s2, closed: false, col, w: sw });
+  m.faces.push({ pts: [...s1, ...s2.reverse()], col, w: sw / (w || 1) });
 }
 
 function buildRevolver(turn: number, lit: number[], gun: number, view: V3): Model {
-  const m: Model = { lines: [], faces: [] };
+  const m: Model = { lines: [], faces: [], labels: [] };
   const G = REVOLVER_LINE, A = REVOLVER_ROUND_LINE;
 
   // frame, grip, hammer, sights, trigger and guard: flat outlines with a thickness
@@ -1327,7 +1332,7 @@ function buildRevolver(turn: number, lit: number[], gun: number, view: V3): Mode
   const cy = 256, R = 76, C = 47;
   lathe(m, [[410, R - 6, true], [416, R, true], [592, R, true], [598, R - 6, true]], cy, 0, G, view);
   lathe(m, [[398, 9, true], [612, 9, true]], cy, 0, G, view, 0.6); // the pin it turns on
-  // the lit chamber sits on the side of the drum nearest the info (on the left of the screen once it faces you)
+  // once it faces you, the lit chamber is the one on the left of the drum (nearest the info); the right half is off screen
   const base = REVOLVER_FLIP ? 0 : Math.PI;
   for (let i = 0; i < 6; i++) {
     const a = base + ((i - turn) * REVOLVER_SPIN * Math.PI) / 3, ry = cy + C * Math.sin(a), rz = C * Math.cos(a);
@@ -1344,6 +1349,8 @@ function buildRevolver(turn: number, lit: number[], gun: number, view: V3): Mode
         closed: true, col: mixRgb(G, REVOLVER_LIT, lit[i]), w: 0.7 + 0.5 * lit[i],
       });
     }
+    // the chamber's number (1 to 6), on the front of the drum, only while it's lit
+    if (lit[i] > 0.01) m.labels.push({ p: { x: 604, y: ry, z: rz }, text: String(i + 1), a: lit[i] });
     // the cartridge in the chamber: the rim, the brass case, then the bullet
     lathe(m, [[408, 17, true], [414, 17, false], [414, 15, true], [528, 15, true], [544, 13, false], [556, 9, false], [566, 3, false]], ry, rz, mixRgb(A, REVOLVER_LIT, lit[i]), view, 0.9 + 0.6 * lit[i]);
   }
@@ -1368,12 +1375,6 @@ function drawRevolver(ctx: CanvasRenderingContext2D, W: number, H: number, o: Re
   };
 
   ctx.save();
-  // a faint glow behind it
-  const glow = ctx.createRadialGradient(o.cx, o.cy, 0, o.cx, o.cy, Math.max(W, H) * 0.42);
-  glow.addColorStop(0, `rgba(${BLUE},.07)`);
-  glow.addColorStop(1, `rgba(${BLUE},0)`);
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, W, H);
   // everything adds light on top of what's under it, so overlapping see-through parts glow a little more
   ctx.globalCompositeOperation = "lighter";
 
@@ -1418,6 +1419,19 @@ function drawRevolver(ctx: CanvasRenderingContext2D, W: number, H: number, o: Re
     ctx.strokeStyle = `rgba(${g.col},${Math.min(1, g.a).toFixed(3)})`;
     ctx.lineWidth = 1.1;
     ctx.stroke(g.path);
+  }
+
+  // the numbers: drawn the size of the bullet inside the chamber, fading in and out with the white
+  ctx.globalCompositeOperation = "source-over";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const l of m.labels) {
+    const q = proj(l.p);
+    const size = 13 * s * (F / (F + q.z)); // 13 = the bullet's width in the model's units
+    if (size < 4) continue;
+    ctx.font = `700 ${size.toFixed(1)}px Arial, Helvetica, sans-serif`;
+    ctx.fillStyle = `rgba(${REVOLVER_LIT},${l.a.toFixed(3)})`;
+    ctx.fillText(l.text, q.x, q.y + size * 0.04);
   }
   ctx.restore();
 }
@@ -1524,7 +1538,6 @@ export default function Home() {
     cv.addEventListener("pointerdown", onDown);
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
     const deg = Math.PI / 180;
-    const fl = REVOLVER_FLIP ? -1 : 1;
 
     const frame = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -1547,20 +1560,25 @@ export default function Home() {
 
       if (br.bottom > 0 && br.top < window.innerHeight) {
         const small = w < 768; // phones: the cylinder sits at the top and the info goes underneath
-        const sSide = Math.min((w * 0.8) / 800, (h * 0.7) / 450);
-        const radius = small ? Math.min(w * 0.36, h * 0.2) : Math.min(h * REVOLVER_ZOOM, w * 0.3);
+        // at the start: the whole revolver, side on, in the middle of the screen
+        const sSide = Math.min((w * 0.8) / 800, (h * 0.7) / 450) * REVOLVER_START_SIZE;
+        // zoomed in: the drum seen from the front, its middle on the right edge of the screen, so half of it shows.
+        // (its radius is 76 in the model's units, and its front is a little nearer, so it looks about 6% bigger)
+        const radius = small ? Math.min(h * 0.22, w * 0.45) : (h * REVOLVER_ZOOM) / 2;
+        const sCyl = radius / (76 * 1.06);
         const z = f * f; // the zoom speeds up towards the end, like a camera pushing in
         const t = now / 1000;
-        const wob = 1 - f * 0.6; // it moves about a bit less once zoomed in
+        const wob = 1 - f; // it stops leaning and swaying once zoomed in, so the drum sits perfectly still
         drawPose(c, {
           turn: tv, lit,
-          gun: 1 - smooth(0.45, 0.9, f),
-          yaw: (lerp(REVOLVER_YAW, fl * (90 - REVOLVER_FACE_ANGLE), f) + (ex * REVOLVER_MOUSE + Math.sin(t * 0.6) * 2) * wob) * deg,
-          tilt: (lerp(REVOLVER_TILT, 4, f) + (ey * REVOLVER_MOUSE * 0.5 + Math.sin(t * 0.45)) * wob) * deg,
-          cx: lerp(w / 2, small ? w / 2 : w * 0.66, f),
+          gun: 1 - smooth(0.3, 0.75, f),
+          // a quarter turn: from side on to the bullets pointing straight at you
+          yaw: (lerp(REVOLVER_YAW, (REVOLVER_FLIP ? -1 : 1) * 90, f) + (ex * REVOLVER_MOUSE + Math.sin(t * 0.6) * 1.5) * wob) * deg,
+          tilt: (REVOLVER_TILT * (1 - f) + (ey * REVOLVER_MOUSE * 0.5 + Math.sin(t * 0.45)) * wob) * deg,
+          cx: lerp(w / 2, w, f),
           cy: lerp(h / 2, small ? h * 0.25 : h * 0.5, f),
-          scale: lerp(sSide, radius / 80, z),
-          px: lerp(590, 560, f),
+          scale: lerp(sSide, sCyl, z),
+          px: lerp(593, 504, f),
           py: lerp(335, 256, f),
         });
       }
@@ -1632,12 +1650,6 @@ export default function Home() {
 
   return (
     <main className="relative text-white" style={{ background: `rgb(${PAGE_BLACK})` }}>
-      {/* blue glow bleeding in from the side (fixed, so it stays put while you scroll) */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none"
-        style={{ position: "fixed", left: 0, right: 0, bottom: 0, top: NAVBAR, background: SIDE_GLOW }}
-      />
 
       {/* the page's main heading: screen readers and Google read it, it isn't shown */}
       <h1 className="sr-only">Ethan Wang: photography, and a bit about me</h1>
@@ -1657,16 +1669,16 @@ export default function Home() {
           <canvas ref={revCanvasRef} role="img" aria-label="A see-through 3D revolver" className="absolute inset-0 h-full w-full" />
 
           {/* the info in each chamber: to the left of the cylinder (underneath it on phones) */}
-          <div className="pointer-events-none absolute inset-x-6 bottom-6 top-[50%] md:inset-y-0 md:left-[6%] md:right-auto md:w-[32%]">
+          <div className="pointer-events-none absolute inset-x-6 bottom-6 top-[50%] md:inset-y-0 md:left-[7%] md:right-auto md:w-[52%]">
             {/* chamber 1: who am i? */}
             <div
               ref={(el) => { panelEls.current[0] = el; }}
               className="absolute inset-0 flex items-start md:items-center"
               style={{ opacity: 0, visibility: "hidden" }}
             >
-              <div className="w-full">
-                {/* your photo in a vintage polaroid (on bigger screens) */}
-                <div className="mb-8 hidden w-full max-w-[10rem] md:block">
+              {/* the text, with your polaroid beside it (the polaroid only shows on bigger screens) */}
+              <div className="flex w-full flex-row-reverse items-center justify-end gap-10 lg:gap-14">
+                <div className="hidden w-[10rem] shrink-0 md:block lg:w-[13rem]">
                   <div className="polaroid">
                     <div className="polaroid-window">
                       {photoOk ? (
@@ -1674,7 +1686,7 @@ export default function Home() {
                           src="/ethan.jpg"
                           alt="Photo of me"
                           fill
-                          sizes="10rem"
+                          sizes="13rem"
                           className="object-cover"
                           onError={() => setPhotoOk(false)}
                         />
@@ -1689,11 +1701,11 @@ export default function Home() {
                   </div>
                 </div>
                 <div>
-                  <p className="mb-4 text-xs uppercase tracking-[0.3em]" style={{ color: `rgb(${BLUE})` }}>01 / 06</p>
                   <h2
                     ref={aboutTitleRef}
                     aria-label={ABOUT_TITLE}
-                    className="text-4xl font-bold leading-[1.02] tracking-tight sm:text-6xl"
+                    className="whitespace-nowrap font-bold leading-[1.02] tracking-tight"
+                    style={{ fontSize: CHAMBER_TITLE_SIZE }}
                   >
                     {ABOUT_TITLE.split(" ").map((word, wi, words) => (
                       <span key={wi} aria-hidden="true">
@@ -1706,7 +1718,7 @@ export default function Home() {
                       </span>
                     ))}
                   </h2>
-                  <div className="mt-6 space-y-4 text-base leading-relaxed text-neutral-400 sm:text-xl">
+                  <div className="mt-6 space-y-4 text-base leading-relaxed text-neutral-400 sm:text-xl lg:mt-8 lg:text-2xl">
                     {ABOUT_TEXT.map((paragraph, i) => (
                       <p key={i}>{paragraph}</p>
                     ))}
@@ -1723,12 +1735,9 @@ export default function Home() {
                 className="absolute inset-0 flex items-start md:items-center"
                 style={{ opacity: 0, visibility: "hidden" }}
               >
-                <div className="max-w-xl">
-                  <p className="mb-4 text-xs uppercase tracking-[0.3em]" style={{ color: `rgb(${BLUE})` }}>
-                    {String(i + 2).padStart(2, "0")} / 06
-                  </p>
-                  <h2 className="text-4xl font-bold leading-[1.02] tracking-tight sm:text-6xl">{ch.title}</h2>
-                  <p className="mt-6 text-base leading-relaxed text-neutral-400 sm:text-xl">{ch.text}</p>
+                <div className="max-w-2xl">
+                  <h2 className="whitespace-nowrap font-bold leading-[1.02] tracking-tight" style={{ fontSize: CHAMBER_TITLE_SIZE }}>{ch.title}</h2>
+                  <p className="mt-6 text-base leading-relaxed text-neutral-400 sm:text-xl lg:mt-8 lg:text-2xl">{ch.text}</p>
                   {ch.link && (
                     <div className="mt-8">
                       {ch.link.href.startsWith("http") ? (
@@ -1750,7 +1759,7 @@ export default function Home() {
           </div>
 
           {/* like a carousel: you can drag the cylinder round too */}
-          <div ref={revDragRef} className="pointer-events-none absolute bottom-8 left-[6%] hidden text-xs uppercase tracking-[0.3em] text-neutral-500 md:block" style={{ opacity: 0 }}>
+          <div ref={revDragRef} className="pointer-events-none absolute bottom-8 left-[7%] hidden text-xs uppercase tracking-[0.3em] text-neutral-500 md:block" style={{ opacity: 0 }}>
             drag / scroll
           </div>
 
