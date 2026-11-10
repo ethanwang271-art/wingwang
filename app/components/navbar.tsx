@@ -1,16 +1,18 @@
 "use client";
 // app/components/navbar.tsx
+// Page links on the left, the wingwang logo in the middle, contact and your profiles on the right.
+// It has no background and no line, so the page shows through behind it.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// TODO: replace these with your real details
 const INSTAGRAM_URL = "https://instagram.com/etnwingwang";
-const LINKEDIN_URL = "https://www.linkedin.com/in/ethan-wang-9206563a1/"; // <- put your LinkedIn profile link here
+const LINKEDIN_URL = "https://www.linkedin.com/in/ethan-wang-9206563a1/";
 
 const pageLinks = [
   { href: "/photos", label: "photos" },
   { href: "/videos", label: "videos" },
+  { href: "/projects", label: "projects" },
 ];
 
 function MailIcon() {
@@ -48,57 +50,50 @@ function LinkedInIcon() {
 // capitalised functions as components, and usePathname is a hook.
 export default function Navbar() {
   const pathname = usePathname();
-
-  const iconButton =
-    "rounded-full p-2 text-neutral-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
-
-  // the email icon opens the contact page; it stays lit while you're on it
   const onContact = pathname.startsWith("/contact");
+
+  // a page link: grey, white on hover, white and underlined on the page you're on
+  const linkClass = (active: boolean) =>
+    `transition focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white ${
+      active ? "text-white underline decoration-1 underline-offset-[6px]" : "text-white hover:opacity-70"
+    }`;
+  const iconButton =
+    "rounded-full p-1.5 text-white transition hover:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:p-2";
 
   return (
     // h-16 is fixed so pages can size themselves with calc(100dvh - 4rem)
-    <header className="sticky top-0 z-50 h-16 border-b border-white/10 bg-[#0b0d0f]/80 text-white backdrop-blur">
-      <nav aria-label="Main" className="mx-auto flex h-full max-w-5xl items-center justify-between px-6">
-        {/* Left: site label (Comic Sans, with fallbacks for devices that don't have it) */}
+    <header className="sticky top-0 z-50 h-16 bg-transparent text-white">
+      <nav aria-label="Main" className="grid h-full grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-8">
+        {/* left: the pages */}
+        <ul className="flex items-center gap-3 text-sm sm:gap-6 sm:text-base">
+          {pageLinks.map((link) => {
+            const active = pathname.startsWith(link.href);
+            return (
+              <li key={link.href}>
+                <Link href={link.href} aria-current={active ? "page" : undefined} className={linkClass(active)}>
+                  {link.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* middle: the logo, which takes you home (Comic Sans, with fallbacks for devices that don't have it) */}
         <Link
           href="/"
-          className="text-xl font-bold tracking-tight"
+          className="text-lg font-bold tracking-tight sm:text-xl"
           style={{ fontFamily: '"Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive' }}
         >
           wingwang
         </Link>
 
-        {/* Right: page links + icons */}
-        <div className="flex items-center gap-1 sm:gap-3">
-          <ul className="flex items-center gap-1 sm:gap-2">
-            {pageLinks.map((link) => {
-              const active = pathname.startsWith(link.href);
-              return (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    aria-current={active ? "page" : undefined}
-                    className={`rounded-md px-2 py-1.5 text-sm font-medium transition sm:px-3 ${
-                      active
-                        ? "text-white underline decoration-white decoration-2 underline-offset-8"
-                        : "text-neutral-400 hover:text-white"
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-
-          <span className="mx-1 hidden h-5 w-px bg-white/20 sm:block" aria-hidden="true" />
-
-          <Link
-            href="/contact"
-            aria-label="Contact me"
-            aria-current={onContact ? "page" : undefined}
-            className={`${iconButton} ${onContact ? "bg-white/10 text-white" : ""}`}
-          >
+        {/* right: contact and your profiles */}
+        <div className="flex items-center justify-end gap-1 sm:gap-3">
+          {/* "contact" as a word on bigger screens, a mail icon on phones */}
+          <Link href="/contact" aria-current={onContact ? "page" : undefined} className={`hidden text-base sm:mr-2 sm:block ${linkClass(onContact)}`}>
+            contact
+          </Link>
+          <Link href="/contact" aria-label="Contact me" className={`${iconButton} sm:hidden`}>
             <MailIcon />
           </Link>
           <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className={iconButton}>

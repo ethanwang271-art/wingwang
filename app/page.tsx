@@ -3,7 +3,6 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import Lenis from "lenis";
 
 // TODO: paste the link to your Google Doc resume here (in Google Docs: Share -> set to "Anyone with the link" -> Copy link)
@@ -35,37 +34,6 @@ const CHAMBER_TITLE_SIZE = "clamp(2.25rem, 5.6vw, 6rem)";
 const SHAKE_PX = 3;        // how far each letter jiggles at most, in px
 const SHAKE_DEG = 2;       // how much each letter tilts at most, in degrees
 const SHAKE_SPEED = 2500;  // scroll speed (px per second) at which the shake is at full strength: lower = shakes more easily
-
-const PAGE_CSS = `
-/* a vintage polaroid: same outer size as the old frame (4:5), thick bottom border, no caption */
-.polaroid {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 5;
-  padding: 5.5% 5.5% 0;
-  border-radius: 3px;
-  background:
-    linear-gradient(145deg, rgba(255,255,255,.55), rgba(255,255,255,0) 40%),
-    linear-gradient(160deg, #f1ecdf, #e4dccb);
-  box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,.35),
-    inset 0 0 32px rgba(140,105,50,.22),
-    0 2px 4px rgba(0,0,0,.5),
-    0 40px 70px -24px rgba(0,0,0,.9);
-  transform: rotate(-2.2deg);
-  transition: transform .7s cubic-bezier(.34,1.56,.64,1);
-}
-.polaroid:hover { transform: rotate(0deg) scale(1.02); }
-/* the photo window: sized so the polaroid's bottom border is about 4x the side borders */
-.polaroid-window {
-  position: relative;
-  overflow: hidden;
-  width: 100%;
-  aspect-ratio: 0.913;
-  background: #171717;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
-}
-`;
 
 // ---- tweak these (smooth scrolling) ----
 const LENIS_LERP = 0.12;  // higher = snappier, the page catches up to your scrolling faster; lower = floatier glide (try 0.06 to 0.2)
@@ -106,6 +74,7 @@ const CURSOR_DOT = 8;             // size of the dot in px
 const CURSOR_RING = 38;           // size of the ring in px
 const CURSOR_FOLLOW = 9;          // how quickly the ring catches up with the dot (lower = lazier, more delay)
 const CURSOR_HOVER_SCALE = 1.7;   // the ring grows this much over links and buttons (1 = never grows)
+const PAINT_COLOR = "255,190,110";  // r,g,b of the paint when you brush over a bullet on the revolver (the same amber as the cartridges)
 
 
 // hide the normal arrow (only on devices with a real mouse); it comes back when you leave this page
@@ -113,6 +82,10 @@ const CURSOR_CSS = `
 @media (hover: hover) and (pointer: fine) {
   html, html * { cursor: none !important; }
 }
+.cursor-dot, .cursor-ring { transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease; }
+/* over a bullet you can paint (see the revolver), the cursor becomes an amber brush */
+html.brush-on .cursor-dot { background: rgb(${PAINT_COLOR}) !important; box-shadow: 0 0 14px rgba(${PAINT_COLOR},.9) !important; }
+html.brush-on .cursor-ring { border-color: rgba(${PAINT_COLOR},.85) !important; mix-blend-mode: normal !important; }
 `;
 
 // the "Contact me" button: dark blue-tinted box, blue border, monospace text
@@ -236,8 +209,8 @@ function Cursor() {
   };
   return (
     <>
-      <div ref={ringRef} aria-hidden="true" style={{ ...base, width: CURSOR_RING, height: CURSOR_RING, border: "1px solid rgba(255,255,255,.4)", mixBlendMode: "difference" }} />
-      <div ref={dotRef} aria-hidden="true" style={{ ...base, width: CURSOR_DOT, height: CURSOR_DOT, background: `rgb(${BLUE})`, boxShadow: `0 0 10px rgba(${BLUE},.9)` }} />
+      <div ref={ringRef} aria-hidden="true" className="cursor-ring" style={{ ...base, width: CURSOR_RING, height: CURSOR_RING, border: "1px solid rgba(255,255,255,.4)", mixBlendMode: "difference" }} />
+      <div ref={dotRef} aria-hidden="true" className="cursor-dot" style={{ ...base, width: CURSOR_DOT, height: CURSOR_DOT, background: `rgb(${BLUE})`, boxShadow: `0 0 10px rgba(${BLUE},.9)` }} />
     </>
   );
 }
@@ -1194,12 +1167,16 @@ const REVOLVER_MOUSE = 6;                   // how much it leans to follow the m
 const REVOLVER_LINE = BLUE;                 // r,g,b of the gun's lines
 const REVOLVER_ROUND_LINE = "255,190,110";  // r,g,b of the cartridges' lines
 const REVOLVER_LIT = "255,255,255";         // r,g,b of the cartridge whose info is showing
+const PAINT_GRID = 34;                      // how many little strokes fit across one bullet (more = finer and denser)
+const PAINT_BRUSH = 0.32;                   // how big the brush is, compared to a bullet (0.32 = about a third of it)
 const REVOLVER_FILL = 0.035;                // how see-through the surfaces are (0 = only lines, higher = more solid)
 
 // where the revolver is and which way it faces. turn = which chamber is lit (0 to 5, in between while turning),
 // lit[i] = how lit chamber i is (0 to 1), cx/cy = where it sits on the screen, scale = how big,
 // px/py = the point on the model it turns around, gun = how visible the rest of the gun is (1 = fully, 0 = only the cylinder)
-type RevolverPose = { turn: number; lit: number[]; gun: number; yaw: number; tilt: number; cx: number; cy: number; scale: number; px: number; py: number };
+// paint[i] = cartridge i's little strokes (m[k] = 0 not painted .. 1 fully painted) and how strongly they show (a).
+// dots = how visible the faint unpainted strokes are (0 to 1)
+type RevolverPose = { turn: number; lit: number[]; paint: { m: Float32Array; a: number }[]; dots: number; gun: number; yaw: number; tilt: number; cx: number; cy: number; scale: number; px: number; py: number };
 
 // mix two "r,g,b" colours: t = 0 gives a, t = 1 gives b
 function mixRgb(a: string, b: string, t: number): string {
@@ -1212,7 +1189,10 @@ function mixRgb(a: string, b: string, t: number): string {
 // (barrel, cylinder, cartridges). Then every point is turned, put in perspective and drawn on a flat canvas.
 type V3 = { x: number; y: number; z: number };
 type Line3 = { pts: V3[]; closed: boolean; col: string; w: number }; // w = how bright (1 = normal)
-type Model = { lines: Line3[]; faces: { pts: V3[]; col: string; w?: number }[]; labels: { p: V3; text: string; a: number }[] };
+type Model = {
+  lines: Line3[]; faces: { pts: V3[]; col: string; w?: number }[]; labels: { p: V3; text: string; a: number }[];
+  rounds: { c: V3; e: V3 }[]; // each cartridge's front: its middle (c) and a point on its edge (e)
+};
 
 // turn an outline written like an SVG path ("M x y L x y Q ... C ... Z") into points.
 // corner[i] = that point is the end of a piece (where the edges across the thickness get drawn)
@@ -1304,7 +1284,7 @@ function lathe(m: Model, prof: [number, number, boolean][], cy: number, cz: numb
 }
 
 function buildRevolver(turn: number, lit: number[], gun: number, view: V3): Model {
-  const m: Model = { lines: [], faces: [], labels: [] };
+  const m: Model = { lines: [], faces: [], labels: [], rounds: [] };
   const G = REVOLVER_LINE, A = REVOLVER_ROUND_LINE;
 
   // frame, grip, hammer, sights, trigger and guard: flat outlines with a thickness
@@ -1349,6 +1329,7 @@ function buildRevolver(turn: number, lit: number[], gun: number, view: V3): Mode
         closed: true, col: mixRgb(G, REVOLVER_LIT, lit[i]), w: 0.7 + 0.5 * lit[i],
       });
     }
+    m.rounds.push({ c: { x: 528, y: ry, z: rz }, e: { x: 528, y: ry + 15, z: rz } });
     // the chamber's number (1 to 6), on the front of the drum, only while it's lit
     if (lit[i] > 0.01) m.labels.push({ p: { x: 604, y: ry, z: rz }, text: String(i + 1), a: lit[i] });
     // the cartridge in the chamber: the rim, the brass case, then the bullet
@@ -1357,8 +1338,50 @@ function buildRevolver(turn: number, lit: number[], gun: number, view: V3): Mode
   return m;
 }
 
-// draw the model in a pose (yaw/tilt in radians)
-function drawRevolver(ctx: CanvasRenderingContext2D, W: number, H: number, o: RevolverPose) {
+// The little strokes that fill a cartridge when you paint it: a grid of short horizontal dashes, worked out once,
+// as positions inside a circle of radius 1 (u = across, v = down). jit makes the brush edge a little ragged.
+const PAINT_MARKS: { u: number; v: number; jit: number }[] = (() => {
+  const out: { u: number; v: number; jit: number }[] = [];
+  const n = PAINT_GRID, cell = 2 / n;
+  for (let row = 0; row < n; row++) {
+    for (let col = 0; col < n; col++) {
+      const u = -1 + (col + 0.5) * cell + (row % 2 ? cell * 0.25 : -cell * 0.25); // rows sit a little offset, like brick
+      const v = -1 + (row + 0.5) * cell;
+      if (u * u + v * v > 0.94) continue;
+      const h = Math.sin(row * 127.1 + col * 311.7) * 43758.5453;
+      out.push({ u, v, jit: 0.75 + 0.5 * (h - Math.floor(h)) });
+    }
+  }
+  return out;
+})();
+
+// Draw one cartridge's strokes: the faint unpainted ones (dots = how visible) and the painted ones in amber.
+function paintRound(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, m: Float32Array, a: number, dots: number) {
+  const cell = (2 * r) / PAINT_GRID, w = cell * 0.72, h = Math.max(1, cell * 0.36);
+  const faint = new Path2D();
+  const lit = [new Path2D(), new Path2D(), new Path2D(), new Path2D()]; // painted strokes, in 4 steps of brightness
+  PAINT_MARKS.forEach((k, i) => {
+    const px = x + k.u * r - w / 2, py = y + k.v * r - h / 2;
+    const v = m[i];
+    if (v > 0) {
+      const grow = 0.55 + 0.45 * v; // each stroke grows to full length as it's painted
+      lit[Math.min(3, Math.floor(v * 4))].rect(x + k.u * r - (w * grow) / 2, py, w * grow, h);
+    } else if (dots > 0) {
+      faint.rect(px, py, w, h);
+    }
+  });
+  if (dots > 0) {
+    ctx.fillStyle = `rgba(${PAINT_COLOR},${(0.09 * dots).toFixed(3)})`;
+    ctx.fill(faint);
+  }
+  lit.forEach((path, i) => {
+    ctx.fillStyle = `rgba(${PAINT_COLOR},${((0.35 + 0.65 * ((i + 1) / 4)) * a).toFixed(3)})`;
+    ctx.fill(path);
+  });
+}
+
+// draw the model in a pose (yaw/tilt in radians). Gives back where each cartridge's front is on the screen.
+function drawRevolver(ctx: CanvasRenderingContext2D, W: number, H: number, o: RevolverPose): { x: number; y: number; r: number }[] {
   const fl = REVOLVER_FLIP ? -1 : 1;
   const cY = Math.cos(o.yaw), sY = Math.sin(o.yaw), cT = Math.cos(o.tilt), sT = Math.sin(o.tilt);
   // which way you're looking, in the model's own directions
@@ -1389,6 +1412,18 @@ function drawRevolver(ctx: CanvasRenderingContext2D, W: number, H: number, o: Re
       ctx.fill();
     }
   }
+
+  // where each cartridge is on the screen, and the paint on it (under the lines, so the outlines stay crisp)
+  const spots = m.rounds.map((rd) => {
+    const c = proj(rd.c), e = proj(rd.e);
+    return { x: c.x, y: c.y, r: Math.hypot(e.x - c.x, e.y - c.y) };
+  });
+  ctx.globalCompositeOperation = "source-over";
+  spots.forEach((sp, i) => {
+    const pt = o.paint[i];
+    if (pt && o.lit[i] < 0.3) paintRound(ctx, sp.x, sp.y, sp.r, pt.m, pt.a, o.dots * (1 - o.lit[i] / 0.3));
+  });
+  ctx.globalCompositeOperation = "lighter";
 
   // lines are grouped by colour and by how near they are (nearer = brighter), then drawn in one go per group
   const LEVELS = 5;
@@ -1434,14 +1469,12 @@ function drawRevolver(ctx: CanvasRenderingContext2D, W: number, H: number, o: Re
     ctx.fillText(l.text, q.x, q.y + size * 0.04);
   }
   ctx.restore();
+  return spots;
 }
 
 /* ---------- Page ---------- */
 
 export default function Home() {
-  // Put your picture at public/ethan.jpg. If it's missing, the placeholder shows.
-  const [photoOk, setPhotoOk] = useState(true);
-
   const aboutTitleRef = useRef<HTMLHeadingElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
   const revRef = useRef<HTMLElement>(null);
@@ -1502,8 +1535,12 @@ export default function Home() {
     const c = cv?.getContext("2d");
     if (!box || !cv || !c) return;
     let raf = 0, last = performance.now(), ps = 0, w = 0, h = 0, dpr = 1, tv = 0;
-    let mx = 0, my = 0, ex = 0, ey = 0;
+    let mx = 0, my = 0, ex = 0, ey = 0, cx0 = -1e4, cy0 = -1e4; // cx0/cy0 = the pointer, in page pixels
     let dragging = false, lastX = 0;
+    // painting the cartridges: how far each one is painted, how strongly it shows, and whether it's being painted
+    const paint = [0, 1, 2, 3, 4, 5].map(() => ({ m: new Float32Array(PAINT_MARKS.length), a: 1, fade: false, any: false }));
+    let spots: { x: number; y: number; r: number }[] = [];
+    let section = 0, brush = false, lastPx = -1e4, lastPy = -1e4;
     const size = () => {
       const r = cv.getBoundingClientRect();
       dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1515,6 +1552,8 @@ export default function Home() {
     const onMove = (e: PointerEvent) => {
       mx = (e.clientX / window.innerWidth) * 2 - 1;
       my = (e.clientY / window.innerHeight) * 2 - 1;
+      cx0 = e.clientX;
+      cy0 = e.clientY;
       if (dragging) {
         // dragging left moves on to the next chamber (it scrolls the page for you)
         const d = (lastX - e.clientX) * REVOLVER_DRAG;
@@ -1558,6 +1597,54 @@ export default function Home() {
       const shown = smooth(A * 0.8, A, ps);
       const lit = [0, 1, 2, 3, 4, 5].map((i) => (1 - clamp(Math.abs(tv - i) * 2, 0, 1)) * shown);
 
+      // Painting: once zoomed in, touching an amber cartridge with the pointer paints it in.
+      // When the cylinder turns to the next section, the paint fades away.
+      const now0 = Math.round(tv);
+      if (now0 !== section) {
+        section = now0;
+        paint.forEach((pt) => { if (pt.any) pt.fade = true; });
+      }
+      let over = false;
+      const cr = cv.getBoundingClientRect();
+      const px = cx0 - cr.left, py = cy0 - cr.top;
+      if (shown > 0.95 && spots.length === 6) {
+        spots.forEach((sp, i) => {
+          const pt = paint[i];
+          if (lit[i] > 0.3 || pt.fade) return;
+          if (Math.hypot(px - sp.x, py - sp.y) < sp.r) over = true;
+          // brush every stroke near the line the pointer moved along since the last frame (so fast swipes don't skip)
+          const br = sp.r * PAINT_BRUSH;
+          const seg = Math.hypot(px - lastPx, py - lastPy);
+          const steps = seg > sp.r * 4 ? 1 : Math.max(1, Math.ceil(seg / (br * 0.4)));
+          for (let k = 1; k <= steps; k++) {
+            const t = k / steps;
+            const bx = steps === 1 ? px : lastPx + (px - lastPx) * t, by = steps === 1 ? py : lastPy + (py - lastPy) * t;
+            if (Math.hypot(bx - sp.x, by - sp.y) > sp.r + br) continue;
+            PAINT_MARKS.forEach((mk, j) => {
+              if (pt.m[j] === 0 && Math.hypot(sp.x + mk.u * sp.r - bx, sp.y + mk.v * sp.r - by) < br * mk.jit) {
+                pt.m[j] = 0.01;
+                pt.any = true;
+              }
+            });
+          }
+        });
+      }
+      lastPx = px;
+      lastPy = py;
+      paint.forEach((pt) => {
+        if (pt.fade) {
+          pt.a -= dt / 0.45;
+          if (pt.a <= 0) { pt.m.fill(0); pt.a = 1; pt.fade = false; pt.any = false; }
+        } else if (pt.any) {
+          // painted strokes light up quickly, one after another, as the brush passes
+          for (let j = 0; j < pt.m.length; j++) if (pt.m[j] > 0 && pt.m[j] < 1) pt.m[j] = Math.min(1, pt.m[j] + dt * 7);
+        }
+      });
+      if (over !== brush) {
+        brush = over;
+        document.documentElement.classList.toggle("brush-on", over);
+      }
+
       if (br.bottom > 0 && br.top < window.innerHeight) {
         const small = w < 768; // phones: the cylinder sits at the top and the info goes underneath
         // at the start: the whole revolver, side on, in the middle of the screen
@@ -1570,7 +1657,7 @@ export default function Home() {
         const t = now / 1000;
         const wob = 1 - f; // it stops leaning and swaying once zoomed in, so the drum sits perfectly still
         drawPose(c, {
-          turn: tv, lit,
+          turn: tv, lit, paint, dots: smooth(0.95, 1, shown),
           gun: 1 - smooth(0.3, 0.75, f),
           // a quarter turn: from side on to the bullets pointing straight at you
           yaw: (lerp(REVOLVER_YAW, (REVOLVER_FLIP ? -1 : 1) * 90, f) + (ex * REVOLVER_MOUSE + Math.sin(t * 0.6) * 1.5) * wob) * deg,
@@ -1581,6 +1668,7 @@ export default function Home() {
           px: lerp(593, 504, f),
           py: lerp(335, 256, f),
         });
+
       }
       // the info for each chamber fades in while its chamber is lit
       panelEls.current.forEach((el, i) => {
@@ -1598,7 +1686,7 @@ export default function Home() {
     const drawPose = (cc: CanvasRenderingContext2D, pose: RevolverPose) => {
       cc.setTransform(dpr, 0, 0, dpr, 0, 0);
       cc.clearRect(0, 0, w, h);
-      drawRevolver(cc, w, h, pose);
+      spots = drawRevolver(cc, w, h, pose);
     };
     raf = requestAnimationFrame(frame);
     return () => {
@@ -1607,6 +1695,7 @@ export default function Home() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       cv.removeEventListener("pointerdown", onDown);
+      document.documentElement.classList.remove("brush-on");
     };
   }, []);
 
@@ -1660,12 +1749,12 @@ export default function Home() {
       {/* dot + trailing ring cursor (it shows on the wall too) */}
       <Cursor />
 
-      <style>{PAGE_CSS + INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + BG_CSS + WALL_CSS}</style>
+      <style>{INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + BG_CSS + WALL_CSS}</style>
 
       {/* The revolver behind the wall. Scrolling through this tall block zooms in on its cylinder, then turns the
           cylinder round one chamber at a time. Each chamber holds some info (edit ABOUT_TITLE, ABOUT_TEXT and CHAMBERS at the top). */}
-      <section ref={revRef} className="relative" style={{ height: REVOLVER_HEIGHT }}>
-        <div className="sticky top-16 h-[calc(100dvh-4rem)] w-full overflow-hidden">
+      <section ref={revRef} className="relative -mt-16" style={{ height: REVOLVER_HEIGHT }}>
+        <div className="sticky top-0 h-dvh w-full overflow-hidden">
           <canvas ref={revCanvasRef} role="img" aria-label="A see-through 3D revolver" className="absolute inset-0 h-full w-full" />
 
           {/* the info in each chamber: to the left of the cylinder (underneath it on phones) */}
@@ -1676,30 +1765,8 @@ export default function Home() {
               className="absolute inset-0 flex items-start md:items-center"
               style={{ opacity: 0, visibility: "hidden" }}
             >
-              {/* the text, with your polaroid beside it (the polaroid only shows on bigger screens) */}
-              <div className="flex w-full flex-row-reverse items-center justify-end gap-10 lg:gap-14">
-                <div className="hidden w-[10rem] shrink-0 md:block lg:w-[13rem]">
-                  <div className="polaroid">
-                    <div className="polaroid-window">
-                      {photoOk ? (
-                        <Image
-                          src="/ethan.jpg"
-                          alt="Photo of me"
-                          fill
-                          sizes="13rem"
-                          className="object-cover"
-                          onError={() => setPhotoOk(false)}
-                        />
-                      ) : (
-                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-6 text-center text-neutral-500">
-                          <p className="text-sm">
-                            Add your photo at <code>public/ethan.jpg</code>
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+              {/* just the text: a thin blue line runs from it to the lit chamber (drawn with the revolver) */}
+              <div className="w-full">
                 <div>
                   <h2
                     ref={aboutTitleRef}
