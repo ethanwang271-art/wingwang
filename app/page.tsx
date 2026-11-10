@@ -61,7 +61,6 @@ const smooth = (a: number, b: number, x: number) => {
 };
 
 // ---- tweak these ----
-const NAVBAR = 64;            // navbar height in px (h-16)
 
 // ---- colours ----
 const PAGE_BLACK = "11,13,15";    // r,g,b of the page's black (taken from your swatch)
@@ -1169,6 +1168,7 @@ const REVOLVER_ROUND_LINE = "255,190,110";  // r,g,b of the cartridges' lines
 const REVOLVER_LIT = "255,255,255";         // r,g,b of the cartridge whose info is showing
 const PAINT_GRID = 34;                      // how many little strokes fit across one bullet (more = finer and denser)
 const PAINT_BRUSH = 0.32;                   // how big the brush is, compared to a bullet (0.32 = about a third of it)
+const REVOLVER_SNAP = 0.35;                 // when you stop scrolling between two chambers, it glides to the nearest one in this many seconds (0 = off)
 const REVOLVER_FILL = 0.035;                // how see-through the surfaces are (0 = only lines, higher = more solid)
 
 // where the revolver is and which way it faces. turn = which chamber is lit (0 to 5, in between while turning),
@@ -1541,6 +1541,8 @@ export default function Home() {
     const paint = [0, 1, 2, 3, 4, 5].map(() => ({ m: new Float32Array(PAINT_MARKS.length), a: 1, fade: false, any: false }));
     let spots: { x: number; y: number; r: number }[] = [];
     let section = 0, brush = false, lastPx = -1e4, lastPy = -1e4;
+    let lastScroll = performance.now(), snapping = false, snapAt = 0; // when the page last moved, and whether it is gliding to a chamber
+    const onScroll = () => { if (!snapping) lastScroll = performance.now(); };
     const size = () => {
       const r = cv.getBoundingClientRect();
       dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1574,6 +1576,7 @@ export default function Home() {
     window.addEventListener("resize", size);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("scroll", onScroll, { passive: true });
     cv.addEventListener("pointerdown", onDown);
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
     const deg = Math.PI / 180;
@@ -1582,7 +1585,7 @@ export default function Home() {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const br = box.getBoundingClientRect();
-      const p = clamp((NAVBAR - br.top) / Math.max(1, br.height - h), 0, 1);
+      const p = clamp(-br.top / Math.max(1, br.height - h), 0, 1);
       ps += (p - ps) * (1 - Math.exp(-dt * 9)); // smooth out the scrolling
       ex += (mx - ex) * (1 - Math.exp(-dt * 3));
       ey += (my - ey) * (1 - Math.exp(-dt * 3));
@@ -1596,6 +1599,21 @@ export default function Home() {
       tv += (target - tv) * (1 - Math.exp(-dt * 6)); // glides after the scroll and settles softly on each chamber
       const shown = smooth(A * 0.8, A, ps);
       const lit = [0, 1, 2, 3, 4, 5].map((i) => (1 - clamp(Math.abs(tv - i) * 2, 0, 1)) * shown);
+
+      // Snapping: if the page stops while the cylinder is turning between two chambers (where neither one's
+      // info can be clicked), glide on to whichever chamber is closer.
+      const l = lenisRef.current;
+      if (snapping && now - snapAt > REVOLVER_SNAP * 1000 + 400) snapping = false; // in case a new scroll cut the glide short
+      if (REVOLVER_SNAP > 0 && l && !snapping && !dragging && !l.isTouching && !l.isScrolling && now - lastScroll > 200) {
+        const pu = clamp((p - A) / (1 - A), 0, 1) * 6, pk = Math.floor(pu), pf = pu - pk;
+        if (pk < 5 && pf > 0.6) {
+          const goal = pf < 0.8 ? pk + 0.5 : pk + 1.05; // just inside the resting spot of the nearer chamber
+          const y = window.scrollY + br.top + (A + (goal / 6) * (1 - A)) * (br.height - h);
+          snapping = true;
+          snapAt = now;
+          l.scrollTo(y, { duration: REVOLVER_SNAP, onComplete: () => { snapping = false; lastScroll = performance.now(); } });
+        }
+      }
 
       // Painting: once zoomed in, touching an amber cartridge with the pointer paints it in.
       // When the cylinder turns to the next section, the paint fades away.
@@ -1694,6 +1712,7 @@ export default function Home() {
       window.removeEventListener("resize", size);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("scroll", onScroll);
       cv.removeEventListener("pointerdown", onDown);
       document.documentElement.classList.remove("brush-on");
     };
