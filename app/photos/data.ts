@@ -88,9 +88,9 @@ export function getFolder(name: string) {
   return {
     title: pretty(match),
     description: describe(match, files.length),
-    photos: files.map<Photo>((f) => ({
+    photos: files.map<Photo>((f, i) => ({
       src: url(match, f),
-      alt: `${pretty(match)} photo`,
+      alt: `${match} photo ${i + 1} of ${files.length}, by Ethan Wang`,
       ...dims(path.join(ROOT, match, f)),
     })),
   };

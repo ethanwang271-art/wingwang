@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
+/* the whole site is dark: starting dark stops a white flash while a page loads */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0d0f;
+  --foreground: #ededed;
 }
 
 @theme inline {

@@ -1,4 +1,5 @@
 "use client";
+// app/components/navbar.tsx
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -6,7 +7,6 @@ import { usePathname } from "next/navigation";
 // TODO: replace these with your real details
 const INSTAGRAM_URL = "https://instagram.com/etnwingwang";
 const LINKEDIN_URL = "https://www.linkedin.com/in/ethan-wang-9206563a1/"; // <- put your LinkedIn profile link here
-const EMAIL = "ethan@wingwang.ca";
 
 const pageLinks = [
   { href: "/photos", label: "photos" },
@@ -52,6 +52,9 @@ export default function Navbar() {
   const iconButton =
     "rounded-full p-2 text-neutral-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
 
+  // the email icon opens the contact page; it stays lit while you're on it
+  const onContact = pathname.startsWith("/contact");
+
   return (
     // h-16 is fixed so pages can size themselves with calc(100dvh - 4rem)
     <header className="sticky top-0 z-50 h-16 border-b border-white/10 bg-[#0b0d0f]/80 text-white backdrop-blur">
@@ -90,9 +93,14 @@ export default function Navbar() {
 
           <span className="mx-1 hidden h-5 w-px bg-white/20 sm:block" aria-hidden="true" />
 
-          <a href={`mailto:${EMAIL}`} aria-label="Email me" className={iconButton}>
+          <Link
+            href="/contact"
+            aria-label="Contact me"
+            aria-current={onContact ? "page" : undefined}
+            className={`${iconButton} ${onContact ? "bg-white/10 text-white" : ""}`}
+          >
             <MailIcon />
-          </a>
+          </Link>
           <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className={iconButton}>
             <InstagramIcon />
           </a>

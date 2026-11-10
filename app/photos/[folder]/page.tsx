@@ -1,19 +1,51 @@
 // app/photos/[folder]/page.tsx  (the folder name in the path is literally [folder], with the brackets)
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getFolder } from "../data";
+import { getFolder, getFolders } from "../data";
 import Gallery from "./Gallery";
 
-export default async function FolderPage({ params }: { params: Promise<{ folder: string }> }) {
-  const { folder } = await params;
-  let name = folder;
-  try { name = decodeURIComponent(folder); } catch {}
+type Props = { params: Promise<{ folder: string }> };
 
+const folderName = async (params: Props["params"]) => {
+  const { folder } = await params;
+  try { return decodeURIComponent(folder); } catch { return folder; }
+};
+// Only show a description you wrote yourself (description.txt), not the auto "A collection of N photos."
+const ownDescription = (d: string) => (/^a collection of \d+ photos?\.?$/i.test(d.trim()) ? "" : d);
+
+// build every album page ahead of time (when the site is built), so they open instantly
+export function generateStaticParams() {
+  return getFolders().map((f) => ({ folder: f.id }));
+}
+
+// each album gets its own title, description and share picture (its first photo)
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const name = await folderName(params);
+  const data = getFolder(name);
+  if (!data) return {};
+  const desc = ownDescription(data.description);
+  const description = `${name}: ${data.photos.length} photos by Ethan Wang.${desc ? ` ${desc}` : ""}`;
+  const path = `/photos/${encodeURIComponent(name)}`;
+  const cover = data.photos[0];
+  return {
+    title: name,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      url: path,
+      title: `${name} | wingwang`,
+      description,
+      images: cover ? [{ url: cover.src, width: cover.w, height: cover.h, alt: cover.alt }] : undefined,
+    },
+  };
+}
+
+export default async function FolderPage({ params }: Props) {
+  const name = await folderName(params);
   const data = getFolder(name);
   if (!data) notFound();
-
-  // Only show a description you wrote yourself (description.txt), not the auto "A collection of N photos."
-  const desc = /^a collection of \d+ photos?\.?$/i.test(data.description.trim()) ? "" : data.description;
+  const desc = ownDescription(data.description);
 
   return (
     <main className="min-h-[calc(100dvh-4rem)] bg-[#0b0d0f] text-white">

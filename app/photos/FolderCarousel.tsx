@@ -494,7 +494,7 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
                 alt=""
                 fill
                 draggable={false}
-                priority={sl.v === 0}
+                preload={sl.v === 0}
                 sizes={isTop ? "90vw" : "(min-width: 640px) 40vw, 62vw"}
                 className="object-cover"
               />

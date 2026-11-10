@@ -9,10 +9,10 @@ const EMAIL = "ethan@wingwang.ca"; // shown on the page. (Messages from the form
 const CONTACT_TITLE = "contact";
 const CONTACT_BLURB = "Tell me a little about what you're working on and I'll get back to you soon.";
 const PHONE: string = ""; // optional, for example "647-555-0123". Leave it empty to hide the phone line
-// TODO: put your real links here (any with an empty link "" is hidden)
+// your links (the same ones as in the navbar). Any with an empty link "" is hidden
 const SOCIALS: { label: string; href: string }[] = [
-  { label: "Instagram", href: "https://instagram.com/" },
-  { label: "LinkedIn", href: "https://linkedin.com/" },
+  { label: "Instagram", href: "https://instagram.com/etnwingwang" },
+  { label: "LinkedIn", href: "https://www.linkedin.com/in/ethan-wang-9206563a1/" },
 ];
 
 // ---- colours and glow (same as the home page) ----

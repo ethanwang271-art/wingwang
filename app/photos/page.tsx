@@ -3,7 +3,12 @@ import type { Metadata } from "next";
 import FolderCarousel from "./FolderCarousel";
 import { getFolders } from "./data";
 
-export const metadata: Metadata = { title: "Photos | wingwang" };
+export const metadata: Metadata = {
+  title: "photos",
+  description: "Photo albums by Ethan Wang: travel, school, friends and more.",
+  alternates: { canonical: "/photos" },
+  openGraph: { url: "/photos", title: "photos | wingwang" },
+};
 
 export default function PhotosPage() {
   const folders = getFolders();
