@@ -7,7 +7,7 @@ import Image from "next/image";
 import Lenis from "lenis";
 
 // TODO: paste the link to your Google Doc resume here (in Google Docs: Share -> set to "Anyone with the link" -> Copy link)
-const RESUME_URL = "https://docs.google.com/document/d/1GPkXz4uP63ArL1-Wk0-hQU1j4F1xY5CJKLFAr5DVoiI/edit?usp=sharing";
+const RESUME_URL = "roblox.com";
 
 // ---- About me section: edit these ----
 const ABOUT_TITLE = "who am i?";
