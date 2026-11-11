@@ -19,9 +19,9 @@ const ABOUT_TEXT = [
 // Each line in quotes inside `text` is one paragraph. After the last one, the camera zooms in through the aperture
 // into your photos, videos and projects.
 const ABOUT_MORE: { title: string; text: string[] }[] = [
-  { title: "where i'm from", text: ["photographer based in Toronto"] },
-  { title: "what i do", text: ["currently currentlying"] },
-  { title: "why photos", text: ["photography has always been appealing to me"] },
+  { title: "where i'm from", text: ["based in Toronto"] },
+  { title: "what i do", text: ["currently a student"] },
+  { title: "why photos", text: ["photography has always been cool to me"] },
   { title: "what's next", text: ["trying to develop new projects"] },
 ];
 
@@ -227,10 +227,14 @@ function Cursor() {
 /* ---------- Wall intro: break through a concrete wall when you first arrive ---------- */
 
 // ---- tweak these ----
-const WALL_HITS = 4;                  // hits it takes to break through (keep it at 4 or less)
+const WALL_HITS = 3;                  // hits it takes to break through (keep it at 4 or less). Each one knocks a big chunk out
 const WALL_PROMPT = "break the wall";       // the big text in the middle
 const WALL_PROMPT_TOUCH = "break the wall"; // the same text on phones and tablets
-const WALL_HOLE_SIZE = 1;             // how big the hole from each hit is (1 = normal, 1.5 = half as big again)
+const WALL_HOLE_SIZE = 1;             // how big the chunk knocked out by each hit is (1 = normal, 1.5 = half as big again)
+const WALL_HIT_AREA = 0.15;           // where the wall can be broken: within this far of the middle (0.15 = 15% of the screen's smaller side).
+                                      // A click further out still hits, just pulled in to the edge of that area
+const WALL_ZOOM_DELAY = 0.2;          // after the last hit, how long it waits before flying through the opening (seconds)
+const WALL_ZOOM_TIME = 0.9;           // how long the fly-through takes (seconds)
 const WALL_COLOR = "#0f1012";         // the colour of the wall (black)
 const WALL_TEXT_COLOR = "#f5f5f3";    // the colour of the "break the wall" text (white)
 
@@ -428,7 +432,8 @@ function cellsPath(cells: Cell[], out: boolean[]): Path2D {
 // The inside edge of an opening: the thickness of the wall that you can see once pieces have come out.
 // Each bit of edge is shaded by which way it faces (bright if it faces the light, dark if it faces away).
 // `inset` says where the back of the wall is for a point on the front.
-function drawRim(ctx: CanvasRenderingContext2D, cells: Cell[], out: boolean[], cx: number, cy: number, inset: (p: Pt) => Pt) {
+// `gone` says if a point is already open from another hole: the edge there has no wall left, so it isn't drawn
+function drawRim(ctx: CanvasRenderingContext2D, cells: Cell[], out: boolean[], cx: number, cy: number, inset: (p: Pt) => Pt, gone?: (x: number, y: number) => boolean) {
   ctx.lineJoin = "round";
   for (let i = 0; i < cells.length; i++) {
     if (!out[i]) continue;
@@ -444,6 +449,7 @@ function drawRim(ctx: CanvasRenderingContext2D, cells: Cell[], out: boolean[], c
       ny /= len;
       if (nx * (c.cx - mx) + ny * (c.cy - my) < 0) { nx = -nx; ny = -ny; } // point it into the opening
       if (nx * (cx - mx) + ny * (cy - my) <= 0) continue;                  // facing away from the viewer
+      if (gone && gone(mx - nx * 3, my - ny * 3)) continue;                 // the wall behind this edge is already gone
       const a2 = inset(a), b2 = inset(b);
       const lit = 0.5 + 0.5 * (nx * -0.6 + ny * -0.8);
       const v1 = Math.round(30 + 75 * lit), v2 = Math.round(v1 * 0.55);
@@ -678,9 +684,10 @@ function inPoly(pts: Pt[], x: number, y: number): boolean {
   return inside;
 }
 
-// A black concrete wall covers the screen, with the camera behind it. Click it: each hit punches a hole
-// right through (with real wall thickness around the edge), so you get a peek at what's behind. The last hit
-// cracks the whole wall and it crumbles: big chunks fall down towards you and off the screen.
+// A black concrete wall covers the screen, with the camera behind it. Click it: each hit knocks a big chunk
+// clean out of the wall (with real wall thickness around the edge), and the pieces tumble down towards you.
+// Only the middle can be broken. After the last hit it flies you through the opening by itself, onto the site.
+// (Esc skips it: the whole wall crumbles.)
 function startWall(
   root: HTMLDivElement, canvas: HTMLCanvasElement, prompt: HTMLDivElement, promptText: HTMLParagraphElement,
   onBreak: () => void, onDone: () => void,
@@ -729,6 +736,11 @@ function startWall(
   let hits = 0, busy = false, broken = false, gone = false, finished = false, dirty = true;
   let shakeT = 0, shakeAmp = 0;
   let px = 0, py = 0; // where the pointer last was (for Enter / Space)
+  // flying through: whether it has started, how far it has got (pass, 0 to 1),
+  // the point it flies towards (fx, fy) and how much it has to zoom for the opening to fill the screen
+  let flying = false, flyT = 0, pass = 0, fx = 0, fy = 0, zoomTo = 1;
+  // is (x, y) open in this hole?
+  const openAt = (h: Hole, x: number, y: number) => h.patch.cells.some((c, i) => h.patch.out[i] && c.pts.length >= 3 && inPoly(c.pts, x, y));
   const timers: number[] = [];
   const rand = (a: number, b: number) => a + Math.random() * (b - a);
   // where the back edge of a hole ends up: pulled a little towards the middle of the screen (perspective)
@@ -802,10 +814,11 @@ function startWall(
     onDone();
   };
 
-  // hits before the last one: knock a hole right through the wall. The pieces fall away behind it.
+  // a hit: a big chunk of the wall breaks clean out, in a few large pieces that tip towards you and drop
   const punch = (x: number, y: number, size: number) => {
-    const rc = (46 + 22 * hits) * size * WALL_HOLE_SIZE;
-    const cells = makeCells(x, y, rc * 3.2, 38, 1.15, rng(5000 + hits * 71 + Math.floor(x * 3 + y * 7)));
+    const rc = (95 + 30 * hits) * size * WALL_HOLE_SIZE;
+    // few, large pieces (spacing 0.2 = big chunks), so it breaks into slabs instead of gravel
+    const cells = makeCells(x, y, rc * 2.1, 30, 1.0, rng(5000 + hits * 71 + Math.floor(x * 3 + y * 7)), 0.2);
     const patch: Patch = { x, y, hit: hits, cells, out: cells.map((c) => c.pts.length >= 3 && c.d < rc), rc, depth: 0, final: false };
     patches.push(patch);
     const thick = 40 * size;
@@ -815,14 +828,47 @@ function startWall(
       const b = makeBody(c.pts, c.cx, c.cy, thick);
       const dx = c.cx - x, dy = c.cy - y, d = Math.hypot(dx, dy) || 1;
       b.z = thick / 2; // its front starts level with the front of the wall
-      b.vx = (dx / d) * rand(20, 140);
-      b.vy = (dy / d) * rand(20, 140) - rand(0, 100);
-      b.vz = rand(500, 1300);
-      b.wx = rand(-5.5, 5.5); b.wy = rand(-5.5, 5.5); b.wz = rand(-2.5, 2.5);
-      b.max = b.life = 2;
-      b.far = true;
+      b.vx = (dx / d) * rand(40, 180);
+      b.vy = (dy / d) * rand(20, 120) - rand(40, 160); // a small pop up, then it drops
+      b.vz = -rand(120, 320);                           // towards you
+      b.wx = rand(-2.6, 2.6); b.wy = rand(-2.6, 2.6); b.wz = rand(-1.6, 1.6);
+      b.g = WALL_CRUMBLE * 0.8;
+      b.max = b.life = 1.8;
+      b.tone = rand(18, 32);
+      b.side = rand(50, 85);
       bodies.push(b);
     });
+  };
+
+  // How far the opening reaches from (x, y) in every direction: the nearest point of its edge.
+  // That says how much the view has to zoom in for the opening to cover the whole screen.
+  const reachFrom = (h: Hole, x: number, y: number) => {
+    let best = Infinity;
+    h.patch.cells.forEach((c, i) => {
+      if (!h.patch.out[i]) return;
+      const n = c.pts.length;
+      for (let k = 0; k < n; k++) {
+        const j = c.nb[k];
+        if (j >= 0 && h.patch.out[j]) continue; // not an edge of the opening
+        const a = c.pts[k], b = c.pts[(k + 1) % n];
+        const ex = b.x - a.x, ey = b.y - a.y, l2 = ex * ex + ey * ey || 1;
+        const t = Math.max(0, Math.min(1, ((x - a.x) * ex + (y - a.y) * ey) / l2));
+        best = Math.min(best, Math.hypot(a.x + ex * t - x, a.y + ey * t - y));
+      }
+    });
+    return best;
+  };
+
+  // the wall is broken: pick the biggest opening and fly through it
+  const getReady = () => {
+    let bestR = 0;
+    for (const h of holes) {
+      const r = reachFrom(h, h.patch.x, h.patch.y);
+      if (r > bestR) { bestR = r; fx = h.patch.x; fy = h.patch.y; }
+    }
+    zoomTo = (Math.hypot(W, H) / 2 / Math.max(20, bestR)) * 1.35;
+    flying = true;
+    dirty = true;
   };
 
   // one piece of the wall lets go: it tips towards you and drops off the screen
@@ -885,21 +931,22 @@ function startWall(
     const size = Math.max(0.7, Math.min(1.25, Math.min(W, H) / 800));
     stars.push(makeStar(x, y, hits, 9000 + hits * 131 + Math.floor(x * 7 + y * 3), 0.85 + 0.12 * (hits - 1)));
     root.style.background = "transparent"; // from now on the page shows through the holes
-    if (!last) {
-      punch(x, y, size);
-      redrawCracks();
-      spawnChips(x, y, 5 + hits * 2, 1);
-      spawnPuffs(x, y, 2 + hits, 150);
-      shakeT = 0.22;
-      shakeAmp = 4 + hits * 2.5;
-    }
+    punch(x, y, size);
+    redrawCracks();
+    spawnChips(x, y, 8 + hits * 3, 1.1);
+    spawnPuffs(x, y, 3 + hits, 170);
+    shakeT = 0.26;
+    shakeAmp = 7 + hits * 3;
     prompt.style.opacity = "0";
     dirty = true;
-    if (last) breakWall(x, y);
+    if (last) timers.push(window.setTimeout(getReady, WALL_ZOOM_DELAY * 1000));
   };
 
   const doHit = (x: number, y: number) => {
-    if (busy || broken) return;
+    if (busy || broken || hits >= WALL_HITS) return;
+    // only the middle of the wall can be broken: a click further out is pulled in to the edge of that area
+    const lim = Math.min(W, H) * WALL_HIT_AREA, dx = x - W / 2, dy = y - H / 2, d = Math.hypot(dx, dy);
+    if (d > lim) { x = W / 2 + (dx / d) * lim; y = H / 2 + (dy / d) * lim; }
     busy = true;
     impact(x, y);
     timers.push(window.setTimeout(() => { busy = false; }, 140));
@@ -924,6 +971,17 @@ function startWall(
 
   const update = (dt: number) => {
     if (shakeT > 0) { shakeT -= dt; dirty = true; }
+    if (flying && !broken && pass < 1) {
+      flyT += dt / WALL_ZOOM_TIME;
+      pass = flyT >= 1 ? 1 : smooth(0, 1, flyT);
+      canvas.style.opacity = String(1 - smooth(0.82, 1, pass)); // the last of the wall fades as it goes past you
+      dirty = true;
+      if (pass >= 1) {
+        root.style.pointerEvents = "none";
+        onBreak();
+        finish();
+      }
+    }
     for (let i = bodies.length - 1; i >= 0; i--) {
       const b = bodies[i];
       b.life -= dt;
@@ -967,7 +1025,12 @@ function startWall(
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const k = shakeT > 0 ? Math.max(0, Math.min(1, shakeT / 0.22)) : 0;
     const sx = (Math.random() - 0.5) * 2 * shakeAmp * k, sy = (Math.random() - 0.5) * 2 * shakeAmp * k;
-    ctx.setTransform(dpr, 0, 0, dpr, sx * dpr, sy * dpr);
+    // flying through: zoom in on the opening while it slides to the middle of the screen
+    const zs = pass > 0 ? Math.pow(zoomTo, pass * pass) : 1;
+    const slide = smooth(0, 0.7, pass);
+    const ox = fx + (W / 2 - fx) * slide - fx * zs, oy = fy + (H / 2 - fy) * slide - fy * zs;
+    const tf = (c: CanvasRenderingContext2D) => c.setTransform(dpr * zs, 0, 0, dpr * zs, (ox + sx) * dpr, (oy + sy) * dpr);
+    tf(ctx);
     bodies.sort((a, b) => b.z - a.z); // furthest away first, so nearer chunks are painted on top
 
     if (!gone) {
@@ -988,7 +1051,8 @@ function startWall(
         ctx.globalCompositeOperation = "source-over";
       };
       for (const h of holes) cut(h.path);
-      for (const h of holes) drawRim(ctx, h.patch.cells, h.patch.out, W / 2, H / 2, inset(h.k));
+      // (where two holes overlap, an edge of one can sit inside the other: those bits are skipped)
+      for (const h of holes) drawRim(ctx, h.patch.cells, h.patch.out, W / 2, H / 2, inset(h.k), (x, y) => holes.some((o) => o !== h && openAt(o, x, y)));
       if (collapse && collapse.path) {
         cut(collapse.path);
         drawRim(ctx, collapse.patch.cells, collapse.patch.out, W / 2, H / 2, inset(collapse.k));
@@ -998,7 +1062,7 @@ function startWall(
       if (bodies.some((b) => b.far)) {
         farx.setTransform(1, 0, 0, 1, 0, 0);
         farx.clearRect(0, 0, farC.width, farC.height);
-        farx.setTransform(dpr, 0, 0, dpr, sx * dpr, sy * dpr);
+        tf(farx);
         for (const b of bodies) if (b.far) drawBody(farx, b, W / 2, H / 2);
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1105,6 +1169,7 @@ function WallIntro({ onBreak, onDone }: { onBreak: () => void; onDone: () => voi
           {WALL_PROMPT}
         </p>
       </div>
+
     </div>
   );
 }
