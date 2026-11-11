@@ -2,33 +2,43 @@
 // app/page.tsx  (everything for the home page lives in this one file)
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import Lenis from "lenis";
-
-// TODO: paste the link to your Google Doc resume here (in Google Docs: Share -> set to "Anyone with the link" -> Copy link)
-const RESUME_URL = "roblox.com";
 
 // ---- About me section: edit these ----
 const ABOUT_TITLE = "who am i?";
 // Each line in quotes is one paragraph. Change them, add more, or delete some.
 const ABOUT_TEXT = [
   "hi my names ethan",
-  "site is not finished :(",
+  "site is a work in progress",
 ];
 
-// ---- What each aperture stop shows: edit these ----
-// The lens has 6 stops (f/1.8, 2.8, 4, 5.6, 8, 11). The first one is "who am i?" above; these are stops 2 to 6 (keep it to 5).
-// `link` is optional: a page on your site ("/photos") or a full web address. Delete the link line to have no button.
-const STOPS: { title: string; text: string; link?: { label: string; href: string } }[] = [
-  { title: "photos", text: "i like taking photos", link: { label: "see my photos", href: "/photos" } },
-  { title: "videos", text: "work in progress. stay tuned :D" },
-  { title: "projects", text: "things i've made", link: { label: "see my projects", href: "/projects" } },
-  { title: "contact", text: "contact me hereee", link: { label: "contact me", href: "/contact" } },
-  { title: "more soon", text: ":)" },
+// ---- The rest of your about me: edit these ----
+// The lens has 5 stops (f/1.8, 2.8, 4, 5.6, 8). The first one is "who am i?" above; these are stops 2 to 5 (keep it to 4).
+// Each line in quotes inside `text` is one paragraph. After the last one, the camera zooms in through the aperture
+// into your photos, videos and projects.
+const ABOUT_MORE: { title: string; text: string[] }[] = [
+  { title: "where i'm from", text: ["photographer based in Toronto"] },
+  { title: "what i do", text: ["currently currentlying"] },
+  { title: "why photos", text: ["photography has always been appealing to me"] },
+  { title: "what's next", text: ["trying to develop new projects"] },
 ];
 
-// how big the titles next to the lens are: grows with the screen width, from 36px (2.25rem) up to 96px (6rem)
-const TITLE_SIZE = "clamp(2.25rem, 5.6vw, 6rem)";
+// ---- The part after the zoom (photos, videos, projects): edit these ----
+// photos: which albums to show (the folder names inside public/photos). If one isn't found, another album fills its spot.
+const HOME_ALBUMS = ["summer '26", "OASIS", "senior sunrise"];
+// videos: the one video to feature. Put the file in public/videos/ and write its path, for example "/videos/reel.mp4".
+// Leave src "" to show a "coming soon" box. poster = an optional picture shown before it plays.
+const HOME_VIDEO = { title: "coming soon", caption: "the first videos are on the way.", src: "", poster: "" };
+// projects: a short list. Copy the example block (without the //) to add one, newest first.
+const HOME_PROJECTS: { date: string; title: string; text: string; href: string }[] = [
+  // { date: "mar '26", title: "my project", text: "one line about it", href: "/projects" },
+];
+
+// how big the titles next to the lens are: grows with the screen width, from 36px (2.25rem) up to 76px (4.75rem).
+// A long title wraps onto two lines rather than running into the lens.
+const TITLE_SIZE = "clamp(2.25rem, 4.4vw, 4.75rem)";
 
 // ---- "who am i?" shake (it wobbles while you scroll past it) ----
 const SHAKE_PX = 3;        // how far each letter jiggles at most, in px
@@ -73,6 +83,7 @@ const CURSOR_DOT = 8;             // size of the dot in px
 const CURSOR_RING = 38;           // size of the ring in px
 const CURSOR_FOLLOW = 9;          // how quickly the ring catches up with the dot (lower = lazier, more delay)
 const CURSOR_HOVER_SCALE = 1.7;   // the ring grows this much over links and buttons (1 = never grows)
+const PAINT_COLOR = "255,190,110";  // r,g,b of the paint when you brush over the aperture blades (the same amber as the blades)
 
 
 // hide the normal arrow (only on devices with a real mouse); it comes back when you leave this page
@@ -81,6 +92,9 @@ const CURSOR_CSS = `
   html, html * { cursor: none !important; }
 }
 .cursor-dot, .cursor-ring { transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease; }
+/* over the aperture blades, where you can paint, the cursor becomes an amber brush */
+html.brush-on .cursor-dot { background: rgb(${PAINT_COLOR}) !important; box-shadow: 0 0 14px rgba(${PAINT_COLOR},.9) !important; }
+html.brush-on .cursor-ring { border-color: rgba(${PAINT_COLOR},.85) !important; mix-blend-mode: normal !important; }
 `;
 
 // the "Contact me" button: dark blue-tinted box, blue border, monospace text
@@ -1097,7 +1111,7 @@ function WallIntro({ onBreak, onDone }: { onBreak: () => void; onDone: () => voi
 
 /* ---------- The camera behind the wall ---------- */
 
-const CAMERA_HEIGHT = "760vh";              // how much scrolling the whole camera part takes (more = slower)
+const CAMERA_HEIGHT = "720vh";              // how much scrolling the whole camera part takes (more = slower). The last screen of it is the zoom through the aperture
 const CAMERA_FACE = 0.14;                   // how much of that scrolling it takes to turn the lens towards you and zoom in on it (0.14 = the first 14%)
 const CAMERA_START_SIZE = 0.62;             // how big the whole camera is at the start (1 = as big as fits)
 const CAMERA_LENS_SIZE = 0.44;              // how big the front of the lens is once zoomed in (0.44 = its radius is 44% of the screen height, so it nearly fills it top to bottom)
@@ -1111,14 +1125,18 @@ const CAMERA_BLADES = "255,190,110";        // r,g,b of the aperture blades
 const CAMERA_LIT = "255,255,255";           // r,g,b of the edge of the opening
 const CAMERA_SNAP = 0.35;                   // when you stop scrolling between two stops, it glides to the nearest one in this many seconds (0 = off)
 const CAMERA_FILL = 0.035;                  // how see-through the surfaces are (0 = only lines, higher = more solid)
-const APERTURE_STOPS = [1.8, 2.8, 4, 5.6, 8, 11]; // the f-number for each of the 6 sections, in order
+const APERTURE_STOPS = [1.8, 2.8, 4, 5.6, 8]; // the f-number for each of the 5 about me sections, in order
 const APERTURE_BLADES = 9;                  // how many blades the aperture has
+const PAINT_GRID = 60;                      // how many little strokes fit across the blades (more = finer and denser)
+const PAINT_BRUSH = 0.09;                   // how big the brush is, compared to the blades' ring (0.09 = about a tenth of it)
 
 // where the camera is and which way it faces. stop = which section is showing (0 to 5, in between while changing),
 // lit = how settled it is on that section (0 to 1), body = how visible the body is, lens = how visible the lens around
 // the blades is (1 = fully, 0 = only the blades), iris = how bright the blades are, cx/cy = where it sits on the screen, scale = how big,
+// paint = the strokes painted on the blades (m[k] = 0 not painted .. 1 fully painted), how strongly they show (a)
+// and how visible the faint unpainted strokes are (dots), mask = while zooming through the aperture, everything outside the opening is blacked out (0 to 1),
 // px/py/pz = the point on the model it turns around, depth = how strong the perspective is (higher = flatter)
-type CameraPose = { stop: number; lit: number; body: number; lens: number; iris: number; yaw: number; tilt: number; cx: number; cy: number; scale: number; px: number; py: number; pz: number; depth: number };
+type CameraPose = { paint: { m: Float32Array; a: number; dots: number } | null; mask: number; stop: number; lit: number; body: number; lens: number; iris: number; yaw: number; tilt: number; cx: number; cy: number; scale: number; px: number; py: number; pz: number; depth: number };
 
 // The camera is a see-through 3D model made of lines, built from simple shapes: flat outlines given a thickness
 // (body, grip, cage) and round shapes spun around a line (lens, dials). Then every point is turned, put in
@@ -1266,6 +1284,28 @@ function buildCamera(view: V3, body: number, lens: number): Model {
   return m;
 }
 
+// The little strokes that fill the blades when you paint them: a grid of short horizontal dashes, worked out once,
+// as positions inside a circle of radius 1 (u = across, v = down). jit makes the brush edge a little ragged.
+const PAINT_MARKS: { u: number; v: number; jit: number }[] = (() => {
+  const out: { u: number; v: number; jit: number }[] = [];
+  const n = PAINT_GRID, cell = 2 / n;
+  for (let row = 0; row < n; row++) {
+    for (let col = 0; col < n; col++) {
+      const u = -1 + (col + 0.5) * cell + (row % 2 ? cell * 0.25 : -cell * 0.25); // rows sit a little offset, like brick
+      const v = -1 + (row + 0.5) * cell;
+      if (u * u + v * v > 0.93) continue;
+      const h = Math.sin(row * 127.1 + col * 311.7) * 43758.5453;
+      out.push({ u, v, jit: 0.75 + 0.5 * (h - Math.floor(h)) });
+    }
+  }
+  return out;
+})();
+
+// where the blades are on the screen: their middle, the radius of their ring, and the opening's corners
+type IrisSpot = { x: number; y: number; r: number; hole: Pt[] };
+// is a point on the blades (inside the ring, outside the opening)?
+const onBlades = (sp: IrisSpot, x: number, y: number) => Math.hypot(x - sp.x, y - sp.y) < sp.r * 0.965 && !inPoly(sp.hole, x, y);
+
 // the f-number at any point while scrolling (in between two stops it's part way between them)
 function fNumber(stop: number): number {
   const s = clamp(stop, 0, APERTURE_STOPS.length - 1), i = Math.min(APERTURE_STOPS.length - 2, Math.floor(s));
@@ -1273,7 +1313,8 @@ function fNumber(stop: number): number {
 }
 
 // draw the model in a pose (yaw/tilt in radians)
-function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose) {
+function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose): IrisSpot | null {
+  let spot: IrisSpot | null = null;
   const cY = Math.cos(o.yaw), sY = Math.sin(o.yaw), cT = Math.cos(o.tilt), sT = Math.sin(o.tilt);
   // which way you're looking, in the model's own directions
   const view = { x: -sY * cT, y: sT, z: cY * cT };
@@ -1293,6 +1334,18 @@ function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose) {
   };
 
   ctx.save();
+  // zooming through: black out everything but the opening, so what's behind the camera shows through it
+  if (o.mask > 0) {
+    const fN = fNumber(o.stop), r = IRIS_R * 0.94 * (APERTURE_STOPS[0] / fN), rot = -0.25 + (1 - r / IRIS_R) * 1.2;
+    const cover = new Path2D();
+    cover.rect(-1e5, -1e5, 2e5, 2e5);
+    trace(cover, Array.from({ length: APERTURE_BLADES }, (_, i) => {
+      const a = rot + (i / APERTURE_BLADES) * Math.PI * 2;
+      return { x: LENS_X + r * Math.cos(a), y: LENS_Y + r * Math.sin(a), z: IRIS_Z };
+    }), true);
+    ctx.fillStyle = `rgba(${PAGE_BLACK},${o.mask.toFixed(3)})`;
+    ctx.fill(cover, "evenodd");
+  }
   // everything adds light on top of what's under it, so overlapping see-through parts glow a little more
   ctx.globalCompositeOperation = "lighter";
 
@@ -1357,6 +1410,34 @@ function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose) {
     trace(fill, v.map((p) => at(p.x, p.y)), true);
     ctx.fillStyle = `rgba(${CAMERA_BLADES},${(0.08 * o.iris).toFixed(3)})`;
     ctx.fill(fill, "evenodd");
+    // where the blades are on the screen (for painting)
+    const c0 = proj(at(0, 0)), e0 = proj(at(R, 0));
+    const sp: IrisSpot = { x: c0.x, y: c0.y, r: Math.hypot(e0.x - c0.x, e0.y - c0.y), hole: v.map((p) => { const q = proj(at(p.x, p.y)); return { x: q.x, y: q.y }; }) };
+    spot = sp;
+    // the paint, under the edges so they stay crisp: faint unpainted strokes, and the painted ones in amber
+    if (o.paint && (o.paint.dots > 0 || o.paint.a > 0)) {
+      const pt = o.paint, sr = sp.r, cell = (2 * sr) / PAINT_GRID, sw = cell * 0.72, sh = Math.max(1, cell * 0.36);
+      const faint = new Path2D(), lit = [new Path2D(), new Path2D(), new Path2D(), new Path2D()]; // painted, in 4 steps of brightness
+      PAINT_MARKS.forEach((k, i) => {
+        const x = sp.x + k.u * sr, y = sp.y + k.v * sr;
+        if (inPoly(sp.hole, x, y)) return; // nothing in the opening
+        const val = pt.m[i];
+        if (val > 0) {
+          const grow = 0.55 + 0.45 * val; // each stroke grows to full length as it's painted
+          lit[Math.min(3, Math.floor(val * 4))].rect(x - (sw * grow) / 2, y - sh / 2, sw * grow, sh);
+        } else if (pt.dots > 0) faint.rect(x - sw / 2, y - sh / 2, sw, sh);
+      });
+      ctx.globalCompositeOperation = "source-over";
+      if (pt.dots > 0) {
+        ctx.fillStyle = `rgba(${PAINT_COLOR},${(0.09 * pt.dots).toFixed(3)})`;
+        ctx.fill(faint);
+      }
+      lit.forEach((path, i) => {
+        ctx.fillStyle = `rgba(${PAINT_COLOR},${((0.35 + 0.65 * ((i + 1) / 4)) * pt.a).toFixed(3)})`;
+        ctx.fill(path);
+      });
+      ctx.globalCompositeOperation = "lighter";
+    }
     // each blade's edge carries on past the corner of the opening, curving a little, out to the housing
     const edges = new Path2D();
     for (let i = 0; i < N; i++) {
@@ -1385,6 +1466,7 @@ function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose) {
   }
 
   ctx.restore();
+  return spot;
 }
 
 // mix two "r,g,b" colours: t = 0 gives a, t = 1 gives b
@@ -1402,6 +1484,19 @@ export default function Home() {
   const camCanvasRef = useRef<HTMLCanvasElement>(null);
   const camHintRef = useRef<HTMLDivElement>(null);
   const camDragRef = useRef<HTMLDivElement>(null);
+  const camStageRef = useRef<HTMLDivElement>(null);
+  // your photo albums, for the photos part after the zoom (read from public/photos by app/api/albums/route.ts)
+  const [albums, setAlbums] = useState<{ id: string; title: string; description: string; cover: string; count: number }[]>([]);
+  useEffect(() => {
+    let gone = false;
+    fetch("/api/albums").then((r) => (r.ok ? r.json() : [])).then((a) => { if (!gone) setAlbums(a); }).catch(() => {});
+    return () => { gone = true; };
+  }, []);
+  // the albums to show: the ones named in HOME_ALBUMS first, then any others, three in all
+  const featured = [
+    ...HOME_ALBUMS.map((n) => albums.find((a) => a.id === n)).filter((a): a is (typeof albums)[number] => !!a),
+    ...albums.filter((a) => !HOME_ALBUMS.includes(a.id)),
+  ].slice(0, 3);
   const panelEls = useRef<(HTMLDivElement | null)[]>([]); // the info for each stop
 
   // the concrete wall you break through when you first arrive (see WallIntro)
@@ -1452,12 +1547,15 @@ export default function Home() {
   // each stop shows one section's info next to the lens. You can also drag sideways over the lens.
   // At the start it leans a little towards the mouse and sways gently, so you can see it's 3D.
   useEffect(() => {
-    const box = camRef.current, cv = camCanvasRef.current, hint = camHintRef.current, drag = camDragRef.current;
+    const box = camRef.current, cv = camCanvasRef.current, hint = camHintRef.current, drag = camDragRef.current, stage = camStageRef.current;
     const c = cv?.getContext("2d");
     if (!box || !cv || !c) return;
     let raf = 0, last = performance.now(), ps = 0, w = 0, h = 0, dpr = 1, tv = 0;
     let mx = 0, my = 0, ex = 0, ey = 0;
     let dragging = false, lastX = 0;
+    // painting the blades: how far each stroke is painted, how strongly they show, and whether they're fading away
+    const paint = { m: new Float32Array(PAINT_MARKS.length), a: 1, fade: false, any: false };
+    let spot: IrisSpot | null = null, section = 0, brush = false, cx0 = -1e4, cy0 = -1e4, lastPx = -1e4, lastPy = -1e4;
     let lastScroll = performance.now(), snapping = false, snapAt = 0; // when the page last moved, and whether it is gliding to a stop
     const onScroll = () => { if (!snapping) lastScroll = performance.now(); };
     const size = () => {
@@ -1471,6 +1569,8 @@ export default function Home() {
     const onMove = (e: PointerEvent) => {
       mx = (e.clientX / window.innerWidth) * 2 - 1;
       my = (e.clientY / window.innerHeight) * 2 - 1;
+      cx0 = e.clientX;
+      cy0 = e.clientY;
       if (dragging) {
         // dragging left moves on to the next stop (it scrolls the page for you)
         const d = (lastX - e.clientX) * CAMERA_DRAG;
@@ -1506,24 +1606,72 @@ export default function Home() {
       ey += (my - ey) * (1 - Math.exp(-dt * 3));
 
       const A = CAMERA_FACE;
+      const n = APERTURE_STOPS.length;
       const f = smooth(0, A, ps); // 0 = the whole camera, 1 = zoomed in on the lens
-      // after that, the scrolling is split into six: one stop each
-      const u = clamp((ps - A) / (1 - A), 0, 1) * 6;
-      const k = Math.min(5, Math.floor(u));
-      const target = Math.min(5, k + smooth(0.6, 1, u - k));
+      // the last screen's worth of scrolling is the zoom through the aperture (it lines up with the next part sliding up)
+      const Z = clamp(1 - h / Math.max(1, br.height - h), A + 0.05, 1);
+      const zoom = clamp((p - Z) / Math.max(1e-6, 1 - Z), 0, 1);
+      // in between, the scrolling is split into one stop each
+      const u = clamp((ps - A) / (Z - A), 0, 1) * n;
+      const k = Math.min(n - 1, Math.floor(u));
+      const target = Math.min(n - 1, k + smooth(0.6, 1, u - k));
       tv += (target - tv) * (1 - Math.exp(-dt * 6)); // glides after the scroll and settles softly on each stop
-      const shown = smooth(A * 0.8, A, ps);
-      const lit = [0, 1, 2, 3, 4, 5].map((i) => (1 - clamp(Math.abs(tv - i) * 2, 0, 1)) * shown);
+      const shown = smooth(A * 0.8, A, ps) * (1 - smooth(0, 0.25, zoom));
+      const lit = APERTURE_STOPS.map((_, i) => (1 - clamp(Math.abs(tv - i) * 2, 0, 1)) * shown);
+
+      // Painting: once zoomed in, moving the pointer over the amber blades paints them in with little strokes.
+      // When the aperture moves on to the next stop, the paint fades away.
+      if (Math.round(tv) !== section) {
+        section = Math.round(tv);
+        if (paint.any) paint.fade = true;
+      }
+      let over = false;
+      const cr = cv.getBoundingClientRect();
+      const px = cx0 - cr.left, py = cy0 - cr.top;
+      if (shown > 0.95 && zoom === 0 && !paint.fade && spot) {
+        const sp = spot;
+        over = onBlades(sp, px, py);
+        // brush every stroke near the line the pointer moved along since the last frame (so fast swipes don't skip)
+        const bw = sp.r * PAINT_BRUSH;
+        const seg = Math.hypot(px - lastPx, py - lastPy);
+        const steps = seg > sp.r * 2 ? 1 : Math.max(1, Math.ceil(seg / (bw * 0.4)));
+        for (let s = 1; s <= steps; s++) {
+          const t = s / steps;
+          const bx = steps === 1 ? px : lastPx + (px - lastPx) * t, by = steps === 1 ? py : lastPy + (py - lastPy) * t;
+          if (Math.hypot(bx - sp.x, by - sp.y) > sp.r + bw) continue;
+          PAINT_MARKS.forEach((mk, j) => {
+            if (paint.m[j] !== 0) return;
+            const x = sp.x + mk.u * sp.r, y = sp.y + mk.v * sp.r;
+            if (Math.hypot(x - bx, y - by) < bw * mk.jit && !inPoly(sp.hole, x, y)) {
+              paint.m[j] = 0.01;
+              paint.any = true;
+            }
+          });
+        }
+      }
+      lastPx = px;
+      lastPy = py;
+      if (paint.fade) {
+        paint.a -= dt / 0.45;
+        if (paint.a <= 0) { paint.m.fill(0); paint.a = 1; paint.fade = false; paint.any = false; }
+      } else if (paint.any) {
+        // painted strokes light up quickly, one after another, as the brush passes
+        for (let j = 0; j < paint.m.length; j++) if (paint.m[j] > 0 && paint.m[j] < 1) paint.m[j] = Math.min(1, paint.m[j] + dt * 7);
+      }
+      if (over !== brush) {
+        brush = over;
+        document.documentElement.classList.toggle("brush-on", over);
+      }
 
       // Snapping: if the page stops while the aperture is changing between two stops (where neither one's
       // info can be clicked), glide on to whichever stop is closer.
       const l = lenisRef.current;
       if (snapping && now - snapAt > CAMERA_SNAP * 1000 + 400) snapping = false; // in case a new scroll cut the glide short
       if (CAMERA_SNAP > 0 && l && !snapping && !dragging && !l.isTouching && !l.isScrolling && now - lastScroll > 200) {
-        const pu = clamp((p - A) / (1 - A), 0, 1) * 6, pk = Math.floor(pu), pf = pu - pk;
-        if (pk < 5 && pf > 0.6) {
+        const pu = clamp((p - A) / (Z - A), 0, 1) * n, pk = Math.floor(pu), pf = pu - pk;
+        if (p < Z && pk < n - 1 && pf > 0.6) {
           const goal = pf < 0.8 ? pk + 0.5 : pk + 1.05; // just inside the resting spot of the nearer stop
-          const y = window.scrollY + br.top + (A + (goal / 6) * (1 - A)) * (br.height - h);
+          const y = window.scrollY + br.top + (A + (goal / n) * (Z - A)) * (br.height - h);
           snapping = true;
           snapAt = now;
           l.scrollTo(y, { duration: CAMERA_SNAP, onComplete: () => { snapping = false; lastScroll = performance.now(); } });
@@ -1534,32 +1682,44 @@ export default function Home() {
         const small = w < 768; // phones: the lens sits at the top and the info goes underneath
         // at the start: the whole camera, facing you, in the middle of the screen
         const sStart = small ? Math.min((w * 0.62) / 760, (h * 0.5) / 720) : Math.min((w * 0.8) / 1000, (h * 0.75) / 720) * CAMERA_START_SIZE;
-        // zoomed in: the whole front of the lens, facing you, to the right of the info (above it on phones).
-        // The middle of the opening is kept clear, ready for photos later.
+        // zoomed in: the whole front of the lens, facing you, to the right of the info (above it on phones)
         const rad = small ? Math.min(h * 0.21, w * 0.44) : Math.min(h * CAMERA_LENS_SIZE, w * 0.27);
         const sLens = rad / LENS_R;
+        // then through the aperture: it grows until the opening is bigger than the screen
+        // (0.88 = how much smaller the blades look than the front of the lens, as they sit further in)
+        const rOpen = IRIS_R * 0.94 * (APERTURE_STOPS[0] / APERTURE_STOPS[n - 1]) * Math.cos(Math.PI / APERTURE_BLADES) * 0.88;
+        const sThrough = (Math.hypot(w, h) / 2 / rOpen) * 1.08;
+        const zEase = zoom * zoom; // starts slowly, then rushes in
+        const move = smooth(0, 0.6, zoom); // the opening slides to the middle of the screen
         const z = f * f; // the zoom speeds up towards the end, like a camera pushing in
         const t = now / 1000;
         const wob = 1 - f; // it stops leaning and swaying once zoomed in, so the lens sits perfectly still
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
         c.clearRect(0, 0, w, h);
-        drawCamera(c, {
-          stop: tv,
-          lit: Math.max(...lit),
-          body: 1 - smooth(0.25, 0.65, f),
-          lens: 1, // 1 = the whole lens stays (lower it to fade the lens and leave only the blades)
-          iris: 0.4 + 0.6 * f,
-          yaw: (lerp(CAMERA_YAW, 0, f) + (ex * CAMERA_MOUSE + Math.sin(t * 0.6) * 1.5) * wob) * deg,
-          tilt: (lerp(CAMERA_TILT, 0, f) + (ey * CAMERA_MOUSE * 0.5 + Math.sin(t * 0.45)) * wob) * deg,
-          cx: lerp(w / 2, small ? w / 2 : w - rad - w * 0.05, f),
-          cy: lerp(h / 2, small ? h * 0.27 : h * 0.5, f),
-          scale: lerp(sStart, sLens, z),
-          px: lerp(0, LENS_X, f),
-          py: lerp(0, LENS_Y, f),
-          pz: lerp(-150, LENS_FRONT, f),
-          depth: lerp(4000, 1600, f), // flatter at the start, so the lens isn't blown up in front of the body
-        });
+        spot = null;
+        if (zoom < 0.999) {
+          spot = drawCamera(c, {
+            paint: { m: paint.m, a: paint.a, dots: smooth(0.95, 1, shown) },
+            mask: zoom > 0 ? 1 : 0,
+            stop: tv,
+            lit: Math.max(...lit),
+            body: 1 - smooth(0.25, 0.65, f),
+            lens: 1 - smooth(0, 0.45, zoom), // the rest of the lens fades as you go through, leaving the blades
+            iris: 0.4 + 0.6 * f,
+            yaw: (lerp(CAMERA_YAW, 0, f) + (ex * CAMERA_MOUSE + Math.sin(t * 0.6) * 1.5) * wob) * deg,
+            tilt: (lerp(CAMERA_TILT, 0, f) + (ey * CAMERA_MOUSE * 0.5 + Math.sin(t * 0.45)) * wob) * deg,
+            cx: lerp(lerp(w / 2, small ? w / 2 : w - rad - w * 0.05, f), w / 2, move),
+            cy: lerp(lerp(h / 2, small ? h * 0.27 : h * 0.5, f), h / 2, move),
+            scale: lerp(sStart, sLens, z) * Math.pow(sThrough / sLens, zEase),
+            px: lerp(0, LENS_X, f),
+            py: lerp(0, LENS_Y, f),
+            pz: lerp(-150, LENS_FRONT, f),
+            depth: lerp(4000, 1600, f), // flatter at the start, so the lens isn't blown up in front of the body
+          });
+        }
       }
+      // once you're through, the camera stops catching clicks so the part underneath can be used
+      if (stage) stage.style.pointerEvents = zoom > 0.5 ? "none" : "";
       // the info for each stop fades in while it's showing
       panelEls.current.forEach((el, i) => {
         if (!el) return;
@@ -1570,7 +1730,7 @@ export default function Home() {
         el.style.pointerEvents = v > 0.6 ? "auto" : "none";
       });
       if (hint) hint.style.opacity = String(1 - smooth(0, 0.03, ps));
-      if (drag) drag.style.opacity = String(shown * (1 - smooth(0.97, 1, ps)));
+      if (drag) drag.style.opacity = String(shown);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -1581,6 +1741,7 @@ export default function Home() {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("scroll", onScroll);
       cv.removeEventListener("pointerdown", onDown);
+      document.documentElement.classList.remove("brush-on");
     };
   }, []);
 
@@ -1637,9 +1798,10 @@ export default function Home() {
       <style>{INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + BG_CSS + WALL_CSS}</style>
 
       {/* The camera behind the wall. Scrolling through this tall block zooms in on its lens, then steps the aperture
-          down one stop at a time. Each stop holds some info (edit ABOUT_TITLE, ABOUT_TEXT and STOPS at the top). */}
+          down one stop at a time (edit ABOUT_TITLE, ABOUT_TEXT and ABOUT_MORE at the top). Then it zooms in through
+          the aperture, and the photos, videos and projects underneath show through the opening. */}
       <section ref={camRef} className="relative -mt-16" style={{ height: CAMERA_HEIGHT }}>
-        <div className="sticky top-0 h-dvh w-full overflow-hidden">
+        <div ref={camStageRef} className="sticky top-0 z-10 h-dvh w-full overflow-hidden">
           <canvas ref={camCanvasRef} role="img" aria-label="A see-through 3D camera with a zoom lens" className="absolute inset-0 h-full w-full" />
 
           {/* the info for each stop: to the left of the lens (underneath it on phones) */}
@@ -1679,8 +1841,8 @@ export default function Home() {
               </div>
             </div>
 
-            {/* stops 2 to 6 */}
-            {STOPS.slice(0, 5).map((ch, i) => (
+            {/* stops 2 to 5: the rest of your about me */}
+            {ABOUT_MORE.slice(0, APERTURE_STOPS.length - 1).map((ch, i) => (
               <div
                 key={i}
                 ref={(el) => { panelEls.current[i + 1] = el; }}
@@ -1689,23 +1851,12 @@ export default function Home() {
               >
                 <div className="max-w-2xl">
                   <p className="mb-3 text-sm font-bold tracking-[0.2em] sm:text-base lg:mb-4" style={{ color: `rgb(${CAMERA_BLADES})` }}>f/{APERTURE_STOPS[i + 1]}</p>
-                  <h2 className="whitespace-nowrap font-bold leading-[1.02] tracking-tight" style={{ fontSize: TITLE_SIZE }}>{ch.title}</h2>
-                  <p className="mt-6 text-base leading-relaxed text-neutral-400 sm:text-xl lg:mt-8 lg:text-2xl">{ch.text}</p>
-                  {ch.link && (
-                    <div className="mt-8">
-                      {ch.link.href.startsWith("http") ? (
-                        <a href={ch.link.href} target="_blank" rel="noopener noreferrer" className="contact-btn">
-                          {ch.link.label}
-                          <ArrowUpRight />
-                        </a>
-                      ) : (
-                        <Link href={ch.link.href} className="contact-btn">
-                          {ch.link.label}
-                          <ArrowUpRight />
-                        </Link>
-                      )}
-                    </div>
-                  )}
+                  <h2 className="font-bold leading-[1.02] tracking-tight [text-wrap:balance]" style={{ fontSize: TITLE_SIZE }}>{ch.title}</h2>
+                  <div className="mt-6 space-y-4 text-base leading-relaxed text-neutral-400 sm:text-xl lg:mt-8 lg:text-2xl">
+                    {ch.text.map((paragraph, j) => (
+                      <p key={j}>{paragraph}</p>
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}
@@ -1723,11 +1874,94 @@ export default function Home() {
         </div>
       </section>
 
+      {/* What you zoom into through the aperture: photos, videos and projects, laid out one after another.
+          It starts tucked up under the last screen of the camera (the -100dvh), so it's what shows through the opening. */}
+      <div className="relative" style={{ marginTop: "-100dvh" }}>
+        <div className="mx-auto max-w-5xl px-6 pb-28 pt-24 sm:pt-28">
+          {/* photos */}
+          <section aria-labelledby="home-photos">
+            <h2 id="home-photos" className="text-4xl font-bold tracking-tight sm:text-5xl">photos</h2>
+            <p className="mt-4 text-lg text-neutral-400 sm:text-xl">
+              {albums.length > 0 ? `${albums.length} albums so far. the latest three:` : "albums from my camera roll."}
+            </p>
+            <div className="mt-8 grid gap-6 sm:grid-cols-3 sm:gap-5">
+              {featured.map((a) => (
+                <Link key={a.id} href={`/photos/${encodeURIComponent(a.id)}`} className="group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+                  <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-neutral-900">
+                    {a.cover && (
+                      <Image src={a.cover} alt={`${a.title}: album cover`} fill sizes="(min-width: 640px) 30vw, 92vw" className="object-cover transition duration-700 group-hover:scale-[1.04]" />
+                    )}
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold sm:text-xl">{a.id}</h3>
+                  <p className="mt-1 text-neutral-400">{a.description}</p>
+                </Link>
+              ))}
+            </div>
+            <Link href="/photos" className="mt-8 inline-block font-mono text-base hover:underline sm:text-lg" style={{ color: `rgb(${BLUE})` }}>
+              see all {albums.length || ""} albums &rarr;
+            </Link>
+          </section>
+
+          {/* videos */}
+          <section aria-labelledby="home-videos" className="mt-28">
+            <h2 id="home-videos" className="text-4xl font-bold tracking-tight sm:text-5xl">videos</h2>
+            <div className="relative mt-8 aspect-video overflow-hidden rounded-xl bg-neutral-900">
+              {HOME_VIDEO.src ? (
+                <video className="h-full w-full object-cover" src={HOME_VIDEO.src} poster={HOME_VIDEO.poster || undefined} controls playsInline preload="metadata" />
+              ) : (
+                <>
+                  {/* the play button, until there's a video */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-full border border-white/25 bg-white/5 sm:h-20 sm:w-20">
+                      <svg viewBox="0 0 24 24" className="ml-1 h-6 w-6 text-white/70 sm:h-7 sm:w-7" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" /></svg>
+                    </span>
+                  </div>
+                  <div className="absolute bottom-4 left-5 sm:bottom-6 sm:left-7">
+                    <p className="text-lg font-semibold sm:text-2xl">{HOME_VIDEO.title}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            <p className="mt-4 text-neutral-400 sm:text-lg">{HOME_VIDEO.caption}</p>
+            <Link href="/videos" className="mt-6 inline-block font-mono text-base hover:underline sm:text-lg" style={{ color: `rgb(${BLUE})` }}>
+              see videos &rarr;
+            </Link>
+          </section>
+
+          {/* projects */}
+          <section aria-labelledby="home-projects" className="mt-28">
+            <h2 id="home-projects" className="text-4xl font-bold tracking-tight sm:text-5xl">projects</h2>
+            {HOME_PROJECTS.length === 0 ? (
+              <p className="mt-4 text-lg text-neutral-400 sm:text-xl">coming soon</p>
+            ) : (
+              <ul className="mt-8 divide-y divide-white/10 border-y border-white/10">
+                {HOME_PROJECTS.map((pj, i) => (
+                  <li key={i}>
+                    <Link href={pj.href} className="group flex items-baseline gap-5 py-5 sm:gap-8">
+                      <span className="w-20 shrink-0 text-sm text-neutral-500 sm:w-24">{pj.date}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-lg font-semibold sm:text-xl">{pj.title}</span>
+                        <span className="mt-1 block text-neutral-400">{pj.text}</span>
+                      </span>
+                      <span className="text-neutral-500 transition group-hover:translate-x-1 group-hover:text-white" aria-hidden="true">&rarr;</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link href="/projects" className="mt-6 inline-block font-mono text-base hover:underline sm:text-lg" style={{ color: `rgb(${BLUE})` }}>
+              see projects &rarr;
+            </Link>
+          </section>
+        </div>
+      </div>
+
       <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 px-6 pb-6 pt-2 text-xs text-neutral-500">
-        <a href={RESUME_URL} target="_blank" rel="noopener noreferrer" className="contact-btn">
+        {/* your resume page (app/resume/page.tsx) */}
+        <Link href="/resume" className="contact-btn">
           Résumé
           <ArrowUpRight />
-        </a>
+        </Link>
         <Link href="/contact" className="contact-btn">
           Contact me
           <ArrowUpRight />
