@@ -15,6 +15,7 @@ const IRIS_BLADES = 9;                // how many blades (the same as the lens o
 const BLADE_LINE = "255,190,110";     // r,g,b of the blades' edges (the amber from the home page)
 const OPENING_LINE = "255,255,255";   // r,g,b of the edge of the opening
 const PAGE_BLACK = "11,13,15";        // r,g,b of the blades themselves (the page's black)
+const BLADE_CURVE = 1.1;              // how much each blade's edge curves (0 = straight lines; same as the home page)
 
 // which of the sections above a page belongs to (or none)
 const sectionOf = (path: string) => IRIS_SECTIONS.find((s) => path === s || path.startsWith(s + "/"));
@@ -42,7 +43,7 @@ function drawIris(ctx: CanvasRenderingContext2D, W: number, H: number, open: num
   ctx.fillStyle = `rgba(${BLADE_LINE},0.035)`;
   ctx.fill(blades, "evenodd");
 
-  // each blade's edge carries on past the corner of the opening, curving a little, out past the screen
+  // each blade's edge carries on from the corner of the opening and sweeps round in a smooth curve, out past the screen
   const edges = new Path2D();
   const far = R * 1.3;
   for (let i = 0; i < N; i++) {
@@ -53,13 +54,19 @@ function drawIris(ctx: CanvasRenderingContext2D, W: number, H: number, open: num
       const ang = rot + ((i + 0.5) / N) * Math.PI * 2 + Math.PI / 2;
       dx = Math.cos(ang); dy = Math.sin(ang);
     } else { dx /= dl; dy /= dl; }
-    const bx = b.x - cx, by = b.y - cy;
-    const pb = bx * dx + by * dy, t = -pb + Math.sqrt(Math.max(0, pb * pb - (bx * bx + by * by - far * far)));
-    const bend = t * 0.1;
-    for (let k = 0; k <= 16; k++) {
-      const u = k / 16, off = Math.sin(u * Math.PI) * bend;
-      const x = b.x + dx * t * u - dy * off, y = b.y + dy * t * u + dx * off;
-      if (k) edges.lineTo(x, y); else edges.moveTo(x, y);
+    // walk outwards from the corner, turning a little towards pointing straight out at every step
+    let x = b.x - cx, y = b.y - cy;
+    const turn = Math.sign(dx * y - dy * x) || 1;
+    const step = far / 60, k = (BLADE_CURVE / far) * step * turn;
+    edges.moveTo(b.x, b.y);
+    for (let n = 0; n < 400 && Math.hypot(x, y) < far; n++) {
+      let diff = Math.atan2(y, x) - Math.atan2(dy, dx);
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      const r = Math.abs(diff) < Math.abs(k) ? diff : k;
+      const c = Math.cos(r), s = Math.sin(r);
+      [dx, dy] = [dx * c - dy * s, dx * s + dy * c];
+      x += dx * step; y += dy * step;
+      edges.lineTo(cx + x, cy + y);
     }
   }
   const glow = (path: Path2D, col: string, a: number, width: number) => {

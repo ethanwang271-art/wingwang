@@ -9,12 +9,12 @@ import Link from "next/link";
 
 // ---- The top ----
 const NAME = "ethan wang";
-const HEADLINE = "[HEADLINE, e.g. student, photographer, builds for the web]";
+const HEADLINE = "student, photographer";
 // the lines on the right. `href` is optional: where clicking it goes
 const CONTACT: { text: string; href?: string }[] = [
-  { text: "[EMAIL]", href: "" },
+  { text: "ethan@wingwang.ca", href: "" },
   { text: "wingwang.ca", href: "https://wingwang.ca" },
-  { text: "[CITY, PROVINCE]" },
+  { text: "TORONTO, ONTARIO" },
   { text: "linkedin.com/in/ethan-wang-9206563a1", href: "https://www.linkedin.com/in/ethan-wang-9206563a1/" },
 ];
 
@@ -63,7 +63,7 @@ const ACTIVITIES: { name: string; detail: string; years: string }[] = [
 const SKILLS = ["photography", "photo editing", "video editing", "web design", "[SKILL]"];
 const TOOLS = ["next.js", "react", "typescript", "tailwind", "[LIGHTROOM?]", "[PREMIERE?]"];
 const AWARDS = ["[AWARD, YEAR]", "[HONOUR ROLL, YEAR]"];
-const LANGUAGES = ["english", "[OTHER]"];
+const LANGUAGES = ["english", "hakka chinese"];
 
 // ---- The bottom line ----
 const FOOTNOTE = "last updated [NOV 2026] · references available on request";

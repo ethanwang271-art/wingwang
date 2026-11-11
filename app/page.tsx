@@ -15,17 +15,27 @@ const ABOUT_TEXT = [
 ];
 
 // ---- The rest of your about me: edit these ----
-// The lens has 5 stops (f/1.8, 2.8, 4, 5.6, 8). The first one is "who am i?" above; these are stops 2 to 5 (keep it to 4).
-// Each line in quotes inside `text` is one paragraph. After the last one, the camera zooms in through the aperture
-// into your photos, videos and projects.
-const ABOUT_MORE: { title: string; text: string[] }[] = [
-  { title: "where i'm from", text: ["based in Toronto"] },
-  { title: "what i do", text: ["currently a student"] },
-  { title: "why photos", text: ["photography has always been cool to me"] },
-  { title: "what's next", text: ["trying to develop new projects"] },
+// These show under "who am i?" on the first page of the camera's screen, in two columns: the professional side
+// and the personal side. Anything in [square brackets] is a placeholder: swap it for your own words (and drop the brackets).
+// Keep each one to a line or two so it all fits on a phone. You can delete a row or add one (5 or so per side fits best).
+const ABOUT_PRO_TITLE = "professional";
+const ABOUT_PRO: { title: string; text: string }[] = [
+  { title: "what i do", text: "currently a student at [school], [program / grade, grad year]" },
+  { title: "what i shoot", text: "[events, portraits, street, sports, concerts...]" },
+  { title: "experience", text: "[clubs, teams, clients or events you've shot for]" },
+  { title: "tools", text: "canon r8, photos editied on lightroom classic" },
+  { title: "open to", text: "freelance shoots, collaborations, internships" },
+];
+const ABOUT_PERSONAL_TITLE = "personal";
+const ABOUT_PERSONAL: { title: string; text: string }[] = [
+  { title: "where i'm from", text: "based in Toronto" },
+  { title: "why photos", text: "photography has always been cool to me" },
+  { title: "outside of photos", text: "[sports, music, games, other hobbies]" },
+  { title: "currently into", text: "[what you're listening to, watching or learning]" },
+  { title: "what's next", text: "trying to develop new projects" },
 ];
 
-// ---- The part after the zoom (photos, videos, projects): edit these ----
+// ---- The other pages on the camera's screen (photos, videos, projects): edit these ----
 // photos: which albums to show (the folder names inside public/photos). If one isn't found, another album fills its spot.
 const HOME_ALBUMS = ["summer '26", "OASIS", "senior sunrise"];
 // videos: the one video to feature. Put the file in public/videos/ and write its path, for example "/videos/reel.mp4".
@@ -36,14 +46,9 @@ const HOME_PROJECTS: { date: string; title: string; text: string; href: string }
   // { date: "mar '26", title: "my project", text: "one line about it", href: "/projects" },
 ];
 
-// how big the titles next to the lens are: grows with the screen width, from 36px (2.25rem) up to 76px (4.75rem).
-// A long title wraps onto two lines rather than running into the lens.
-const TITLE_SIZE = "clamp(2.25rem, 4.4vw, 4.75rem)";
-
-// ---- "who am i?" shake (it wobbles while you scroll past it) ----
-const SHAKE_PX = 3;        // how far each letter jiggles at most, in px
-const SHAKE_DEG = 2;       // how much each letter tilts at most, in degrees
-const SHAKE_SPEED = 2500;  // scroll speed (px per second) at which the shake is at full strength: lower = shakes more easily
+// the last page on the camera's screen
+const CONTACT_TITLE = "contact me";
+const CONTACT_TEXT = "want to shoot something together, or just say hi?";
 
 // ---- tweak these (smooth scrolling) ----
 const LENIS_LERP = 0.12;  // higher = snappier, the page catches up to your scrolling faster; lower = floatier glide (try 0.06 to 0.2)
@@ -83,7 +88,6 @@ const CURSOR_DOT = 8;             // size of the dot in px
 const CURSOR_RING = 38;           // size of the ring in px
 const CURSOR_FOLLOW = 9;          // how quickly the ring catches up with the dot (lower = lazier, more delay)
 const CURSOR_HOVER_SCALE = 1.7;   // the ring grows this much over links and buttons (1 = never grows)
-const PAINT_COLOR = "255,190,110";  // r,g,b of the paint when you brush over the aperture blades (the same amber as the blades)
 
 
 // hide the normal arrow (only on devices with a real mouse); it comes back when you leave this page
@@ -92,9 +96,6 @@ const CURSOR_CSS = `
   html, html * { cursor: none !important; }
 }
 .cursor-dot, .cursor-ring { transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease; }
-/* over the aperture blades, where you can paint, the cursor becomes an amber brush */
-html.brush-on .cursor-dot { background: rgb(${PAINT_COLOR}) !important; box-shadow: 0 0 14px rgba(${PAINT_COLOR},.9) !important; }
-html.brush-on .cursor-ring { border-color: rgba(${PAINT_COLOR},.85) !important; mix-blend-mode: normal !important; }
 `;
 
 // the "Contact me" button: dark blue-tinted box, blue border, monospace text
@@ -152,7 +153,7 @@ function Cursor() {
     let mx = -100, my = -100;   // the mouse (the dot sits exactly here)
     let rx = -100, ry = -100;   // the ring, which drifts after it
     let sc = 1, hover = false, down = false, seen = false;
-    let raf = 0, last = performance.now();
+    let raf = 0, last = performance.now(), lastDot = "", lastRing = "";
 
     const show = (on: boolean) => {
       dot.style.opacity = on ? "1" : "0";
@@ -186,8 +187,11 @@ function Cursor() {
       const want = (hover ? CURSOR_HOVER_SCALE : 1) * (down ? 0.8 : 1);
       sc += (want - sc) * (1 - Math.exp(-dt * 14));
 
-      dot.style.transform = `translate3d(${mx}px,${my}px,0) translate(-50%,-50%)`;
-      ring.style.transform = `translate3d(${rx}px,${ry}px,0) translate(-50%,-50%) scale(${sc.toFixed(3)})`;
+      // only touch the page when the cursor has actually moved
+      const d = `translate3d(${mx}px,${my}px,0) translate(-50%,-50%)`;
+      const r = `translate3d(${rx.toFixed(1)}px,${ry.toFixed(1)}px,0) translate(-50%,-50%) scale(${sc.toFixed(3)})`;
+      if (d !== lastDot) { dot.style.transform = d; lastDot = d; }
+      if (r !== lastRing) { ring.style.transform = r; lastRing = r; }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -218,7 +222,7 @@ function Cursor() {
   };
   return (
     <>
-      <div ref={ringRef} aria-hidden="true" className="cursor-ring" style={{ ...base, width: CURSOR_RING, height: CURSOR_RING, border: "1px solid rgba(255,255,255,.4)", mixBlendMode: "difference" }} />
+      <div ref={ringRef} aria-hidden="true" className="cursor-ring" style={{ ...base, width: CURSOR_RING, height: CURSOR_RING, border: "1px solid rgba(255,255,255,.4)" }} />
       <div ref={dotRef} aria-hidden="true" className="cursor-dot" style={{ ...base, width: CURSOR_DOT, height: CURSOR_DOT, background: `rgb(${BLUE})`, boxShadow: `0 0 10px rgba(${BLUE},.9)` }} />
     </>
   );
@@ -1176,35 +1180,45 @@ function WallIntro({ onBreak, onDone }: { onBreak: () => void; onDone: () => voi
 
 /* ---------- The camera behind the wall ---------- */
 
-const CAMERA_HEIGHT = "720vh";              // how much scrolling the whole camera part takes (more = slower). The last screen of it is the zoom through the aperture
-const CAMERA_FACE = 0.14;                   // how much of that scrolling it takes to turn the lens towards you and zoom in on it (0.14 = the first 14%)
+const CAMERA_HEIGHT = "600vh";              // how much scrolling the whole camera part takes (more = slower)
+const CAMERA_TURN = 0.2;                    // how much of that scrolling it takes to turn round and zoom in on the screen (0.2 = the first 20%). The rest swipes through the screen's pages
 const CAMERA_START_SIZE = 0.62;             // how big the whole camera is at the start (1 = as big as fits)
-const CAMERA_LENS_SIZE = 0.44;              // how big the front of the lens is once zoomed in (0.44 = its radius is 44% of the screen height, so it nearly fills it top to bottom)
-const CAMERA_DRAG = 3;                      // dragging sideways over the lens changes the stop too: higher = further per drag
+const CAMERA_SCREEN_SIZE = 0.86;            // once zoomed in, how much of the window's width the camera's screen may fill (it also always fits the height)
+const CAMERA_SWIPE = 50;                    // how far (px) you have to swipe or drag across the screen to go to the next page
 const CAMERA_YAW = 0;                       // how far it's turned at the start, in degrees (0 = facing you straight on)
 const CAMERA_TILT = 0;                      // how much you look down on it at the start, in degrees
+const CAMERA_SPIN = 0.45;                   // at the start you can drag the camera round to look at it from any side: degrees it turns per pixel dragged
+const CAMERA_SPIN_BACK = 0.45;              // once you scroll, it lets go of your drag and carries on turning in about this many seconds
 const CAMERA_MOUSE = 6;                     // how much it leans to follow the mouse at the start, in degrees (0 = not at all)
-const CAMERA_LINE = BLUE;                   // r,g,b of the body, cage and lens lines
+const CAMERA_LINE = BLUE;                   // r,g,b of the body and lens lines
 const CAMERA_GLASS = "170,215,255";         // r,g,b of the glass inside the lens
 const CAMERA_BLADES = "255,190,110";        // r,g,b of the aperture blades
 const CAMERA_LIT = "255,255,255";           // r,g,b of the edge of the opening
-const CAMERA_SNAP = 0.35;                   // when you stop scrolling between two stops, it glides to the nearest one in this many seconds (0 = off)
+const CAMERA_SNAP = 0.35;                   // when you stop scrolling between two pages, it glides to the nearest one in this many seconds (0 = off)
+const CAMERA_DOTS = "100,159,255";         // r,g,b of the little dots on the camera's back screen (the blue)
+const CAMERA_DOTS_LIT = "160,205,255";      // r,g,b of a dot once the pointer has passed over it (a lighter blue)
+const CAMERA_DOT_GAP = 7;                   // how far apart the dots on the screen are (lower = more, finer dots; about 4.5 = 1mm)
+const CAMERA_DOT_FAINT = 0.2;               // how visible the dots are before you hover over them (0 = hidden until lit)
+const CAMERA_DOT_TURN = -0.3;               // how far round you have to turn the camera before the dots light up (-1 = even from the front, 0 = side on, 1 = only straight from the back)
+const CAMERA_BRUSH = 0.05;                  // how big the patch that lights up under the pointer is, compared to the window (0.05 = 5% of its shorter side)
+const CAMERA_SHARPNESS = 1.5;               // how sharp the camera is drawn on high-resolution screens (2 = fully sharp but slower, 1 = fastest)
 const CAMERA_FILL = 0.035;                  // how see-through the surfaces are (0 = only lines, higher = more solid)
-const APERTURE_STOPS = [1.8, 2.8, 4, 5.6, 8]; // the f-number for each of the 5 about me sections, in order
+const CAMERA_FSTOP = 2.8;                   // the aperture you can see in the lens (1.8 = wide open, 8 = small)
 const APERTURE_BLADES = 9;                  // how many blades the aperture has
-const PAINT_GRID = 60;                      // how many little strokes fit across the blades (more = finer and denser)
-const PAINT_BRUSH = 0.09;                   // how big the brush is, compared to the blades' ring (0.09 = about a tenth of it)
+// the pages on the camera's screen, in order (the words shown in the bar along its top)
+const SCREEN_PAGES = ["who am i", "photos", "videos", "projects", "contact"];
 
-// where the camera is and which way it faces. stop = which section is showing (0 to 5, in between while changing),
-// lit = how settled it is on that section (0 to 1), body = how visible the body is, lens = how visible the lens around
-// the blades is (1 = fully, 0 = only the blades), iris = how bright the blades are, cx/cy = where it sits on the screen, scale = how big,
-// paint = the strokes painted on the blades (m[k] = 0 not painted .. 1 fully painted), how strongly they show (a)
-// and how visible the faint unpainted strokes are (dots), mask = while zooming through the aperture, everything outside the opening is blacked out (0 to 1),
+// where the camera is and which way it faces. lit = how bright the edge of the opening is (0 to 1), body = how
+// visible the body is, lens = how visible the lens around the blades is, iris = how bright the blades are,
+// fstop = how far the aperture is closed, cx/cy = where it sits on the screen, scale = how big,
+// yaw/tilt/roll = turned round / tipped forward / tipped on its side (radians),
 // px/py/pz = the point on the model it turns around, depth = how strong the perspective is (higher = flatter)
-type CameraPose = { paint: { m: Float32Array; a: number; dots: number } | null; mask: number; stop: number; lit: number; body: number; lens: number; iris: number; yaw: number; tilt: number; cx: number; cy: number; scale: number; px: number; py: number; pz: number; depth: number };
+// dots = the dots on the back screen: how lit each one is (0 = not yet .. 1 = fully), where each one landed on the page
+// (filled in while drawing, for the pointer to find them) and how visible they all are (show)
+type CameraPose = { dots: { lit: Float32Array; xy: Float32Array; show: number } | null; fstop: number; lit: number; body: number; lens: number; iris: number; yaw: number; tilt: number; roll: number; cx: number; cy: number; scale: number; px: number; py: number; pz: number; depth: number };
 
 // The camera is a see-through 3D model made of lines, built from simple shapes: flat outlines given a thickness
-// (body, grip, cage) and round shapes spun around a line (lens, dials). Then every point is turned, put in
+// (body, hump, screen), outlines stacked at different heights (grip) and round shapes spun around a line (lens, dials). Then every point is turned, put in
 // perspective and drawn on a flat canvas. Units are about 4.5 per millimetre. x = right, y = down,
 // z = away from you when the lens points at you (the lens sticks out towards -z, the body sits from z 0 to 170).
 type V3 = { x: number; y: number; z: number };
@@ -1257,6 +1271,7 @@ function pathPts(d: string): { pts: Pt[]; corner: boolean[] } {
 // how a flat outline's (u, v) and its thickness (t) map onto the model:
 const FRONT = (u: number, v: number, t: number): V3 => ({ x: u, y: v, z: t }); // drawn as seen from the front, thick front to back
 const SIDE = (u: number, v: number, t: number): V3 => ({ x: t, y: v, z: u });  // drawn as seen from the side (u = front to back), thick left to right
+const TOP = (u: number, v: number, t: number): V3 => ({ x: u, y: t, z: v });   // drawn as seen from above (v = front to back), thick top to bottom
 
 // a flat outline with a thickness: one face at t0, the other at t1, and edges across at the corners
 function prism(m: Model, d: string, t0: number, t1: number, col: string, at = FRONT, w = 1) {
@@ -1265,6 +1280,21 @@ function prism(m: Model, d: string, t0: number, t1: number, col: string, at = FR
   m.lines.push({ pts: f, closed: true, col, w }, { pts: b, closed: true, col, w });
   pts.forEach((_, i) => { if (corner[i]) m.lines.push({ pts: [f[i], b[i]], closed: false, col, w: 0.6 * w }); });
   m.faces.push({ pts: f, col, w }, { pts: b, col, w });
+}
+// the same kind of outline at several levels, each one a little different, joined up at the corners.
+// For shapes whose sides curve, like the grip. rings = [the outline, how far along its thickness]; inner = how bright the rings in between are
+function loft(m: Model, rings: [string, number][], col: string, at = FRONT, inner = 0.45) {
+  let prev: V3[] = [];
+  rings.forEach(([d, t], k) => {
+    const { pts, corner } = pathPts(d);
+    const cur = pts.map((q) => at(q.x, q.y, t));
+    m.lines.push({ pts: cur, closed: false, col, w: k === 0 || k === rings.length - 1 ? 1 : inner });
+    if (prev.length === cur.length) {
+      const before = prev;
+      cur.forEach((q, i) => { if (corner[i]) m.lines.push({ pts: [before[i], q], closed: false, col, w: 0.6 }); });
+    }
+    prev = cur;
+  });
 }
 // just the outline (no thickness), for slots and panel edges
 function outline(m: Model, d: string, t: number, col: string, at = FRONT, w = 0.5) {
@@ -1297,26 +1327,70 @@ function spin(m: Model, prof: [number, number, boolean][], axis: Axis, c1: numbe
 
 // where the lens is: its middle (x, y), the depth of the aperture blades and how big their housing is
 const LENS_X = 0, LENS_Y = 30, IRIS_Z = -270, IRIS_R = 140, LENS_FRONT = -486, LENS_R = 188;
+// the screen on the back: the middle of its picture, its size (3 by 2, like the real one) and how far back it is
+const SCREEN_X = 19, SCREEN_Y = 64.5, SCREEN_W = 338, SCREEN_H = 225, SCREEN_Z = 198;
+
+// The grip, seen from above, for a grip that sticks out g in front of the body (it's open at the back, where it joins the body)
+const gripPlan = (g: number) =>
+  `M -150 0 Q -182 0 -190 ${-0.35 * g} L -200 ${-0.72 * g} Q -207 ${-g} -246 ${-g} L -300 ${-g} Q -346 ${-g} -350 ${-0.5 * g} L -350 0`;
+// the grip at each height, top to bottom: [how far down, how far it sticks out]. The top slopes forward (where the
+// shutter button sits), then there's a dip for your middle finger, then it fills out
+const GRIP_RINGS: [string, number][] = ([[-128, 38], [-104, 90], [-62, 83], [30, 96], [150, 96], [185, 84]] as const).map(([y, g]) => [gripPlan(g), y]);
 
 function buildCamera(view: V3, body: number, lens: number): Model {
   const m: Model = { lines: [], faces: [] };
   const G = CAMERA_LINE, GL = CAMERA_GLASS;
 
-  // ---- the body (a small mirrorless camera, no logos) ----
-  prism(m, "M -300 -110 Q -300 -140 -270 -140 L -120 -140 L -96 -226 Q -92 -238 -78 -238 L 78 -238 Q 92 -238 96 -226 L 120 -140 L 270 -140 Q 300 -140 300 -110 L 300 180 Q 300 210 270 210 L -270 210 Q -300 210 -300 180 Z", 0, 170, G);
+  // ---- the body (a small full-frame mirrorless camera, no logos). Seen from the front, the grip is on the left,
+  // the lens sits a little right of the middle, and the viewfinder hump is above the lens. ----
+  // the main box, drawn from above and given its height
+  prism(m, "M -350 0 L 216 0 Q 246 0 246 30 L 246 155 Q 246 185 216 185 L -320 185 Q -350 185 -350 155 Z", -128, 185, G, TOP);
   // the grip, sticking out at the front on the left
-  prism(m, "M 0 -140 L -70 -140 Q -150 -128 -152 -40 L -152 150 Q -150 208 -95 210 L 0 210 Z", -296, -176, G, SIDE);
-  // shutter button and the dials on top
-  spin(m, [[-140, 22, true], [-156, 22, true], [-161, 15, true]], "y", -236, -92, G, view, 0.8);
-  spin(m, [[-140, 46, true], [-168, 46, true]], "y", -150, 80, G, view, 0.8);
-  spin(m, [[-140, 38, true], [-160, 38, true]], "y", 180, 84, G, view, 0.8);
-  // viewfinder eyecup and the screen on the back
-  prism(m, "M -84 -230 Q -84 -236 -76 -236 L 76 -236 Q 84 -236 84 -230 L 84 -122 L -84 -122 Z", 170, 236, G);
-  outline(m, "M -40 -112 L 272 -112 L 272 190 L -40 190 Z", 172, G);
+  loft(m, GRIP_RINGS, G, TOP);
+  // the viewfinder hump: it leans out a little over the lens mount, with the flash shoe on top
+  prism(m, "M -90 -128 L -66 -184 Q -62 -192 -50 -192 L 62 -192 Q 74 -192 78 -184 L 102 -128 Z", -14, 185, G);
+  prism(m, "M -46 46 L 58 46 L 58 182 L -46 182 Z", -192, -202, G, TOP, 0.7);
+  outline(m, "M -30 62 L 42 62 L 42 182 L -30 182 Z", -202, G, TOP, 0.4);
+  // the viewfinder eyecup on the back, and the window you look through
+  prism(m, "M -66 -160 Q -66 -174 -52 -174 L 64 -174 Q 78 -174 78 -160 L 78 -76 Q 78 -62 64 -62 L -52 -62 Q -66 -62 -66 -76 Z", 185, 212, G);
+  outline(m, "M -34 -150 L 46 -150 L 46 -92 L -34 -92 Z", 212, G);
 
-  // on the front: the lens release button beside the mount, and the little lamp on the grip
-  circle(m, "z", 196, 70, -1, 15, G, 0.6);
-  circle(m, "z", -214, -96, -150, 9, G, 0.5);
+  // on top, grip side: the shutter button on the slope of the grip, with the main dial just behind it
+  spin(m, [[-116, 22, true], [-129, 22, true], [-132, 14, true]], "y", -282, -60, G, view, 0.8);
+  spin(m, [[-14, 22, true], [16, 22, true]], "z", -298, -122, G, view, 0.8);
+  circle(m, "y", -258, -24, -124, 7, G, 0.5);
+  // the mode dial next to the hump, the record button, and the back dial with the power switch round it
+  spin(m, [[-128, 40, true], [-150, 40, true], [-154, 33, true]], "y", -140, 95, G, view, 0.8);
+  circle(m, "y", -222, 53, -129, 9, G, 0.5);
+  spin(m, [[-128, 45, true], [-135, 45, true], [-135, 36, true], [-153, 36, true]], "y", -272, 124, G, view, 0.8);
+  outline(m, "M -236 150 L -218 158 L -224 172 L -244 162 Z", -132, G, TOP, 0.5);
+  // on top, the other side: the photo / video switch
+  spin(m, [[-128, 30, true], [-144, 30, true], [-147, 24, true]], "y", 176, 120, G, view, 0.8);
+  outline(m, "M 196 84 L 214 92 L 208 104 L 192 98 Z", -134, G, TOP, 0.5);
+
+  // on the front: the ring the lens locks into, the lens release button beside it, and the little lamp by the grip
+  spin(m, [[0, 160, true], [-12, 154, true]], "z", LENS_X, LENS_Y, G, view, 0.8);
+  spin(m, [[0, 20, true], [-8, 20, true]], "z", 208, 8, G, view, 0.6);
+  circle(m, "z", -150, -92, -1, 9, G, 0.5);
+
+  // on the back: the flip-out screen...
+  prism(m, "M -166 -62 L 204 -62 L 204 187 L -166 187 Z", 185, SCREEN_Z, G, FRONT, 0.8);
+  const sx0 = SCREEN_X - SCREEN_W / 2, sx1 = SCREEN_X + SCREEN_W / 2, sy0 = SCREEN_Y - SCREEN_H / 2, sy1 = SCREEN_Y + SCREEN_H / 2;
+  outline(m, `M ${sx0} ${sy0} L ${sx1} ${sy0} L ${sx1} ${sy1} L ${sx0} ${sy1} Z`, SCREEN_Z, G);
+  outline(m, "M 212 -40 L 234 -40 L 234 165 L 212 165 Z", 186, G, FRONT, 0.35); // its hinge
+  // ...and the buttons: menu, AF-ON and the two above the thumb, info, the round pad, play and delete
+  for (const [bx, by, br] of [[178, -78, 13], [-265, -74, 16], [-316, -74, 10], [-320, -38, 10], [-205, 20, 14], [-239, 76, 36], [-239, 76, 14], [-205, 136, 11], [-269, 136, 11]] as const) {
+    circle(m, "z", bx, by, 186, br, G, 0.5);
+  }
+
+  // underneath: the tripod thread and the battery door under the grip
+  circle(m, "y", 0, 95, 185, 13, G, 0.5);
+  circle(m, "y", 0, 95, 185, 26, G, 0.35);
+  outline(m, "M -334 -58 Q -334 -74 -318 -74 L -214 -74 Q -198 -74 -198 -58 L -198 150 Q -198 166 -214 166 L -318 166 Q -334 166 -334 150 Z", 185, G, TOP, 0.4);
+  // on the sides: the strap loops, and the covers over the sockets
+  outline(m, "M 84 -116 L 108 -116 L 108 -92 L 84 -92 Z", 248, G, SIDE);
+  outline(m, "M 84 -116 L 108 -116 L 108 -92 L 84 -92 Z", -352, G, SIDE);
+  outline(m, "M 44 -52 Q 44 -64 56 -64 L 138 -64 Q 150 -64 150 -52 L 150 118 Q 150 130 138 130 L 56 130 Q 44 130 44 118 Z", 246, G, SIDE, 0.4);
 
   // everything so far fades away as you zoom in on the lens
   for (const l of m.lines) l.w *= body;
@@ -1332,10 +1406,28 @@ function buildCamera(view: V3, body: number, lens: number): Model {
   // the rubber grip on the zoom ring and the focus ring
   for (let k = 0; k < 40; k++) {
     const a = (k / 40) * Math.PI * 2;
-    for (const [z0, z1] of [[-164, -294], [-339, -434]]) {
+    for (const [z0, z1] of [[-164, -294], [-339, -398]]) {
       m.lines.push({ pts: [around("z", LENS_X, LENS_Y, z0, LENS_R + 1, a), around("z", LENS_X, LENS_Y, z1, LENS_R + 1, a)], closed: false, col: G, w: 0.18 });
     }
   }
+  // the control ring at the front: a finer, criss-cross grip
+  circle(m, "z", LENS_X, LENS_Y, -406, LENS_R, G, 0.5);
+  for (let k = 0; k < 64; k++) {
+    const a = (k / 64) * Math.PI * 2, tw = Math.PI / 64;
+    for (const d of [tw, -tw]) {
+      m.lines.push({ pts: [around("z", LENS_X, LENS_Y, -410, LENS_R + 1, a - d), around("z", LENS_X, LENS_Y, -436, LENS_R + 1, a + d)], closed: false, col: G, w: 0.16 });
+    }
+  }
+  // the panel of switches on the side of the lens, near the body (it follows the curve of the barrel)
+  const onBarrel = (a0: number, a1: number, z0: number, z1: number, w: number) => {
+    const pts: V3[] = [];
+    for (let k = 0; k <= 6; k++) pts.push(around("z", LENS_X, LENS_Y, z0, 185, a0 + ((a1 - a0) * k) / 6));
+    for (let k = 6; k >= 0; k--) pts.push(around("z", LENS_X, LENS_Y, z1, 185, a0 + ((a1 - a0) * k) / 6));
+    m.lines.push({ pts, closed: true, col: G, w });
+  };
+  onBarrel(-0.42, 0.42, -62, -142, 0.5);
+  onBarrel(-0.3, -0.08, -84, -120, 0.4);
+  onBarrel(0.08, 0.3, -84, -120, 0.4);
   // the glass: a domed front element, and more elements further in
   spin(m, [[-466, 156, true], [-475, 134, true], [-481, 100, true], [-484, 52, false]], "z", LENS_X, LENS_Y, GL, view, 0.8);
   circle(m, "z", LENS_X, LENS_Y, -472, 166, G, 0.6);
@@ -1349,38 +1441,59 @@ function buildCamera(view: V3, body: number, lens: number): Model {
   return m;
 }
 
-// The little strokes that fill the blades when you paint them: a grid of short horizontal dashes, worked out once,
-// as positions inside a circle of radius 1 (u = across, v = down). jit makes the brush edge a little ragged.
-const PAINT_MARKS: { u: number; v: number; jit: number }[] = (() => {
-  const out: { u: number; v: number; jit: number }[] = [];
-  const n = PAINT_GRID, cell = 2 / n;
-  for (let row = 0; row < n; row++) {
-    for (let col = 0; col < n; col++) {
-      const u = -1 + (col + 0.5) * cell + (row % 2 ? cell * 0.25 : -cell * 0.25); // rows sit a little offset, like brick
-      const v = -1 + (row + 0.5) * cell;
-      if (u * u + v * v > 0.93) continue;
-      const h = Math.sin(row * 127.1 + col * 311.7) * 43758.5453;
-      out.push({ u, v, jit: 0.75 + 0.5 * (h - Math.floor(h)) });
+// One blade's edge, from corner b of the opening (coming from corner a) out to the housing of radius R.
+// It sets off along the side of the opening and keeps turning outwards, so it sweeps round in a curve.
+// BLADE_CURVE = how much it curves (0 = straight lines).
+const BLADE_CURVE = 1.1;
+function bladeEdge(a: { x: number; y: number }, b: { x: number; y: number }, R: number): { x: number; y: number }[] {
+  let dx = b.x - a.x, dy = b.y - a.y;
+  const dl = Math.hypot(dx, dy);
+  if (dl < 1e-6) { // opening shut to a point: set off sideways from the middle
+    const ang = Math.atan2(b.y, b.x) + Math.PI / 2;
+    dx = Math.cos(ang); dy = Math.sin(ang);
+  } else { dx /= dl; dy /= dl; }
+  const turn = Math.sign(dx * b.y - dy * b.x) || 1; // which way is outwards
+  const step = R / 60, k = (BLADE_CURVE / R) * step * turn;
+  const pts = [{ x: b.x, y: b.y }];
+  let x = b.x, y = b.y;
+  for (let n = 0; n < 400; n++) {
+    // turn a little towards pointing straight out, but never past it
+    const out = Math.atan2(y, x), head = Math.atan2(dy, dx);
+    let diff = out - head;
+    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    const rot = Math.abs(diff) < Math.abs(k) ? diff : k;
+    const c = Math.cos(rot), s = Math.sin(rot);
+    [dx, dy] = [dx * c - dy * s, dx * s + dy * c];
+    const nx = x + dx * step, ny = y + dy * step;
+    if (Math.hypot(nx, ny) >= R) { // reached the housing: end exactly on it
+      const pb = x * dx + y * dy, t = -pb + Math.sqrt(Math.max(0, pb * pb - (x * x + y * y - R * R)));
+      pts.push({ x: x + dx * t, y: y + dy * t });
+      break;
+    }
+    x = nx; y = ny;
+    pts.push({ x, y });
+  }
+  return pts;
+}
+
+// the dots on the camera's back screen: a grid over its picture (rows offset like brick), worked out once
+const CAMERA_SCREEN_DOTS: V3[] = (() => {
+  const out: V3[] = [], g = CAMERA_DOT_GAP;
+  for (let v = g / 2, row = 0; v < SCREEN_H; v += g, row++) {
+    for (let u = row % 2 ? g : g / 2; u < SCREEN_W; u += g) {
+      out.push({ x: SCREEN_X - SCREEN_W / 2 + u, y: SCREEN_Y - SCREEN_H / 2 + v, z: SCREEN_Z });
     }
   }
   return out;
 })();
 
-// where the blades are on the screen: their middle, the radius of their ring, and the opening's corners
-type IrisSpot = { x: number; y: number; r: number; hole: Pt[] };
-// is a point on the blades (inside the ring, outside the opening)?
-const onBlades = (sp: IrisSpot, x: number, y: number) => Math.hypot(x - sp.x, y - sp.y) < sp.r * 0.965 && !inPoly(sp.hole, x, y);
+// where the camera's back screen ended up on the page (its picture area)
+type ScreenBox = { x: number; y: number; w: number; h: number };
 
-// the f-number at any point while scrolling (in between two stops it's part way between them)
-function fNumber(stop: number): number {
-  const s = clamp(stop, 0, APERTURE_STOPS.length - 1), i = Math.min(APERTURE_STOPS.length - 2, Math.floor(s));
-  return APERTURE_STOPS[i] + (APERTURE_STOPS[i + 1] - APERTURE_STOPS[i]) * (s - i);
-}
-
-// draw the model in a pose (yaw/tilt in radians)
-function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose): IrisSpot | null {
-  let spot: IrisSpot | null = null;
+// draw the model in a pose
+function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose): ScreenBox {
   const cY = Math.cos(o.yaw), sY = Math.sin(o.yaw), cT = Math.cos(o.tilt), sT = Math.sin(o.tilt);
+  const cR = Math.cos(o.roll), sR = Math.sin(o.roll);
   // which way you're looking, in the model's own directions
   const view = { x: -sY * cT, y: sT, z: cY * cT };
   const m = buildCamera(view, o.body, o.lens);
@@ -1391,7 +1504,8 @@ function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose): IrisSpot | nu
     const x1 = X * cY + Z * sY, z1 = -X * sY + Z * cY;
     const y2 = Y * cT - z1 * sT, z2 = Y * sT + z1 * cT;
     const k = F / (F + z2);
-    return { x: o.cx + x1 * s * k, y: o.cy + y2 * s * k, z: z2 };
+    const a = x1 * s * k, b = y2 * s * k;
+    return { x: o.cx + a * cR - b * sR, y: o.cy + a * sR + b * cR, z: z2 };
   };
   const trace = (path: CanvasRenderingContext2D | Path2D, pts: V3[], closed: boolean) => {
     pts.forEach((p, i) => { const q = proj(p); if (i) path.lineTo(q.x, q.y); else path.moveTo(q.x, q.y); });
@@ -1399,20 +1513,34 @@ function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose): IrisSpot | nu
   };
 
   ctx.save();
-  // zooming through: black out everything but the opening, so what's behind the camera shows through it
-  if (o.mask > 0) {
-    const fN = fNumber(o.stop), r = IRIS_R * 0.94 * (APERTURE_STOPS[0] / fN), rot = -0.25 + (1 - r / IRIS_R) * 1.2;
-    const cover = new Path2D();
-    cover.rect(-1e5, -1e5, 2e5, 2e5);
-    trace(cover, Array.from({ length: APERTURE_BLADES }, (_, i) => {
-      const a = rot + (i / APERTURE_BLADES) * Math.PI * 2;
-      return { x: LENS_X + r * Math.cos(a), y: LENS_Y + r * Math.sin(a), z: IRIS_Z };
-    }), true);
-    ctx.fillStyle = `rgba(${PAGE_BLACK},${o.mask.toFixed(3)})`;
-    ctx.fill(cover, "evenodd");
-  }
   // everything adds light on top of what's under it, so overlapping see-through parts glow a little more
   ctx.globalCompositeOperation = "lighter";
+
+  // the dots on the screen: faint ones, and the ones the pointer has lit up. Nearer ones are brighter, like the lines
+  if (o.dots && o.dots.show > 0.003) {
+    const D = CAMERA_SCREEN_DOTS, { lit, xy, show } = o.dots;
+    const LV = 4, faint = Array.from({ length: LV }, () => new Path2D()), glow = Array.from({ length: LV }, () => new Path2D());
+    for (let i = 0; i < D.length; i++) {
+      const d = D[i], q = proj(d);
+      xy[i * 2] = q.x;
+      xy[i * 2 + 1] = q.y;
+      const k = F / (F + q.z), size = Math.max(0.9, CAMERA_DOT_GAP * s * k * 0.26);
+      const near = clamp(0.5 - q.z / 900, 0, 1), lv = Math.min(LV - 1, Math.floor(near * LV));
+      const v = lit[i];
+      if (v > 0) {
+        const g = size * (1.2 + 0.6 * v);
+        glow[Math.min(LV - 1, Math.floor(v * LV))].rect(q.x - g / 2, q.y - g / 2, g, g);
+      } else faint[lv].rect(q.x - size / 2, q.y - size / 2, size, size);
+    }
+    faint.forEach((path, lv) => {
+      ctx.fillStyle = `rgba(${CAMERA_DOTS},${(CAMERA_DOT_FAINT * show * (0.35 + 0.65 * (lv + 0.5) / LV)).toFixed(3)})`;
+      ctx.fill(path);
+    });
+    glow.forEach((path, i) => {
+      ctx.fillStyle = `rgba(${CAMERA_DOTS_LIT},${((0.35 + 0.65 * ((i + 1) / LV)) * show).toFixed(3)})`;
+      ctx.fill(path);
+    });
+  }
 
   if (CAMERA_FILL > 0) {
     for (const f of m.faces) {
@@ -1458,11 +1586,11 @@ function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose): IrisSpot | nu
   };
   for (const g of groups.values()) glowLine(g.path, g.col, g.a);
 
-  // ---- the aperture blades. The opening shrinks from f/1.8 (wide open) to f/11 (tiny), and the blades
+  // ---- the aperture blades. The opening is smaller the higher the f-number, and the blades
   // turn a little as it closes, like a real lens. ----
   if (o.iris > 0.01) {
-    const N = APERTURE_BLADES, R = IRIS_R, fN = fNumber(o.stop);
-    const r = R * 0.94 * (APERTURE_STOPS[0] / fN); // the opening's size: halves for every two stops
+    const N = APERTURE_BLADES, R = IRIS_R;
+    const r = R * 0.94 * (1.8 / Math.max(1.8, o.fstop)); // the opening's size: nearly the whole ring wide open (f/1.8), halving every two stops
     const rot = -0.25 + (1 - r / R) * 1.2;
     const at = (x: number, y: number) => ({ x: LENS_X + x, y: LENS_Y + y, z: IRIS_Z });
     const v = Array.from({ length: N }, (_, i) => {
@@ -1475,53 +1603,11 @@ function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose): IrisSpot | nu
     trace(fill, v.map((p) => at(p.x, p.y)), true);
     ctx.fillStyle = `rgba(${CAMERA_BLADES},${(0.08 * o.iris).toFixed(3)})`;
     ctx.fill(fill, "evenodd");
-    // where the blades are on the screen (for painting)
-    const c0 = proj(at(0, 0)), e0 = proj(at(R, 0));
-    const sp: IrisSpot = { x: c0.x, y: c0.y, r: Math.hypot(e0.x - c0.x, e0.y - c0.y), hole: v.map((p) => { const q = proj(at(p.x, p.y)); return { x: q.x, y: q.y }; }) };
-    spot = sp;
-    // the paint, under the edges so they stay crisp: faint unpainted strokes, and the painted ones in amber
-    if (o.paint && (o.paint.dots > 0 || o.paint.a > 0)) {
-      const pt = o.paint, sr = sp.r, cell = (2 * sr) / PAINT_GRID, sw = cell * 0.72, sh = Math.max(1, cell * 0.36);
-      const faint = new Path2D(), lit = [new Path2D(), new Path2D(), new Path2D(), new Path2D()]; // painted, in 4 steps of brightness
-      PAINT_MARKS.forEach((k, i) => {
-        const x = sp.x + k.u * sr, y = sp.y + k.v * sr;
-        if (inPoly(sp.hole, x, y)) return; // nothing in the opening
-        const val = pt.m[i];
-        if (val > 0) {
-          const grow = 0.55 + 0.45 * val; // each stroke grows to full length as it's painted
-          lit[Math.min(3, Math.floor(val * 4))].rect(x - (sw * grow) / 2, y - sh / 2, sw * grow, sh);
-        } else if (pt.dots > 0) faint.rect(x - sw / 2, y - sh / 2, sw, sh);
-      });
-      ctx.globalCompositeOperation = "source-over";
-      if (pt.dots > 0) {
-        ctx.fillStyle = `rgba(${PAINT_COLOR},${(0.09 * pt.dots).toFixed(3)})`;
-        ctx.fill(faint);
-      }
-      lit.forEach((path, i) => {
-        ctx.fillStyle = `rgba(${PAINT_COLOR},${((0.35 + 0.65 * ((i + 1) / 4)) * pt.a).toFixed(3)})`;
-        ctx.fill(path);
-      });
-      ctx.globalCompositeOperation = "lighter";
-    }
-    // each blade's edge carries on past the corner of the opening, curving a little, out to the housing
+    // each blade's edge carries on from the corner of the opening and sweeps round in a smooth curve
+    // out to the housing, like the curved blades of a real lens
     const edges = new Path2D();
     for (let i = 0; i < N; i++) {
-      const a = v[i], b = v[(i + 1) % N];
-      let dx = b.x - a.x, dy = b.y - a.y;
-      const dl = Math.hypot(dx, dy) || 1;
-      dx /= dl; dy /= dl;
-      // how far along that line the housing is: |b + t*d| = R
-      const pb = b.x * dx + b.y * dy, t = -pb + Math.sqrt(Math.max(0, pb * pb - (b.x * b.x + b.y * b.y - R * R)));
-      const bend = t * 0.1;
-      const pts: V3[] = [];
-      for (let k = 0; k <= 10; k++) {
-        const u = k / 10, off = Math.sin(u * Math.PI) * bend;
-        pts.push(at(b.x + dx * t * u - dy * off, b.y + dy * t * u + dx * off));
-      }
-      trace(edges, pts, false);
-      // the pin at the outer end of each blade: they slide round the housing as the blades turn
-      const ex = b.x + dx * t, ey = b.y + dy * t;
-      trace(edges, Array.from({ length: 16 }, (_, k) => at(ex * 0.93 + 5 * Math.cos((k / 16) * Math.PI * 2), ey * 0.93 + 5 * Math.sin((k / 16) * Math.PI * 2))), true);
+      trace(edges, bladeEdge(v[i], v[(i + 1) % N], R).map((p) => at(p.x, p.y)), false);
     }
     glowLine(edges, CAMERA_BLADES, 0.75 * o.iris, 1);
     // the edge of the opening
@@ -1531,7 +1617,11 @@ function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose): IrisSpot | nu
   }
 
   ctx.restore();
-  return spot;
+  // where the screen's corners landed
+  const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => proj({ x: SCREEN_X + (a * SCREEN_W) / 2, y: SCREEN_Y + (b * SCREEN_H) / 2, z: SCREEN_Z }));
+  const xs = q.map((p) => p.x), ys = q.map((p) => p.y);
+  const x = Math.min(...xs), y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
 }
 
 // mix two "r,g,b" colours: t = 0 gives a, t = 1 gives b
@@ -1543,14 +1633,41 @@ function mixRgb(a: string, b: string, t: number): string {
 /* ---------- Page ---------- */
 
 export default function Home() {
-  const aboutTitleRef = useRef<HTMLHeadingElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
   const camRef = useRef<HTMLElement>(null);
   const camCanvasRef = useRef<HTMLCanvasElement>(null);
   const camHintRef = useRef<HTMLDivElement>(null);
-  const camDragRef = useRef<HTMLDivElement>(null);
-  const camStageRef = useRef<HTMLDivElement>(null);
-  // your photo albums, for the photos part after the zoom (read from public/photos by app/api/albums/route.ts)
+  // the camera's screen: the box laid over it, the strip of pages that slides along, each page, the dots, the bar's words
+  const screenRef = useRef<HTMLDivElement>(null);
+  const screenTrackRef = useRef<HTMLDivElement>(null);
+  const screenPageEls = useRef<(HTMLDivElement | null)[]>([]);
+  const screenDotEls = useRef<(HTMLButtonElement | null)[]>([]);
+  const screenLabelRef = useRef<HTMLSpanElement>(null);
+  const goToPageRef = useRef<(i: number) => void>(() => {});
+  // the visitor's real battery, for the bar along the top of the camera's screen: how full (0 to 1) and whether
+  // it's charging. Only some browsers share this (Chrome, Edge, Opera, Chrome on Android); in the others
+  // (Safari, every iPhone browser, Firefox) it stays null and the battery just shows full with no number.
+  const [battery, setBattery] = useState<{ level: number; charging: boolean } | null>(null);
+  useEffect(() => {
+    type Battery = EventTarget & { level: number; charging: boolean };
+    const nav = navigator as Navigator & { getBattery?: () => Promise<Battery> };
+    if (!nav.getBattery) return;
+    let b: Battery | null = null, gone = false;
+    const update = () => { if (b && !gone) setBattery({ level: b.level, charging: b.charging }); };
+    nav.getBattery().then((bat) => {
+      if (gone) return;
+      b = bat;
+      update();
+      bat.addEventListener("levelchange", update);
+      bat.addEventListener("chargingchange", update);
+    }).catch(() => {});
+    return () => {
+      gone = true;
+      b?.removeEventListener("levelchange", update);
+      b?.removeEventListener("chargingchange", update);
+    };
+  }, []);
+  // your photo albums, for the photos page on the screen (read from public/photos by app/api/albums/route.ts)
   const [albums, setAlbums] = useState<{ id: string; title: string; description: string; cover: string; count: number }[]>([]);
   useEffect(() => {
     let gone = false;
@@ -1562,7 +1679,6 @@ export default function Home() {
     ...HOME_ALBUMS.map((n) => albums.find((a) => a.id === n)).filter((a): a is (typeof albums)[number] => !!a),
     ...albums.filter((a) => !HOME_ALBUMS.includes(a.id)),
   ].slice(0, 3);
-  const panelEls = useRef<(HTMLDivElement | null)[]>([]); // the info for each stop
 
   // the concrete wall you break through when you first arrive (see WallIntro)
   const [phase, setPhase] = useState<"wall" | "breaking" | "none">(() =>
@@ -1607,57 +1723,164 @@ export default function Home() {
     };
   }, [introOn]);
 
-  // The camera. As you scroll: first it turns its lens towards you and zooms in until only the lens is left
-  // (the body and cage fade away). Then the aperture steps down one stop at a time, from f/1.8 to f/11;
-  // each stop shows one section's info next to the lens. You can also drag sideways over the lens.
-  // At the start it leans a little towards the mouse and sways gently, so you can see it's 3D.
+  // The camera. At the start you can drag it round to look at it from any side (it also leans a little towards
+  // the mouse and sways gently). As you scroll, it turns round to show its back and zooms in on the screen there
+  // (on phones held upright it also tips on its side, so the screen stands up tall). Then the screen's pages
+  // (who am i, photos, videos, projects, contact) slide past one at a time as you keep scrolling. You can also
+  // swipe or drag them sideways, press the left and right arrow keys, or tap the dots.
   useEffect(() => {
-    const box = camRef.current, cv = camCanvasRef.current, hint = camHintRef.current, drag = camDragRef.current, stage = camStageRef.current;
+    const box = camRef.current, cv = camCanvasRef.current, hint = camHintRef.current;
+    const scr = screenRef.current, track = screenTrackRef.current, label = screenLabelRef.current;
     const c = cv?.getContext("2d");
-    if (!box || !cv || !c) return;
-    let raf = 0, last = performance.now(), ps = 0, w = 0, h = 0, dpr = 1, tv = 0;
+    if (!box || !cv || !c || !scr || !track) return;
+    const T = CAMERA_TURN, n = SCREEN_PAGES.length;
+    let raf = 0, last = performance.now(), ps = 0, w = 0, h = 0, dpr = 1, tv = 0, page = -1, boxKey = "";
+    // the last pose drawn, and where the screen was: if nothing has moved since, the drawing is left as it is
+    let drawnKey = "", drawnBox: ScreenBox | null = null;
+    // the dots over the camera: how lit each one is, where each one is on the page, a little wobble in the
+    // brush's edge for each (so the lit patch looks hand painted), and a count that goes up whenever any change
+    const D = CAMERA_SCREEN_DOTS;
+    const dotLit = new Float32Array(D.length), dotXY = new Float32Array(D.length * 2).fill(-1e5);
+    const dotJit = Float32Array.from(D, (_, i) => { const r = Math.sin(i * 127.1 + 311.7) * 43758.5453; return 0.7 + 0.5 * (r - Math.floor(r)); });
+    // how much the screen on the back faces you (1 = straight at you, 0 = side on, below 0 = you're looking at the front),
+    // from the last frame drawn. The dots only light up when you've turned the camera to see its side or back
+    let screenFacing = -1;
+    let dotVer = 0, dotsAny = false, ptrX = -1e5, ptrY = -1e5, brushX = -1e5, brushY = -1e5;
     let mx = 0, my = 0, ex = 0, ey = 0;
-    let dragging = false, lastX = 0;
-    // painting the blades: how far each stroke is painted, how strongly they show, and whether they're fading away
-    const paint = { m: new Float32Array(PAINT_MARKS.length), a: 1, fade: false, any: false };
-    let spot: IrisSpot | null = null, section = 0, brush = false, cx0 = -1e4, cy0 = -1e4, lastPx = -1e4, lastPy = -1e4;
+    // turning the camera by hand: how far it's turned (ry = round, rx = up and down, in radians), how fast it's
+    // still turning after you let go, and when the pointer last moved
+    let spinning = false, lastX = 0, lastY = 0, ry = 0, rx = 0, vy = 0, vx = 0, movedAt = 0;
+    const START = 0.01; // you can turn it until you've scrolled this far (1 = the whole camera part)
+    // swiping the screen: where the swipe started, whether it's gone sideways yet, and how far the pages are pulled along
+    let swipe: { id: number; x: number; y: number; on: boolean } | null = null, dragPx = 0, justSwiped = false;
+    // a page you asked for (by swiping, the dots or the arrow keys) that the scrolling is on its way to (-1 = none)
+    let forced = -1;
     let lastScroll = performance.now(), snapping = false, snapAt = 0; // when the page last moved, and whether it is gliding to a stop
     const onScroll = () => { if (!snapping) lastScroll = performance.now(); };
     const size = () => {
       const r = cv.getBoundingClientRect();
-      dpr = Math.min(2, window.devicePixelRatio || 1);
+      dpr = Math.min(CAMERA_SHARPNESS, window.devicePixelRatio || 1);
       w = r.width;
       h = r.height;
       cv.width = Math.round(w * dpr);
       cv.height = Math.round(h * dpr);
+      drawnKey = ""; // resizing clears the canvas, so draw again
     };
+    // how far down the page to scroll to for screen page i (or part way into it)
+    const scrollFor = (i: number) => {
+      const br = box.getBoundingClientRect();
+      return window.scrollY + br.top + (T + (i / n) * (1 - T)) * (br.height - h);
+    };
+    const glide = (y: number, secs: number) => {
+      const l = lenisRef.current;
+      snapping = true;
+      snapAt = performance.now();
+      const done = () => { snapping = false; forced = -1; lastScroll = performance.now(); };
+      if (l) l.scrollTo(y, { duration: secs, onComplete: done });
+      else { window.scrollTo(0, y); done(); }
+    };
+    const goTo = (i: number) => {
+      const j = clamp(i, 0, n - 1);
+      forced = j;
+      glide(scrollFor(j + 0.3), 0.7);
+    };
+    goToPageRef.current = goTo;
+
     const onMove = (e: PointerEvent) => {
+      ptrX = e.clientX;
+      ptrY = e.clientY;
+      if (spinning) {
+        // the side of the camera nearest you follows the pointer. Up and down stops at straight above / straight below
+        const k = (CAMERA_SPIN * Math.PI) / 180, now = performance.now(), gap = Math.max(0.008, (now - movedAt) / 1000);
+        const dy = -(e.clientX - lastX) * k, dx = (e.clientY - lastY) * k;
+        ry += dy;
+        rx = clamp(rx + dx, -Math.PI / 2, Math.PI / 2);
+        vy = dy / gap;
+        vx = dx / gap;
+        movedAt = now;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        return;
+      }
       mx = (e.clientX / window.innerWidth) * 2 - 1;
       my = (e.clientY / window.innerHeight) * 2 - 1;
-      cx0 = e.clientX;
-      cy0 = e.clientY;
-      if (dragging) {
-        // dragging left moves on to the next stop (it scrolls the page for you)
-        const d = (lastX - e.clientX) * CAMERA_DRAG;
-        lastX = e.clientX;
-        const l = lenisRef.current;
-        if (l) l.scrollTo(l.targetScroll + d, { immediate: true });
-        else window.scrollBy(0, d);
-      }
     };
     const onDown = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse" || e.button !== 0) return; // on phones, swiping already scrolls
-      dragging = true;
+      if (e.button !== 0 || ps >= START) return;
+      // at the start: dragging turns the camera (on phones: swipe sideways; up and down still scrolls)
+      spinning = true;
       lastX = e.clientX;
-      e.preventDefault();
+      lastY = e.clientY;
+      vy = vx = 0;
+      movedAt = performance.now();
+      if (e.pointerType === "mouse") e.preventDefault();
     };
-    const onUp = () => { dragging = false; };
+    const onUp = () => {
+      if (spinning && performance.now() - movedAt > 90) vy = vx = 0; // held still before letting go: it stays put
+      spinning = false;
+    };
+
+    // swiping the screen's pages, like on a phone
+    const onScrDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      justSwiped = false;
+      swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, on: false };
+      if (e.pointerType === "mouse") e.preventDefault(); // no selecting text or dragging pictures out
+    };
+    const onScrMove = (e: PointerEvent) => {
+      if (!swipe || e.pointerId !== swipe.id) return;
+      const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+      if (!swipe.on) {
+        if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; } // going up or down: that's scrolling
+        if (Math.abs(dx) < 8) return;
+        swipe.on = true;
+        scr.setPointerCapture(e.pointerId);
+      }
+      const at = Math.round(tv);
+      // past the first or last page it only gives a little, then springs back
+      dragPx = (at === 0 && dx > 0) || (at === n - 1 && dx < 0) ? dx * 0.3 : dx;
+    };
+    const onScrUp = (e: PointerEvent) => {
+      if (!swipe || e.pointerId !== swipe.id) return;
+      if (swipe.on) {
+        const dx = e.clientX - swipe.x, at = Math.round(tv);
+        justSwiped = true; // so letting go over a button doesn't also press it
+        // carry on from exactly where the pages were pulled to
+        tv -= dragPx / Math.max(1, scr.clientWidth);
+        dragPx = 0;
+        if (dx < -CAMERA_SWIPE && at < n - 1) goTo(at + 1);
+        else if (dx > CAMERA_SWIPE && at > 0) goTo(at - 1);
+      }
+      swipe = null;
+    };
+    const onScrClick = (e: MouseEvent) => {
+      if (!justSwiped) return;
+      justSwiped = false;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      if (scr.style.visibility !== "visible" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      goTo(Math.round(tv) + (e.key === "ArrowRight" ? 1 : -1));
+    };
+
     size();
     window.addEventListener("resize", size);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("keydown", onKey);
     cv.addEventListener("pointerdown", onDown);
+    scr.addEventListener("pointerdown", onScrDown);
+    scr.addEventListener("pointermove", onScrMove);
+    scr.addEventListener("pointerup", onScrUp);
+    scr.addEventListener("pointercancel", onScrUp);
+    scr.addEventListener("click", onScrClick, true);
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
     const deg = Math.PI / 180;
 
@@ -1666,136 +1889,159 @@ export default function Home() {
       last = now;
       const br = box.getBoundingClientRect();
       const p = clamp(-br.top / Math.max(1, br.height - h), 0, 1);
-      ps += (p - ps) * (1 - Math.exp(-dt * 9)); // smooth out the scrolling
+      ps += (p - ps) * (1 - Math.exp(-dt * 16)); // smooth out the scrolling a touch (the smooth scrolling already does most of it)
       ex += (mx - ex) * (1 - Math.exp(-dt * 3));
       ey += (my - ey) * (1 - Math.exp(-dt * 3));
+      const f = smooth(0, T, ps); // 0 = the whole camera from the front, 1 = zoomed in on its screen
 
-      const A = CAMERA_FACE;
-      const n = APERTURE_STOPS.length;
-      const f = smooth(0, A, ps); // 0 = the whole camera, 1 = zoomed in on the lens
-      // the last screen's worth of scrolling is the zoom through the aperture (it lines up with the next part sliding up)
-      const Z = clamp(1 - h / Math.max(1, br.height - h), A + 0.05, 1);
-      const zoom = clamp((p - Z) / Math.max(1e-6, 1 - Z), 0, 1);
-      // in between, the scrolling is split into one stop each
-      const u = clamp((ps - A) / (Z - A), 0, 1) * n;
-      const k = Math.min(n - 1, Math.floor(u));
-      const target = Math.min(n - 1, k + smooth(0.6, 1, u - k));
-      tv += (target - tv) * (1 - Math.exp(-dt * 6)); // glides after the scroll and settles softly on each stop
-      const shown = smooth(A * 0.8, A, ps) * (1 - smooth(0, 0.25, zoom));
-      const lit = APERTURE_STOPS.map((_, i) => (1 - clamp(Math.abs(tv - i) * 2, 0, 1)) * shown);
-
-      // Painting: once zoomed in, moving the pointer over the amber blades paints them in with little strokes.
-      // When the aperture moves on to the next stop, the paint fades away.
-      if (Math.round(tv) !== section) {
-        section = Math.round(tv);
-        if (paint.any) paint.fade = true;
+      // Turning it by hand: after you let go it carries on a little and slows down. As soon as you scroll,
+      // it lets go of the drag and settles back (the short way round) into the turn towards its screen.
+      if (ps >= START) {
+        spinning = false;
+        vy = vx = 0;
+        const back = 1 - Math.exp((-dt * 3) / Math.max(0.05, CAMERA_SPIN_BACK));
+        ry = Math.atan2(Math.sin(ry), Math.cos(ry));
+        ry -= ry * back;
+        rx -= rx * back;
+      } else if (!spinning) {
+        ry += vy * dt;
+        rx = clamp(rx + vx * dt, -Math.PI / 2, Math.PI / 2);
+        vy *= Math.exp(-dt * 3.5);
+        vx *= Math.exp(-dt * 3.5);
       }
-      let over = false;
+      const held = 1 - smooth(0.02, 0.3, f); // however fast you scroll, your drag is gone early in the turn
+
+      // Lighting up the dots: every dot near the line the pointer moved along since the last frame lights up
+      // (so fast moves don't skip any). Once you scroll on towards the screen, they all fade away.
+      const dotShow = 1 - smooth(0.12, 0.55, f);
       const cr = cv.getBoundingClientRect();
-      const px = cx0 - cr.left, py = cy0 - cr.top;
-      if (shown > 0.95 && zoom === 0 && !paint.fade && spot) {
-        const sp = spot;
-        over = onBlades(sp, px, py);
-        // brush every stroke near the line the pointer moved along since the last frame (so fast swipes don't skip)
-        const bw = sp.r * PAINT_BRUSH;
-        const seg = Math.hypot(px - lastPx, py - lastPy);
-        const steps = seg > sp.r * 2 ? 1 : Math.max(1, Math.ceil(seg / (bw * 0.4)));
-        for (let s = 1; s <= steps; s++) {
-          const t = s / steps;
-          const bx = steps === 1 ? px : lastPx + (px - lastPx) * t, by = steps === 1 ? py : lastPy + (py - lastPy) * t;
-          if (Math.hypot(bx - sp.x, by - sp.y) > sp.r + bw) continue;
-          PAINT_MARKS.forEach((mk, j) => {
-            if (paint.m[j] !== 0) return;
-            const x = sp.x + mk.u * sp.r, y = sp.y + mk.v * sp.r;
-            if (Math.hypot(x - bx, y - by) < bw * mk.jit && !inPoly(sp.hole, x, y)) {
-              paint.m[j] = 0.01;
-              paint.any = true;
-            }
-          });
+      const bx = ptrX - cr.left, by = ptrY - cr.top;
+      if (dotShow > 0.6 && screenFacing > CAMERA_DOT_TURN && (bx !== brushX || by !== brushY)) {
+        const r = Math.min(w, h) * CAMERA_BRUSH;
+        const fromX = brushX < -1e4 ? bx : brushX, fromY = brushY < -1e4 ? by : brushY;
+        const sx = bx - fromX, sy = by - fromY, sl = sx * sx + sy * sy;
+        const minX = Math.min(fromX, bx) - r * 1.2, maxX = Math.max(fromX, bx) + r * 1.2, minY = Math.min(fromY, by) - r * 1.2, maxY = Math.max(fromY, by) + r * 1.2;
+        for (let i = 0; i < D.length; i++) {
+          if (dotLit[i] !== 0) continue;
+          const x = dotXY[i * 2], y = dotXY[i * 2 + 1];
+          if (x < minX || x > maxX || y < minY || y > maxY) continue;
+          const u = sl > 0 ? clamp(((x - fromX) * sx + (y - fromY) * sy) / sl, 0, 1) : 0;
+          const dx = x - (fromX + sx * u), dy = y - (fromY + sy * u);
+          if (dx * dx + dy * dy < (r * dotJit[i]) ** 2) { dotLit[i] = 0.01; dotsAny = true; dotVer++; }
         }
       }
-      lastPx = px;
-      lastPy = py;
-      if (paint.fade) {
-        paint.a -= dt / 0.45;
-        if (paint.a <= 0) { paint.m.fill(0); paint.a = 1; paint.fade = false; paint.any = false; }
-      } else if (paint.any) {
-        // painted strokes light up quickly, one after another, as the brush passes
-        for (let j = 0; j < paint.m.length; j++) if (paint.m[j] > 0 && paint.m[j] < 1) paint.m[j] = Math.min(1, paint.m[j] + dt * 7);
-      }
-      if (over !== brush) {
-        brush = over;
-        document.documentElement.classList.toggle("brush-on", over);
+      brushX = bx;
+      brushY = by;
+      if (dotsAny) {
+        if (dotShow <= 0) { dotLit.fill(0); dotsAny = false; dotVer++; } // faded right out: start fresh next time
+        else {
+          // lit dots brighten quickly, one after another, as the brush passes
+          let moving = false;
+          for (let i = 0; i < dotLit.length; i++) if (dotLit[i] > 0 && dotLit[i] < 1) { dotLit[i] = Math.min(1, dotLit[i] + dt * 6); moving = true; }
+          if (moving) dotVer++;
+        }
       }
 
-      // Snapping: if the page stops while the aperture is changing between two stops (where neither one's
-      // info can be clicked), glide on to whichever stop is closer.
+      // which page of the screen is showing: the scrolling after the turn is split into one share per page
+      const u = clamp((ps - T) / (1 - T), 0, 1) * n;
+      const k = Math.min(n - 1, Math.floor(u));
+      const target = forced >= 0 ? forced : Math.min(n - 1, k + smooth(0.6, 1, u - k));
+      tv += (target - tv) * (1 - Math.exp(-dt * 7)); // slides along and settles softly on each page
+      if (!swipe?.on) dragPx *= Math.exp(-dt * 14); // a short swipe springs back
+
+      // Snapping: if the scrolling stops part way between two pages, glide on to whichever is closer
       const l = lenisRef.current;
-      if (snapping && now - snapAt > CAMERA_SNAP * 1000 + 400) snapping = false; // in case a new scroll cut the glide short
-      if (CAMERA_SNAP > 0 && l && !snapping && !dragging && !l.isTouching && !l.isScrolling && now - lastScroll > 200) {
-        const pu = clamp((p - A) / (Z - A), 0, 1) * n, pk = Math.floor(pu), pf = pu - pk;
-        if (p < Z && pk < n - 1 && pf > 0.6) {
-          const goal = pf < 0.8 ? pk + 0.5 : pk + 1.05; // just inside the resting spot of the nearer stop
-          const y = window.scrollY + br.top + (A + (goal / n) * (Z - A)) * (br.height - h);
-          snapping = true;
-          snapAt = now;
-          l.scrollTo(y, { duration: CAMERA_SNAP, onComplete: () => { snapping = false; lastScroll = performance.now(); } });
-        }
+      if (snapping && now - snapAt > 1500) { snapping = false; forced = -1; } // in case a new scroll cut the glide short
+      if (CAMERA_SNAP > 0 && l && !snapping && !spinning && !swipe && !l.isTouching && !l.isScrolling && now - lastScroll > 200) {
+        const pu = clamp((p - T) / (1 - T), 0, 1) * n, pk = Math.floor(pu), pf = pu - pk;
+        if (p > T && p < 1 && pk < n - 1 && pf > 0.6) glide(scrollFor(pf < 0.8 ? pk + 0.5 : pk + 1.05), CAMERA_SNAP);
       }
 
+      // the screen's box: hidden until the camera has turned round and zoomed in
+      const on = smooth(0.9, 1, f);
+      let sb: ScreenBox | null = null;
       if (br.bottom > 0 && br.top < window.innerHeight) {
-        const small = w < 768; // phones: the lens sits at the top and the info goes underneath
+        const tall = h > w * 1.05; // a phone held upright: the camera tips on its side so its screen stands up tall
         // at the start: the whole camera, facing you, in the middle of the screen
-        const sStart = small ? Math.min((w * 0.62) / 760, (h * 0.5) / 720) : Math.min((w * 0.8) / 1000, (h * 0.75) / 720) * CAMERA_START_SIZE;
-        // zoomed in: the whole front of the lens, facing you, to the right of the info (above it on phones)
-        const rad = small ? Math.min(h * 0.21, w * 0.44) : Math.min(h * CAMERA_LENS_SIZE, w * 0.27);
-        const sLens = rad / LENS_R;
-        // then through the aperture: it grows until the opening is bigger than the screen
-        // (0.88 = how much smaller the blades look than the front of the lens, as they sit further in)
-        const rOpen = IRIS_R * 0.94 * (APERTURE_STOPS[0] / APERTURE_STOPS[n - 1]) * Math.cos(Math.PI / APERTURE_BLADES) * 0.88;
-        const sThrough = (Math.hypot(w, h) / 2 / rOpen) * 1.08;
-        const zEase = zoom * zoom; // starts slowly, then rushes in
-        const move = smooth(0, 0.6, zoom); // the opening slides to the middle of the screen
-        const z = f * f; // the zoom speeds up towards the end, like a camera pushing in
+        const sStart = tall ? Math.min((w * 0.62) / 760, (h * 0.5) / 720) : Math.min((w * 0.8) / 1000, (h * 0.75) / 720) * CAMERA_START_SIZE;
+        // at the end: the back screen as big as fits (under the navbar)
+        const sEnd = tall
+          ? Math.min((w * 0.9) / SCREEN_H, (h * 0.76) / SCREEN_W)
+          : Math.min((w * CAMERA_SCREEN_SIZE) / SCREEN_W, (h * 0.74) / SCREEN_H);
+        const turn = smooth(0, 0.75, f); // it turns round first...
+        const z = smooth(tall ? 0.4 : 0.15, 1, f); // ...while pushing in on the screen (later on phones, so it doesn't spill off the sides while it's side on)
         const t = now / 1000;
-        const wob = 1 - f; // it stops leaning and swaying once zoomed in, so the lens sits perfectly still
-        c.setTransform(dpr, 0, 0, dpr, 0, 0);
-        c.clearRect(0, 0, w, h);
-        spot = null;
-        if (zoom < 0.999) {
-          spot = drawCamera(c, {
-            paint: { m: paint.m, a: paint.a, dots: smooth(0.95, 1, shown) },
-            mask: zoom > 0 ? 1 : 0,
-            stop: tv,
-            lit: Math.max(...lit),
-            body: 1 - smooth(0.25, 0.65, f),
-            lens: 1 - smooth(0, 0.45, zoom), // the rest of the lens fades as you go through, leaving the blades
-            iris: 0.4 + 0.6 * f,
-            yaw: (lerp(CAMERA_YAW, 0, f) + (ex * CAMERA_MOUSE + Math.sin(t * 0.6) * 1.5) * wob) * deg,
-            tilt: (lerp(CAMERA_TILT, 0, f) + (ey * CAMERA_MOUSE * 0.5 + Math.sin(t * 0.45)) * wob) * deg,
-            cx: lerp(lerp(w / 2, small ? w / 2 : w - rad - w * 0.05, f), w / 2, move),
-            cy: lerp(lerp(h / 2, small ? h * 0.27 : h * 0.5, f), h / 2, move),
-            scale: lerp(sStart, sLens, z) * Math.pow(sThrough / sLens, zEase),
-            px: lerp(0, LENS_X, f),
-            py: lerp(0, LENS_Y, f),
-            pz: lerp(-150, LENS_FRONT, f),
-            depth: lerp(4000, 1600, f), // flatter at the start, so the lens isn't blown up in front of the body
-          });
+        const wob = 1 - f; // it stops leaning and swaying as it turns, so the screen ends up perfectly still
+        const fade = smooth(0.3, 0.85, f); // the lens and blades fade back, so they don't show through the screen
+        const pose: CameraPose = {
+          dots: { lit: dotLit, xy: dotXY, show: dotShow },
+          fstop: CAMERA_FSTOP,
+          lit: 0,
+          body: 1,
+          lens: 1 - 0.85 * fade,
+          iris: 0.4 * (1 - fade),
+          yaw: lerp(CAMERA_YAW * deg, Math.PI, turn) + (ex * CAMERA_MOUSE + Math.sin(t * 0.6) * 1.5) * wob * deg + ry * held,
+          tilt: lerp(CAMERA_TILT, 0, turn) * deg + (ey * CAMERA_MOUSE * 0.5 + Math.sin(t * 0.45)) * wob * deg + rx * held,
+          roll: tall ? (Math.PI / 2) * smooth(0.35, 1, f) : 0,
+          cx: w / 2,
+          cy: h / 2 + (tall ? 0 : 16 * z),
+          scale: sStart * Math.pow(sEnd / sStart, z),
+          px: lerp(0, SCREEN_X, z),
+          py: lerp(0, SCREEN_Y, z),
+          pz: lerp(-150, SCREEN_Z, z),
+          depth: lerp(4000, 2400, f),
+        };
+        screenFacing = -Math.cos(pose.yaw) * Math.cos(pose.tilt);
+        // only draw when something has visibly moved (once zoomed in on the screen, the camera holds still)
+        // (angles to a twentieth of a degree: the slow sway at the start then redraws only when it has moved enough to see)
+        const key = [pose.yaw, pose.tilt, pose.roll].map((v) => v.toFixed(3)).join(",") + "|" +
+          [pose.lens, pose.iris, pose.scale, pose.px, pose.py, pose.pz, pose.depth].map((v) => v.toFixed(4)).join(",") +
+          `|${pose.cx.toFixed(1)},${pose.cy.toFixed(1)},${w},${h}|${dotShow.toFixed(3)},${dotVer}`;
+        if (key !== drawnKey || !drawnBox) {
+          drawnKey = key;
+          c.setTransform(dpr, 0, 0, dpr, 0, 0);
+          c.clearRect(0, 0, w, h);
+          drawnBox = drawCamera(c, pose);
         }
+        sb = drawnBox;
       }
-      // once you're through, the camera stops catching clicks so the part underneath can be used
-      if (stage) stage.style.pointerEvents = zoom > 0.5 ? "none" : "";
-      // the info for each stop fades in while it's showing
-      panelEls.current.forEach((el, i) => {
-        if (!el) return;
-        const v = lit[i];
-        el.style.opacity = String(v);
-        el.style.transform = `translate3d(0,${((1 - v) * 24).toFixed(1)}px,0)`;
-        el.style.visibility = v < 0.01 ? "hidden" : "visible";
-        el.style.pointerEvents = v > 0.6 ? "auto" : "none";
-      });
+      if (sb && on > 0.001) {
+        const key = `${Math.round(sb.x)},${Math.round(sb.y)},${Math.round(sb.w)},${Math.round(sb.h)}`;
+        if (key !== boxKey) {
+          boxKey = key;
+          scr.style.left = `${Math.round(sb.x)}px`;
+          scr.style.top = `${Math.round(sb.y)}px`;
+          scr.style.width = `${Math.round(sb.w)}px`;
+          scr.style.height = `${Math.round(sb.h)}px`;
+        }
+        scr.style.opacity = String(on);
+        scr.style.visibility = "visible";
+        scr.style.pointerEvents = on > 0.95 ? "auto" : "none";
+      } else if (scr.style.visibility !== "hidden") {
+        scr.style.visibility = "hidden";
+        scr.style.pointerEvents = "none";
+      }
+      // slide the pages along
+      const slide = `translate3d(calc(${(-tv * 100).toFixed(2)}% + ${dragPx.toFixed(1)}px),0,0)`;
+      if (track.style.transform !== slide) track.style.transform = slide;
+      const showing = clamp(Math.round(tv), 0, n - 1);
+      if (showing !== page) {
+        page = showing;
+        // only the page that's showing can be clicked or reached with Tab
+        screenPageEls.current.forEach((el, i) => {
+          if (!el) return;
+          el.inert = i !== page;
+          el.setAttribute("aria-hidden", String(i !== page));
+        });
+        screenDotEls.current.forEach((el, i) => {
+          if (!el) return;
+          el.setAttribute("aria-current", String(i === page));
+          el.style.background = i === page ? `rgb(${BLUE})` : "rgba(255,255,255,.25)";
+          el.style.width = i === page ? "18px" : "6px";
+        });
+        if (label) label.textContent = `${String(page + 1).padStart(2, "0")}/${String(n).padStart(2, "0")}  ${SCREEN_PAGES[page]}`;
+      }
       if (hint) hint.style.opacity = String(1 - smooth(0, 0.03, ps));
-      if (drag) drag.style.opacity = String(shown);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -1804,49 +2050,23 @@ export default function Home() {
       window.removeEventListener("resize", size);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("keydown", onKey);
       cv.removeEventListener("pointerdown", onDown);
-      document.documentElement.classList.remove("brush-on");
+      scr.removeEventListener("pointerdown", onScrDown);
+      scr.removeEventListener("pointermove", onScrMove);
+      scr.removeEventListener("pointerup", onScrUp);
+      scr.removeEventListener("pointercancel", onScrUp);
+      scr.removeEventListener("click", onScrClick, true);
     };
   }, []);
 
-  // "who am i?" wobbles while you scroll: each letter jiggles a little, more the faster you scroll
-  useEffect(() => {
-    const title = aboutTitleRef.current;
-    if (!title) return;
-    const chars: HTMLElement[] = Array.from(title.querySelectorAll<HTMLElement>(".shake-ch"));
-    let raf = 0, last = performance.now(), lastY = window.scrollY, vs = 0, shaking = false;
-
-    const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      const y = window.scrollY;
-      const v = Math.abs(y - lastY) / Math.max(dt, 0.001);
-      lastY = y;
-      vs += (v - vs) * (1 - Math.exp(-dt * 8)); // smooth, so it ramps up and settles instead of twitching
-
-      const r = title.getBoundingClientRect();
-      const inView = r.bottom > 0 && r.top < window.innerHeight;
-      const amp = inView ? Math.pow(clamp(vs / SHAKE_SPEED, 0, 1), 0.8) : 0;
-
-      if (amp > 0.01) {
-        shaking = true;
-        const t = now / 1000;
-        chars.forEach((el, i) => {
-          const x = Math.sin(t * 38 + i * 1.7) * amp * SHAKE_PX;
-          const yy = Math.cos(t * 31 + i * 2.3) * amp * SHAKE_PX * 0.7;
-          const rot = Math.sin(t * 27 + i * 1.1) * amp * SHAKE_DEG;
-          el.style.transform = `translate3d(${x.toFixed(2)}px,${yy.toFixed(2)}px,0) rotate(${rot.toFixed(2)}deg)`;
-        });
-      } else if (shaking) {
-        shaking = false;
-        chars.forEach((el) => { el.style.transform = ""; });
-      }
-      raf = requestAnimationFrame(frame);
-    };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-  }, []);
+  // sizes for the writing on the camera's screen: they grow with the screen (cqmin = 1% of its shorter side)
+  const scrTitle: CSSProperties = { fontSize: "clamp(1.35rem, 7cqmin, 3.75rem)" };
+  const scrText: CSSProperties = { fontSize: "clamp(0.8rem, 2.5cqmin, 1.3rem)" };
+  const scrSmall: CSSProperties = { fontSize: "clamp(0.7rem, 1.9cqmin, 1rem)" };
+  const scrPad: CSSProperties = { padding: "clamp(14px, 5cqmin, 48px)", paddingTop: "clamp(10px, 3cqmin, 28px)" };
 
   return (
     <main className="relative text-white" style={{ background: `rgb(${PAGE_BLACK})` }}>
@@ -1862,164 +2082,186 @@ export default function Home() {
 
       <style>{INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + BG_CSS + WALL_CSS}</style>
 
-      {/* The camera behind the wall. Scrolling through this tall block zooms in on its lens, then steps the aperture
-          down one stop at a time (edit ABOUT_TITLE, ABOUT_TEXT and ABOUT_MORE at the top). Then it zooms in through
-          the aperture, and the photos, videos and projects underneath show through the opening. */}
+      {/* The camera behind the wall. Scrolling through this tall block turns it round and zooms in on its back
+          screen. Then the screen's pages slide past: who am i, photos, videos, projects and contact
+          (edit ABOUT_TITLE, ABOUT_TEXT, ABOUT_PRO, ABOUT_PERSONAL, HOME_ALBUMS, HOME_VIDEO, HOME_PROJECTS and CONTACT_TEXT at the top). */}
       <section ref={camRef} className="relative -mt-16" style={{ height: CAMERA_HEIGHT }}>
-        <div ref={camStageRef} className="sticky top-0 z-10 h-dvh w-full overflow-hidden">
-          <canvas ref={camCanvasRef} role="img" aria-label="A see-through 3D camera with a zoom lens" className="absolute inset-0 h-full w-full" />
+        <div className="sticky top-0 z-10 h-dvh w-full overflow-hidden">
+          <canvas ref={camCanvasRef} role="img" aria-label="A see-through 3D camera. Drag to turn it." className="absolute inset-0 h-full w-full" style={{ touchAction: "pan-y" }} />
 
-          {/* the info for each stop: to the left of the lens (underneath it on phones) */}
-          <div className="pointer-events-none absolute inset-x-6 bottom-6 top-[50%] md:inset-y-0 md:left-[7%] md:right-auto md:w-[34%]">
-            {/* stop 1 (f/1.8): who am i? */}
-            <div
-              ref={(el) => { panelEls.current[0] = el; }}
-              className="absolute inset-0 flex items-start md:items-center"
-              style={{ opacity: 0, visibility: "hidden" }}
-            >
-              <div className="w-full">
-                <div>
-                  <p className="mb-3 text-sm font-bold tracking-[0.2em] sm:text-base lg:mb-4" style={{ color: `rgb(${CAMERA_BLADES})` }}>f/{APERTURE_STOPS[0]}</p>
-                  <h2
-                    ref={aboutTitleRef}
-                    aria-label={ABOUT_TITLE}
-                    className="whitespace-nowrap font-bold leading-[1.02] tracking-tight"
-                    style={{ fontSize: TITLE_SIZE }}
-                  >
-                    {ABOUT_TITLE.split(" ").map((word, wi, words) => (
-                      <span key={wi} aria-hidden="true">
-                        <span className="inline-block whitespace-nowrap">
-                          {word.split("").map((ch, ci) => (
-                            <span key={ci} className="shake-ch inline-block will-change-transform">{ch}</span>
+          {/* the camera's back screen: laid exactly over the screen in the drawing once it's zoomed in */}
+          <div
+            ref={screenRef}
+            role="region"
+            aria-roledescription="carousel"
+            aria-label="the camera's screen"
+            className="absolute flex select-none flex-col overflow-hidden rounded-[10px]"
+            style={{
+              left: 0, top: 0, width: 0, height: 0, opacity: 0, visibility: "hidden",
+              containerType: "size", touchAction: "pan-y",
+              background: `linear-gradient(180deg, rgba(${BLUE},.07), rgba(${BLUE},.02)), rgb(${PAGE_BLACK})`,
+              boxShadow: `0 0 0 1px rgba(${BLUE},.6), 0 0 28px rgba(${BLUE},.22), inset 0 0 60px rgba(0,0,0,.6)`,
+            }}
+          >
+            {/* the bar along the top, like a camera's screen: which page, and the settings */}
+            <div className="flex shrink-0 items-center justify-between font-mono text-neutral-400" style={{ ...scrSmall, padding: "clamp(8px, 2.4cqmin, 20px) clamp(14px, 5cqmin, 48px) 0" }}>
+              <span ref={screenLabelRef} className="whitespace-pre uppercase tracking-[0.2em]">01/05  who am i</span>
+              <span className="flex items-center gap-[1.4em]">
+                <span className="hidden sm:inline">f/{CAMERA_FSTOP}</span>
+                <span className="hidden sm:inline">1/250</span>
+                <span>ISO 100</span>
+                {/* the visitor's battery: the percentage (if their browser shares it), and the icon filled to match.
+                    It turns red at 20% or less, and shows a lightning bolt while charging */}
+                <span className="flex items-center gap-[0.5em]" aria-label={battery ? `battery ${Math.round(battery.level * 100)}%${battery.charging ? ", charging" : ""}` : undefined}>
+                  {battery && <span aria-hidden="true">{Math.round(battery.level * 100)}%</span>}
+                  <svg viewBox="0 0 26 12" className="h-[1em] w-auto" aria-hidden="true">
+                    <rect x="0.5" y="0.5" width="22" height="11" rx="2" fill="none" stroke="currentColor" />
+                    <rect x="23" y="3.5" width="2.5" height="5" rx="1" fill="currentColor" />
+                    <rect
+                      x="2.5" y="2.5" height="7" rx="1"
+                      width={(18 * clamp(battery ? battery.level : 1, 0.06, 1)).toFixed(2)}
+                      fill={battery && battery.level <= 0.2 && !battery.charging ? "rgb(255,95,95)" : `rgb(${BLUE})`}
+                    />
+                    {battery?.charging && <path d="M12.5 1.8 8.6 6.6h3l-1.2 3.6 4-4.9h-3z" fill="#fff" />}
+                  </svg>
+                </span>
+              </span>
+            </div>
+
+            {/* the pages, side by side; the strip slides along to show one at a time */}
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <div ref={screenTrackRef} className="flex h-full will-change-transform">
+                {/* 1: who am i */}
+                <div ref={(el) => { screenPageEls.current[0] = el; }} role="group" aria-roledescription="slide" aria-label={`1 of ${SCREEN_PAGES.length}: who am i`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
+                  <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{ABOUT_TITLE}</h2>
+                  <div className="mt-[0.6em] space-y-[0.3em] leading-snug text-neutral-300" style={scrText}>
+                    {ABOUT_TEXT.map((paragraph, i) => <p key={i}>{paragraph}</p>)}
+                  </div>
+                  {/* two columns: the professional side and the personal side */}
+                  <div className="mt-[1.4em] grid min-h-0 grid-cols-2 gap-x-[2em]" style={scrSmall}>
+                    {([[ABOUT_PRO_TITLE, ABOUT_PRO], [ABOUT_PERSONAL_TITLE, ABOUT_PERSONAL]] as const).map(([head, rows]) => (
+                      <div key={head} className="min-w-0">
+                        <h3 className="font-mono uppercase tracking-[0.2em]" style={{ color: `rgb(${BLUE})` }}>{head}</h3>
+                        <dl className="mt-[0.7em] space-y-[0.75em]">
+                          {rows.map((row, i) => (
+                            <div key={i}>
+                              <dt className="font-semibold text-white">{row.title}</dt>
+                              <dd className="mt-[0.1em] leading-snug text-neutral-400">{row.text}</dd>
+                            </div>
                           ))}
-                        </span>
-                        {wi < words.length - 1 ? " " : ""}
-                      </span>
+                        </dl>
+                      </div>
                     ))}
-                  </h2>
-                  <div className="mt-6 space-y-4 text-base leading-relaxed text-neutral-400 sm:text-xl lg:mt-8 lg:text-2xl">
-                    {ABOUT_TEXT.map((paragraph, i) => (
-                      <p key={i}>{paragraph}</p>
+                  </div>
+                  <div className="mt-auto flex flex-wrap gap-3 pt-[1em]">
+                    <Link href="/resume" className="contact-btn" draggable={false}>Résumé<ArrowUpRight /></Link>
+                  </div>
+                </div>
+
+                {/* 2: photos */}
+                <div ref={(el) => { screenPageEls.current[1] = el; }} role="group" aria-roledescription="slide" aria-label={`2 of ${SCREEN_PAGES.length}: photos`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
+                  <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>photos</h2>
+                  <p className="mt-[0.5em] text-neutral-400" style={scrText}>
+                    {albums.length > 0 ? `${albums.length} albums so far. the latest three:` : "albums from my camera roll."}
+                  </p>
+                  <div className="mt-[1em] grid min-h-0 flex-1 grid-cols-3 gap-[clamp(8px,2cqmin,20px)]">
+                    {featured.map((a) => (
+                      <Link key={a.id} href={`/photos/${encodeURIComponent(a.id)}`} draggable={false} className="group relative block min-h-0 overflow-hidden rounded-lg bg-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+                        {a.cover && (
+                          <Image src={a.cover} alt={`${a.title}: album cover`} fill sizes="(min-width: 768px) 28vw, 30vw" draggable={false} className="object-cover transition duration-700 group-hover:scale-[1.04]" />
+                        )}
+                        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-[0.7em] pb-[0.5em] pt-[2em] font-semibold" style={scrSmall}>{a.id}</span>
+                      </Link>
                     ))}
+                  </div>
+                  <div className="flex flex-wrap gap-3 pt-[1em]">
+                    <Link href="/photos" className="contact-btn" draggable={false}>See all photos<ArrowUpRight /></Link>
+                  </div>
+                </div>
+
+                {/* 3: videos */}
+                <div ref={(el) => { screenPageEls.current[2] = el; }} role="group" aria-roledescription="slide" aria-label={`3 of ${SCREEN_PAGES.length}: videos`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
+                  <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>videos</h2>
+                  <p className="mt-[0.5em] text-neutral-400" style={scrText}>{HOME_VIDEO.caption}</p>
+                  <div className="relative mt-[1em] min-h-0 flex-1 overflow-hidden rounded-lg bg-neutral-900">
+                    {HOME_VIDEO.src ? (
+                      <video className="h-full w-full object-cover" src={HOME_VIDEO.src} poster={HOME_VIDEO.poster || undefined} controls playsInline preload="metadata" />
+                    ) : (
+                      <>
+                        {/* the play button, until there's a video */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="flex h-[clamp(40px,12cqmin,80px)] w-[clamp(40px,12cqmin,80px)] items-center justify-center rounded-full border border-white/25 bg-white/5">
+                            <svg viewBox="0 0 24 24" className="ml-[8%] h-[40%] w-[40%] text-white/70" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" /></svg>
+                          </span>
+                        </div>
+                        <p className="absolute bottom-[0.8em] left-[1em] font-semibold" style={scrText}>{HOME_VIDEO.title}</p>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-3 pt-[1em]">
+                    <Link href="/videos" className="contact-btn" draggable={false}>See videos<ArrowUpRight /></Link>
+                  </div>
+                </div>
+
+                {/* 4: projects */}
+                <div ref={(el) => { screenPageEls.current[3] = el; }} role="group" aria-roledescription="slide" aria-label={`4 of ${SCREEN_PAGES.length}: projects`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
+                  <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>projects</h2>
+                  {HOME_PROJECTS.length === 0 ? (
+                    <p className="mt-[0.5em] text-neutral-400" style={scrText}>coming soon</p>
+                  ) : (
+                    <ul className="mt-[1em] min-h-0 flex-1 divide-y divide-white/10 overflow-hidden border-y border-white/10" style={scrText}>
+                      {HOME_PROJECTS.map((pj, i) => (
+                        <li key={i}>
+                          <Link href={pj.href} draggable={false} className="group flex items-baseline gap-[1em] py-[0.7em]">
+                            <span className="w-[5em] shrink-0 text-neutral-500" style={scrSmall}>{pj.date}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-semibold">{pj.title}</span>
+                              <span className="mt-[0.1em] block text-neutral-400">{pj.text}</span>
+                            </span>
+                            <span className="text-neutral-500 transition group-hover:translate-x-1 group-hover:text-white" aria-hidden="true">&rarr;</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="mt-auto flex flex-wrap gap-3 pt-[1em]">
+                    <Link href="/projects" className="contact-btn" draggable={false}>See projects<ArrowUpRight /></Link>
+                  </div>
+                </div>
+
+                {/* 5: contact */}
+                <div ref={(el) => { screenPageEls.current[4] = el; }} role="group" aria-roledescription="slide" aria-label={`5 of ${SCREEN_PAGES.length}: contact`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
+                  <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{CONTACT_TITLE}</h2>
+                  <p className="mt-[0.5em] text-neutral-400" style={scrText}>{CONTACT_TEXT}</p>
+                  <div className="mt-auto flex flex-wrap gap-3 pt-[1em]">
+                    <Link href="/contact" className="contact-btn" draggable={false}>Contact me<ArrowUpRight /></Link>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* stops 2 to 5: the rest of your about me */}
-            {ABOUT_MORE.slice(0, APERTURE_STOPS.length - 1).map((ch, i) => (
-              <div
-                key={i}
-                ref={(el) => { panelEls.current[i + 1] = el; }}
-                className="absolute inset-0 flex items-start md:items-center"
-                style={{ opacity: 0, visibility: "hidden" }}
-              >
-                <div className="max-w-2xl">
-                  <p className="mb-3 text-sm font-bold tracking-[0.2em] sm:text-base lg:mb-4" style={{ color: `rgb(${CAMERA_BLADES})` }}>f/{APERTURE_STOPS[i + 1]}</p>
-                  <h2 className="font-bold leading-[1.02] tracking-tight [text-wrap:balance]" style={{ fontSize: TITLE_SIZE }}>{ch.title}</h2>
-                  <div className="mt-6 space-y-4 text-base leading-relaxed text-neutral-400 sm:text-xl lg:mt-8 lg:text-2xl">
-                    {ch.text.map((paragraph, j) => (
-                      <p key={j}>{paragraph}</p>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
+            {/* the dots: which page you're on; tap one to go there */}
+            <div className="flex shrink-0 items-center justify-center gap-2" style={{ padding: "0 0 clamp(8px, 2.4cqmin, 20px)" }}>
+              {SCREEN_PAGES.map((name, i) => (
+                <button
+                  key={name}
+                  ref={(el) => { screenDotEls.current[i] = el; }}
+                  type="button"
+                  aria-label={`show ${name}`}
+                  onClick={() => goToPageRef.current(i)}
+                  className="relative h-1.5 rounded-full transition-all duration-300 before:absolute before:-inset-3 before:content-['']"
+                  style={{ width: 6, background: "rgba(255,255,255,.25)" }}
+                />
+              ))}
+            </div>
           </div>
 
-          {/* like a carousel: you can drag over the lens too */}
-          <div ref={camDragRef} className="pointer-events-none absolute bottom-8 left-[7%] hidden text-xs uppercase tracking-[0.3em] text-neutral-500 md:block" style={{ opacity: 0 }}>
-            drag / scroll
-          </div>
-
-          <div ref={camHintRef} className="pointer-events-none absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3 text-xs uppercase tracking-[0.3em] text-neutral-400">
-            scroll
+          <div ref={camHintRef} className="pointer-events-none absolute bottom-8 left-1/2 flex -translate-x-1/2 whitespace-nowrap flex-col items-center gap-3 text-xs uppercase tracking-[0.3em] text-neutral-400">
+            drag to turn / scroll
             <span className="sc-hint block h-10 w-px bg-white/60" />
           </div>
         </div>
       </section>
-
-      {/* What you zoom into through the aperture: photos, videos and projects, laid out one after another.
-          It starts tucked up under the last screen of the camera (the -100dvh), so it's what shows through the opening. */}
-      <div className="relative" style={{ marginTop: "-100dvh" }}>
-        <div className="mx-auto max-w-5xl px-6 pb-28 pt-24 sm:pt-28">
-          {/* photos */}
-          <section aria-labelledby="home-photos">
-            <h2 id="home-photos" className="text-4xl font-bold tracking-tight sm:text-5xl">photos</h2>
-            <p className="mt-4 text-lg text-neutral-400 sm:text-xl">
-              {albums.length > 0 ? `${albums.length} albums so far. the latest three:` : "albums from my camera roll."}
-            </p>
-            <div className="mt-8 grid gap-6 sm:grid-cols-3 sm:gap-5">
-              {featured.map((a) => (
-                <Link key={a.id} href={`/photos/${encodeURIComponent(a.id)}`} className="group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
-                  <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-neutral-900">
-                    {a.cover && (
-                      <Image src={a.cover} alt={`${a.title}: album cover`} fill sizes="(min-width: 640px) 30vw, 92vw" className="object-cover transition duration-700 group-hover:scale-[1.04]" />
-                    )}
-                  </div>
-                  <h3 className="mt-4 text-lg font-semibold sm:text-xl">{a.id}</h3>
-                  <p className="mt-1 text-neutral-400">{a.description}</p>
-                </Link>
-              ))}
-            </div>
-            <Link href="/photos" className="mt-8 inline-block font-mono text-base hover:underline sm:text-lg" style={{ color: `rgb(${BLUE})` }}>
-              see all {albums.length || ""} albums &rarr;
-            </Link>
-          </section>
-
-          {/* videos */}
-          <section aria-labelledby="home-videos" className="mt-28">
-            <h2 id="home-videos" className="text-4xl font-bold tracking-tight sm:text-5xl">videos</h2>
-            <div className="relative mt-8 aspect-video overflow-hidden rounded-xl bg-neutral-900">
-              {HOME_VIDEO.src ? (
-                <video className="h-full w-full object-cover" src={HOME_VIDEO.src} poster={HOME_VIDEO.poster || undefined} controls playsInline preload="metadata" />
-              ) : (
-                <>
-                  {/* the play button, until there's a video */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="flex h-16 w-16 items-center justify-center rounded-full border border-white/25 bg-white/5 sm:h-20 sm:w-20">
-                      <svg viewBox="0 0 24 24" className="ml-1 h-6 w-6 text-white/70 sm:h-7 sm:w-7" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" /></svg>
-                    </span>
-                  </div>
-                  <div className="absolute bottom-4 left-5 sm:bottom-6 sm:left-7">
-                    <p className="text-lg font-semibold sm:text-2xl">{HOME_VIDEO.title}</p>
-                  </div>
-                </>
-              )}
-            </div>
-            <p className="mt-4 text-neutral-400 sm:text-lg">{HOME_VIDEO.caption}</p>
-            <Link href="/videos" className="mt-6 inline-block font-mono text-base hover:underline sm:text-lg" style={{ color: `rgb(${BLUE})` }}>
-              see videos &rarr;
-            </Link>
-          </section>
-
-          {/* projects */}
-          <section aria-labelledby="home-projects" className="mt-28">
-            <h2 id="home-projects" className="text-4xl font-bold tracking-tight sm:text-5xl">projects</h2>
-            {HOME_PROJECTS.length === 0 ? (
-              <p className="mt-4 text-lg text-neutral-400 sm:text-xl">coming soon</p>
-            ) : (
-              <ul className="mt-8 divide-y divide-white/10 border-y border-white/10">
-                {HOME_PROJECTS.map((pj, i) => (
-                  <li key={i}>
-                    <Link href={pj.href} className="group flex items-baseline gap-5 py-5 sm:gap-8">
-                      <span className="w-20 shrink-0 text-sm text-neutral-500 sm:w-24">{pj.date}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-lg font-semibold sm:text-xl">{pj.title}</span>
-                        <span className="mt-1 block text-neutral-400">{pj.text}</span>
-                      </span>
-                      <span className="text-neutral-500 transition group-hover:translate-x-1 group-hover:text-white" aria-hidden="true">&rarr;</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <Link href="/projects" className="mt-6 inline-block font-mono text-base hover:underline sm:text-lg" style={{ color: `rgb(${BLUE})` }}>
-              see projects &rarr;
-            </Link>
-          </section>
-        </div>
-      </div>
 
       <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 px-6 pb-6 pt-2 text-xs text-neutral-500">
         {/* your resume page (app/resume/page.tsx) */}
