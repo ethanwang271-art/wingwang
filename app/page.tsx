@@ -16,10 +16,10 @@ const ABOUT_TEXT = [
   "site is not finished :(",
 ];
 
-// ---- What's in the revolver's chambers: edit these ----
-// The cylinder has 6 chambers. The first one is "who am i?" above; these are chambers 2 to 6 (keep it to 5).
+// ---- What each aperture stop shows: edit these ----
+// The lens has 6 stops (f/1.8, 2.8, 4, 5.6, 8, 11). The first one is "who am i?" above; these are stops 2 to 6 (keep it to 5).
 // `link` is optional: a page on your site ("/photos") or a full web address. Delete the link line to have no button.
-const CHAMBERS: { title: string; text: string; link?: { label: string; href: string } }[] = [
+const STOPS: { title: string; text: string; link?: { label: string; href: string } }[] = [
   { title: "photos", text: "i like taking photos", link: { label: "see my photos", href: "/photos" } },
   { title: "videos", text: "work in progress. stay tuned :D" },
   { title: "projects", text: "things i've made", link: { label: "see my projects", href: "/projects" } },
@@ -27,8 +27,8 @@ const CHAMBERS: { title: string; text: string; link?: { label: string; href: str
   { title: "more soon", text: ":)" },
 ];
 
-// how big the titles next to the cylinder are: grows with the screen width, from 36px (2.25rem) up to 96px (6rem)
-const CHAMBER_TITLE_SIZE = "clamp(2.25rem, 5.6vw, 6rem)";
+// how big the titles next to the lens are: grows with the screen width, from 36px (2.25rem) up to 96px (6rem)
+const TITLE_SIZE = "clamp(2.25rem, 5.6vw, 6rem)";
 
 // ---- "who am i?" shake (it wobbles while you scroll past it) ----
 const SHAKE_PX = 3;        // how far each letter jiggles at most, in px
@@ -73,7 +73,6 @@ const CURSOR_DOT = 8;             // size of the dot in px
 const CURSOR_RING = 38;           // size of the ring in px
 const CURSOR_FOLLOW = 9;          // how quickly the ring catches up with the dot (lower = lazier, more delay)
 const CURSOR_HOVER_SCALE = 1.7;   // the ring grows this much over links and buttons (1 = never grows)
-const PAINT_COLOR = "255,190,110";  // r,g,b of the paint when you brush over a bullet on the revolver (the same amber as the cartridges)
 
 
 // hide the normal arrow (only on devices with a real mouse); it comes back when you leave this page
@@ -82,9 +81,6 @@ const CURSOR_CSS = `
   html, html * { cursor: none !important; }
 }
 .cursor-dot, .cursor-ring { transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease; }
-/* over a bullet you can paint (see the revolver), the cursor becomes an amber brush */
-html.brush-on .cursor-dot { background: rgb(${PAINT_COLOR}) !important; box-shadow: 0 0 14px rgba(${PAINT_COLOR},.9) !important; }
-html.brush-on .cursor-ring { border-color: rgba(${PAINT_COLOR},.85) !important; mix-blend-mode: normal !important; }
 `;
 
 // the "Contact me" button: dark blue-tinted box, blue border, monospace text
@@ -668,7 +664,7 @@ function inPoly(pts: Pt[], x: number, y: number): boolean {
   return inside;
 }
 
-// A black concrete wall covers the screen, with the revolver behind it. Click it: each hit punches a hole
+// A black concrete wall covers the screen, with the camera behind it. Click it: each hit punches a hole
 // right through (with real wall thickness around the edge), so you get a peek at what's behind. The last hit
 // cracks the whole wall and it crumbles: big chunks fall down towards you and off the screen.
 function startWall(
@@ -1099,48 +1095,38 @@ function WallIntro({ onBreak, onDone }: { onBreak: () => void; onDone: () => voi
   );
 }
 
-/* ---------- The revolver behind the wall ---------- */
+/* ---------- The camera behind the wall ---------- */
 
-const REVOLVER_HEIGHT = "760vh";            // how much scrolling the whole revolver part takes (more = slower)
-const REVOLVER_FACE = 0.14;                 // how much of that scrolling it takes to turn and zoom in on the cylinder (0.14 = the first 14%)
-const REVOLVER_START_SIZE = 0.55;           // how big the whole revolver is at the start (1 = as wide as fits)
-const REVOLVER_ZOOM = 1.25;                 // how big the cylinder is once zoomed in (1.25 = 125% of the screen height, so a little runs off the top and bottom). Half of it hangs off the right edge
-const REVOLVER_DRAG = 3;                    // dragging the cylinder sideways turns it too: higher = it turns further per drag
-const REVOLVER_SPIN = 1;                    // 1 or -1: which way the cylinder turns when you scroll down
-const REVOLVER_FLIP = true;                 // true = barrel points left, grip on the right. false = barrel right, grip left
-const REVOLVER_YAW = 0;                     // how far it's turned towards you at the start, in degrees (0 = flat side view)
-const REVOLVER_TILT = 0;                    // how much you look down on it at the start, in degrees
-const REVOLVER_MOUSE = 6;                   // how much it leans to follow the mouse at the start, in degrees (0 = not at all)
-const REVOLVER_LINE = BLUE;                 // r,g,b of the gun's lines
-const REVOLVER_ROUND_LINE = "255,190,110";  // r,g,b of the cartridges' lines
-const REVOLVER_LIT = "255,255,255";         // r,g,b of the cartridge whose info is showing
-const PAINT_GRID = 34;                      // how many little strokes fit across one bullet (more = finer and denser)
-const PAINT_BRUSH = 0.32;                   // how big the brush is, compared to a bullet (0.32 = about a third of it)
-const REVOLVER_SNAP = 0.35;                 // when you stop scrolling between two chambers, it glides to the nearest one in this many seconds (0 = off)
-const REVOLVER_FILL = 0.035;                // how see-through the surfaces are (0 = only lines, higher = more solid)
+const CAMERA_HEIGHT = "760vh";              // how much scrolling the whole camera part takes (more = slower)
+const CAMERA_FACE = 0.14;                   // how much of that scrolling it takes to turn the lens towards you and zoom in on it (0.14 = the first 14%)
+const CAMERA_START_SIZE = 0.62;             // how big the whole camera is at the start (1 = as big as fits)
+const CAMERA_LENS_SIZE = 0.44;              // how big the front of the lens is once zoomed in (0.44 = its radius is 44% of the screen height, so it nearly fills it top to bottom)
+const CAMERA_DRAG = 3;                      // dragging sideways over the lens changes the stop too: higher = further per drag
+const CAMERA_YAW = 0;                       // how far it's turned at the start, in degrees (0 = facing you straight on)
+const CAMERA_TILT = 0;                      // how much you look down on it at the start, in degrees
+const CAMERA_MOUSE = 6;                     // how much it leans to follow the mouse at the start, in degrees (0 = not at all)
+const CAMERA_LINE = BLUE;                   // r,g,b of the body, cage and lens lines
+const CAMERA_GLASS = "170,215,255";         // r,g,b of the glass inside the lens
+const CAMERA_BLADES = "255,190,110";        // r,g,b of the aperture blades
+const CAMERA_LIT = "255,255,255";           // r,g,b of the edge of the opening
+const CAMERA_SNAP = 0.35;                   // when you stop scrolling between two stops, it glides to the nearest one in this many seconds (0 = off)
+const CAMERA_FILL = 0.035;                  // how see-through the surfaces are (0 = only lines, higher = more solid)
+const APERTURE_STOPS = [1.8, 2.8, 4, 5.6, 8, 11]; // the f-number for each of the 6 sections, in order
+const APERTURE_BLADES = 9;                  // how many blades the aperture has
 
-// where the revolver is and which way it faces. turn = which chamber is lit (0 to 5, in between while turning),
-// lit[i] = how lit chamber i is (0 to 1), cx/cy = where it sits on the screen, scale = how big,
-// px/py = the point on the model it turns around, gun = how visible the rest of the gun is (1 = fully, 0 = only the cylinder)
-// paint[i] = cartridge i's little strokes (m[k] = 0 not painted .. 1 fully painted) and how strongly they show (a).
-// dots = how visible the faint unpainted strokes are (0 to 1)
-type RevolverPose = { turn: number; lit: number[]; paint: { m: Float32Array; a: number }[]; dots: number; gun: number; yaw: number; tilt: number; cx: number; cy: number; scale: number; px: number; py: number };
+// where the camera is and which way it faces. stop = which section is showing (0 to 5, in between while changing),
+// lit = how settled it is on that section (0 to 1), body = how visible the body is, lens = how visible the lens around
+// the blades is (1 = fully, 0 = only the blades), iris = how bright the blades are, cx/cy = where it sits on the screen, scale = how big,
+// px/py/pz = the point on the model it turns around, depth = how strong the perspective is (higher = flatter)
+type CameraPose = { stop: number; lit: number; body: number; lens: number; iris: number; yaw: number; tilt: number; cx: number; cy: number; scale: number; px: number; py: number; pz: number; depth: number };
 
-// mix two "r,g,b" colours: t = 0 gives a, t = 1 gives b
-function mixRgb(a: string, b: string, t: number): string {
-  const x = a.split(",").map(Number), y = b.split(",").map(Number);
-  return x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(",");
-}
-
-// The revolver is a see-through 3D model made of lines. It's built from simple shapes:
-// flat outlines given a thickness (frame, grip, hammer, trigger) and round shapes spun around a line
-// (barrel, cylinder, cartridges). Then every point is turned, put in perspective and drawn on a flat canvas.
+// The camera is a see-through 3D model made of lines, built from simple shapes: flat outlines given a thickness
+// (body, grip, cage) and round shapes spun around a line (lens, dials). Then every point is turned, put in
+// perspective and drawn on a flat canvas. Units are about 4.5 per millimetre. x = right, y = down,
+// z = away from you when the lens points at you (the lens sticks out towards -z, the body sits from z 0 to 170).
 type V3 = { x: number; y: number; z: number };
 type Line3 = { pts: V3[]; closed: boolean; col: string; w: number }; // w = how bright (1 = normal)
-type Model = {
-  lines: Line3[]; faces: { pts: V3[]; col: string; w?: number }[]; labels: { p: V3; text: string; a: number }[];
-  rounds: { c: V3; e: V3 }[]; // each cartridge's front: its middle (c) and a point on its edge (e)
-};
+type Model = { lines: Line3[]; faces: { pts: V3[]; col: string; w?: number }[] };
 
 // turn an outline written like an SVG path ("M x y L x y Q ... C ... Z") into points.
 // corner[i] = that point is the end of a piece (where the edges across the thickness get drawn)
@@ -1185,193 +1171,141 @@ function pathPts(d: string): { pts: Pt[]; corner: boolean[] } {
   return out;
 }
 
-// a flat outline with a thickness: the front from z0, the back at z1, and edges across at the corners
-function extrudePts(m: Model, pts: Pt[], corner: boolean[], z0: number, z1: number, col: string) {
-  const f = pts.map((p) => ({ x: p.x, y: p.y, z: z0 })), b = pts.map((p) => ({ x: p.x, y: p.y, z: z1 }));
-  m.lines.push({ pts: f, closed: true, col, w: 1 }, { pts: b, closed: true, col, w: 1 });
-  pts.forEach((_, i) => { if (corner[i]) m.lines.push({ pts: [f[i], b[i]], closed: false, col, w: 0.6 }); });
-  m.faces.push({ pts: f, col }, { pts: b, col });
-}
-function extrude(m: Model, d: string, z0: number, z1: number, col: string) {
+// how a flat outline's (u, v) and its thickness (t) map onto the model:
+const FRONT = (u: number, v: number, t: number): V3 => ({ x: u, y: v, z: t }); // drawn as seen from the front, thick front to back
+const SIDE = (u: number, v: number, t: number): V3 => ({ x: t, y: v, z: u });  // drawn as seen from the side (u = front to back), thick left to right
+
+// a flat outline with a thickness: one face at t0, the other at t1, and edges across at the corners
+function prism(m: Model, d: string, t0: number, t1: number, col: string, at = FRONT, w = 1) {
   const { pts, corner } = pathPts(d);
-  extrudePts(m, pts, corner, z0, z1, col);
+  const f = pts.map((p) => at(p.x, p.y, t0)), b = pts.map((p) => at(p.x, p.y, t1));
+  m.lines.push({ pts: f, closed: true, col, w }, { pts: b, closed: true, col, w });
+  pts.forEach((_, i) => { if (corner[i]) m.lines.push({ pts: [f[i], b[i]], closed: false, col, w: 0.6 * w }); });
+  m.faces.push({ pts: f, col, w }, { pts: b, col, w });
 }
-// a bent bar of a set width that follows a line (trigger, trigger guard), with a thickness
-function ribbon(m: Model, d: string, width: number, z0: number, z1: number, col: string) {
-  const { pts } = pathPts(d);
-  const a: Pt[] = [], b: Pt[] = [];
-  pts.forEach((p, i) => {
-    const p0 = pts[Math.max(0, i - 1)], p1 = pts[Math.min(pts.length - 1, i + 1)];
-    let nx = -(p1.y - p0.y), ny = p1.x - p0.x;
-    const l = Math.hypot(nx, ny) || 1;
-    nx = (nx / l) * width / 2;
-    ny = (ny / l) * width / 2;
-    a.push({ x: p.x + nx, y: p.y + ny });
-    b.push({ x: p.x - nx, y: p.y - ny });
-  });
-  const outline = [...a, ...b.reverse()];
-  extrudePts(m, outline, outline.map((_, i) => i === 0 || i === a.length - 1 || i === a.length || i === outline.length - 1), z0, z1, col);
+// just the outline (no thickness), for slots and panel edges
+function outline(m: Model, d: string, t: number, col: string, at = FRONT, w = 0.5) {
+  m.lines.push({ pts: pathPts(d).pts.map((p) => at(p.x, p.y, t)), closed: true, col, w });
 }
-// a round shape spun around a line running left to right at height cy, depth cz.
-// prof = [x, radius, draw a ring here?]. view = which way you're looking (so the outline edges can be found)
-function lathe(m: Model, prof: [number, number, boolean][], cy: number, cz: number, col: string, view: V3, w = 1) {
-  const ring = (x: number, r: number) =>
-    Array.from({ length: 64 }, (_, k) => {
-      const a = (k / 64) * Math.PI * 2;
-      return { x, y: cy + r * Math.sin(a), z: cz + r * Math.cos(a) };
-    });
-  for (const [x, r, on] of prof) if (on && r > 0) m.lines.push({ pts: ring(x, r), closed: true, col, w });
-  // the two edges along the side that make its outline from where you're looking.
-  // Looking straight down its length (end on) there's no side to see, so they fade out.
-  const as = Math.atan2(-view.z, view.y);
-  const sw = w * smooth(0.12, 0.45, Math.hypot(view.y, view.z));
-  const side = (a: number) => prof.map(([x, r]) => ({ x, y: cy + r * Math.sin(a), z: cz + r * Math.cos(a) }));
+
+// a point on a circle around one of the three directions: axis "z" = the lens's direction, "y" = up and down, "x" = left to right.
+// (c1, c2) = the centre, t = how far along the axis
+type Axis = "x" | "y" | "z";
+function around(axis: Axis, c1: number, c2: number, t: number, r: number, a: number): V3 {
+  const p = c1 + r * Math.cos(a), q = c2 + r * Math.sin(a);
+  return axis === "z" ? { x: p, y: q, z: t } : axis === "y" ? { x: p, y: t, z: q } : { x: t, y: q, z: p };
+}
+function circle(m: Model, axis: Axis, c1: number, c2: number, t: number, r: number, col: string, w = 1) {
+  m.lines.push({ pts: Array.from({ length: 56 }, (_, k) => around(axis, c1, c2, t, r, (k / 56) * Math.PI * 2)), closed: true, col, w });
+}
+// a round shape spun around an axis. prof = [how far along, radius, draw a ring here?].
+// view = which way you're looking (so the two edges that make its outline can be found)
+function spin(m: Model, prof: [number, number, boolean][], axis: Axis, c1: number, c2: number, col: string, view: V3, w = 1) {
+  for (const [t, r, on] of prof) if (on && r > 0) circle(m, axis, c1, c2, t, r, col, w);
+  // the view seen across the axis: looking straight down the axis there's no side to see, so the edges fade out
+  const [a1, a2] = axis === "z" ? [view.x, view.y] : axis === "y" ? [view.x, view.z] : [view.z, view.y];
+  const as = Math.atan2(-a1, a2);
+  const sw = w * smooth(0.12, 0.45, Math.hypot(a1, a2));
+  const side = (a: number) => prof.map(([t, r]) => around(axis, c1, c2, t, r, a));
   const s1 = side(as), s2 = side(as + Math.PI);
   m.lines.push({ pts: s1, closed: false, col, w: sw }, { pts: s2, closed: false, col, w: sw });
-  m.faces.push({ pts: [...s1, ...s2.reverse()], col, w: sw / (w || 1) });
+  m.faces.push({ pts: [...s1, ...s2.reverse()], col, w: sw });
 }
 
-function buildRevolver(turn: number, lit: number[], gun: number, view: V3): Model {
-  const m: Model = { lines: [], faces: [], labels: [], rounds: [] };
-  const G = REVOLVER_LINE, A = REVOLVER_ROUND_LINE;
+// where the lens is: its middle (x, y), the depth of the aperture blades and how big their housing is
+const LENS_X = 0, LENS_Y = 30, IRIS_Z = -270, IRIS_R = 140, LENS_FRONT = -486, LENS_R = 188;
 
-  // frame, grip, hammer, sights, trigger and guard: flat outlines with a thickness
-  extrude(m, "M 322 212 L 340 160 L 612 160 L 622 182 L 622 300 Q 618 345 572 352 L 418 352 Q 395 352 385 335 L 345 285 Z", -24, 24, G);
-  extrude(m, "M 335 205 C 305 265 262 370 222 500 Q 210 545 248 550 L 305 550 Q 336 547 340 515 C 350 452 372 392 410 348 L 410 300 Z", -30, 30, G);
-  // the outline of the grip panels on each side (lines only)
-  const panel = pathPts("M 330 262 C 305 318 276 398 249 494 Q 242 528 266 530 L 300 530 Q 320 528 323 505 C 332 450 350 400 380 355 L 372 300 Z").pts;
-  for (const z of [-31, 31]) m.lines.push({ pts: panel.map((p) => ({ x: p.x, y: p.y, z })), closed: true, col: G, w: 0.45 });
-  extrude(m, "M 352 205 L 338 160 Q 318 132 282 120 L 272 128 Q 300 145 312 175 L 322 210 Z", -7, 7, G);
-  extrude(m, "M 346 160 L 346 150 L 356 150 L 356 156 L 366 156 L 366 150 L 376 150 L 376 160 Z", -8, 8, G);
-  extrude(m, "M 918 188 L 950 188 L 950 166 Q 936 166 924 176 Z", -4, 4, G);
-  ribbon(m, "M 470 350 Q 480 385 454 412", 9, -5, 5, G);
-  ribbon(m, "M 420 350 C 405 420 470 448 520 432 C 560 420 575 385 568 350", 12, -7, 7, G);
+function buildCamera(view: V3, body: number, lens: number): Model {
+  const m: Model = { lines: [], faces: [] };
+  const G = CAMERA_LINE, GL = CAMERA_GLASS;
 
-  // barrel (with the hole down the middle at the end) and the housing under it
-  lathe(m, [[612, 26, true], [958, 26, true], [964, 24, true]], 214, 0, G, view);
-  lathe(m, [[958, 8, false], [964, 8, true]], 214, 0, G, view, 0.8);
-  lathe(m, [[612, 15, true], [890, 15, true], [905, 4, true]], 253, 0, G, view, 0.8);
+  // ---- the body (a small mirrorless camera, no logos) ----
+  prism(m, "M -300 -110 Q -300 -140 -270 -140 L -120 -140 L -96 -226 Q -92 -238 -78 -238 L 78 -238 Q 92 -238 96 -226 L 120 -140 L 270 -140 Q 300 -140 300 -110 L 300 180 Q 300 210 270 210 L -270 210 Q -300 210 -300 180 Z", 0, 170, G);
+  // the grip, sticking out at the front on the left
+  prism(m, "M 0 -140 L -70 -140 Q -150 -128 -152 -40 L -152 150 Q -150 208 -95 210 L 0 210 Z", -296, -176, G, SIDE);
+  // shutter button and the dials on top
+  spin(m, [[-140, 22, true], [-156, 22, true], [-161, 15, true]], "y", -236, -92, G, view, 0.8);
+  spin(m, [[-140, 46, true], [-168, 46, true]], "y", -150, 80, G, view, 0.8);
+  spin(m, [[-140, 38, true], [-160, 38, true]], "y", 180, 84, G, view, 0.8);
+  // viewfinder eyecup and the screen on the back
+  prism(m, "M -84 -230 Q -84 -236 -76 -236 L 76 -236 Q 84 -236 84 -230 L 84 -122 L -84 -122 Z", 170, 236, G);
+  outline(m, "M -40 -112 L 272 -112 L 272 190 L -40 190 Z", 172, G);
 
-  // everything so far is the rest of the gun: it fades away as you zoom in on the cylinder
-  for (const l of m.lines) l.w *= gun;
-  for (const f of m.faces) f.w = gun;
+  // on the front: the lens release button beside the mount, and the little lamp on the grip
+  circle(m, "z", 196, 70, -1, 15, G, 0.6);
+  circle(m, "z", -214, -96, -150, 9, G, 0.5);
 
-  // the cylinder: a drum with six chambers, turned by `turn`
-  const cy = 256, R = 76, C = 47;
-  lathe(m, [[410, R - 6, true], [416, R, true], [592, R, true], [598, R - 6, true]], cy, 0, G, view);
-  lathe(m, [[398, 9, true], [612, 9, true]], cy, 0, G, view, 0.6); // the pin it turns on
-  // once it faces you, the lit chamber is the one on the left of the drum (nearest the info); the right half is off screen
-  const base = REVOLVER_FLIP ? 0 : Math.PI;
-  for (let i = 0; i < 6; i++) {
-    const a = base + ((i - turn) * REVOLVER_SPIN * Math.PI) / 3, ry = cy + C * Math.sin(a), rz = C * Math.cos(a);
-    // the grooves on the outside, between the chambers
-    const g = a + Math.PI / 6;
-    m.lines.push({ pts: [450, 560].map((x) => ({ x, y: cy + R * Math.sin(g), z: R * Math.cos(g) })), closed: false, col: G, w: 0.45 });
-    // the chamber holes on the front and back of the drum
-    for (const x of [410, 598]) {
-      m.lines.push({
-        pts: Array.from({ length: 40 }, (_, k) => {
-          const b = (k / 40) * Math.PI * 2;
-          return { x, y: ry + 18 * Math.sin(b), z: rz + 18 * Math.cos(b) };
-        }),
-        closed: true, col: mixRgb(G, REVOLVER_LIT, lit[i]), w: 0.7 + 0.5 * lit[i],
-      });
+  // everything so far fades away as you zoom in on the lens
+  for (const l of m.lines) l.w *= body;
+  for (const f of m.faces) f.w = (f.w ?? 1) * body;
+
+  // ---- the lens (a 24-105mm f4 zoom, no writing on it) ----
+  const lensLines = m.lines.length, lensFaces = m.faces.length;
+  spin(m, [
+    [0, 128, true], [-22, 128, true], [-30, 150, true], [-48, 182, true], [-150, 184, true],
+    [-158, LENS_R, true], [-300, LENS_R, true], [-308, 184, true], [-325, 184, true], [-333, LENS_R, true],
+    [-440, LENS_R, true], [-448, 184, true], [-480, 184, true], [LENS_FRONT, 176, true],
+  ], "z", LENS_X, LENS_Y, G, view);
+  // the rubber grip on the zoom ring and the focus ring
+  for (let k = 0; k < 40; k++) {
+    const a = (k / 40) * Math.PI * 2;
+    for (const [z0, z1] of [[-164, -294], [-339, -434]]) {
+      m.lines.push({ pts: [around("z", LENS_X, LENS_Y, z0, LENS_R + 1, a), around("z", LENS_X, LENS_Y, z1, LENS_R + 1, a)], closed: false, col: G, w: 0.18 });
     }
-    m.rounds.push({ c: { x: 528, y: ry, z: rz }, e: { x: 528, y: ry + 15, z: rz } });
-    // the chamber's number (1 to 6), on the front of the drum, only while it's lit
-    if (lit[i] > 0.01) m.labels.push({ p: { x: 604, y: ry, z: rz }, text: String(i + 1), a: lit[i] });
-    // the cartridge in the chamber: the rim, the brass case, then the bullet
-    lathe(m, [[408, 17, true], [414, 17, false], [414, 15, true], [528, 15, true], [544, 13, false], [556, 9, false], [566, 3, false]], ry, rz, mixRgb(A, REVOLVER_LIT, lit[i]), view, 0.9 + 0.6 * lit[i]);
   }
+  // the glass: a domed front element, and more elements further in
+  spin(m, [[-466, 156, true], [-475, 134, true], [-481, 100, true], [-484, 52, false]], "z", LENS_X, LENS_Y, GL, view, 0.8);
+  circle(m, "z", LENS_X, LENS_Y, -472, 166, G, 0.6);
+  for (const [z, r] of [[-400, 146], [-150, 120], [-60, 104]] as const) circle(m, "z", LENS_X, LENS_Y, z, r, GL, 0.3);
+  // the lens fades away too, leaving only the blades
+  for (let i = lensLines; i < m.lines.length; i++) m.lines[i].w *= lens;
+  for (let i = lensFaces; i < m.faces.length; i++) m.faces[i].w = (m.faces[i].w ?? 1) * lens;
+  // the ring that holds the aperture blades
+  circle(m, "z", LENS_X, LENS_Y, IRIS_Z, IRIS_R, CAMERA_BLADES, 0.6);
+  circle(m, "z", LENS_X, LENS_Y, IRIS_Z + 8, IRIS_R + 6, CAMERA_BLADES, 0.35);
   return m;
 }
 
-// The little strokes that fill a cartridge when you paint it: a grid of short horizontal dashes, worked out once,
-// as positions inside a circle of radius 1 (u = across, v = down). jit makes the brush edge a little ragged.
-const PAINT_MARKS: { u: number; v: number; jit: number }[] = (() => {
-  const out: { u: number; v: number; jit: number }[] = [];
-  const n = PAINT_GRID, cell = 2 / n;
-  for (let row = 0; row < n; row++) {
-    for (let col = 0; col < n; col++) {
-      const u = -1 + (col + 0.5) * cell + (row % 2 ? cell * 0.25 : -cell * 0.25); // rows sit a little offset, like brick
-      const v = -1 + (row + 0.5) * cell;
-      if (u * u + v * v > 0.94) continue;
-      const h = Math.sin(row * 127.1 + col * 311.7) * 43758.5453;
-      out.push({ u, v, jit: 0.75 + 0.5 * (h - Math.floor(h)) });
-    }
-  }
-  return out;
-})();
-
-// Draw one cartridge's strokes: the faint unpainted ones (dots = how visible) and the painted ones in amber.
-function paintRound(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, m: Float32Array, a: number, dots: number) {
-  const cell = (2 * r) / PAINT_GRID, w = cell * 0.72, h = Math.max(1, cell * 0.36);
-  const faint = new Path2D();
-  const lit = [new Path2D(), new Path2D(), new Path2D(), new Path2D()]; // painted strokes, in 4 steps of brightness
-  PAINT_MARKS.forEach((k, i) => {
-    const px = x + k.u * r - w / 2, py = y + k.v * r - h / 2;
-    const v = m[i];
-    if (v > 0) {
-      const grow = 0.55 + 0.45 * v; // each stroke grows to full length as it's painted
-      lit[Math.min(3, Math.floor(v * 4))].rect(x + k.u * r - (w * grow) / 2, py, w * grow, h);
-    } else if (dots > 0) {
-      faint.rect(px, py, w, h);
-    }
-  });
-  if (dots > 0) {
-    ctx.fillStyle = `rgba(${PAINT_COLOR},${(0.09 * dots).toFixed(3)})`;
-    ctx.fill(faint);
-  }
-  lit.forEach((path, i) => {
-    ctx.fillStyle = `rgba(${PAINT_COLOR},${((0.35 + 0.65 * ((i + 1) / 4)) * a).toFixed(3)})`;
-    ctx.fill(path);
-  });
+// the f-number at any point while scrolling (in between two stops it's part way between them)
+function fNumber(stop: number): number {
+  const s = clamp(stop, 0, APERTURE_STOPS.length - 1), i = Math.min(APERTURE_STOPS.length - 2, Math.floor(s));
+  return APERTURE_STOPS[i] + (APERTURE_STOPS[i + 1] - APERTURE_STOPS[i]) * (s - i);
 }
 
-// draw the model in a pose (yaw/tilt in radians). Gives back where each cartridge's front is on the screen.
-function drawRevolver(ctx: CanvasRenderingContext2D, W: number, H: number, o: RevolverPose): { x: number; y: number; r: number }[] {
-  const fl = REVOLVER_FLIP ? -1 : 1;
+// draw the model in a pose (yaw/tilt in radians)
+function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose) {
   const cY = Math.cos(o.yaw), sY = Math.sin(o.yaw), cT = Math.cos(o.tilt), sT = Math.sin(o.tilt);
   // which way you're looking, in the model's own directions
-  const view = { x: -sY * cT * fl, y: sT, z: cY * cT };
-  const m = buildRevolver(o.turn, o.lit, o.gun, view);
+  const view = { x: -sY * cT, y: sT, z: cY * cT };
+  const m = buildCamera(view, o.body, o.lens);
 
-  const s = o.scale, F = 1600;
+  const s = o.scale, F = o.depth;
   const proj = (p: V3) => {
-    const X = (p.x - o.px) * fl, Y = p.y - o.py, Z = p.z;
+    const X = p.x - o.px, Y = p.y - o.py, Z = p.z - o.pz;
     const x1 = X * cY + Z * sY, z1 = -X * sY + Z * cY;
     const y2 = Y * cT - z1 * sT, z2 = Y * sT + z1 * cT;
     const k = F / (F + z2);
     return { x: o.cx + x1 * s * k, y: o.cy + y2 * s * k, z: z2 };
+  };
+  const trace = (path: CanvasRenderingContext2D | Path2D, pts: V3[], closed: boolean) => {
+    pts.forEach((p, i) => { const q = proj(p); if (i) path.lineTo(q.x, q.y); else path.moveTo(q.x, q.y); });
+    if (closed) path.closePath();
   };
 
   ctx.save();
   // everything adds light on top of what's under it, so overlapping see-through parts glow a little more
   ctx.globalCompositeOperation = "lighter";
 
-  if (REVOLVER_FILL > 0) {
+  if (CAMERA_FILL > 0) {
     for (const f of m.faces) {
       const fw = f.w ?? 1;
       if (fw < 0.01) continue;
-      ctx.fillStyle = `rgba(${f.col},${(REVOLVER_FILL * fw).toFixed(4)})`;
+      ctx.fillStyle = `rgba(${f.col},${(CAMERA_FILL * fw).toFixed(4)})`;
       ctx.beginPath();
-      f.pts.forEach((p, i) => { const q = proj(p); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
-      ctx.closePath();
+      trace(ctx, f.pts, true);
       ctx.fill();
     }
   }
-
-  // where each cartridge is on the screen, and the paint on it (under the lines, so the outlines stay crisp)
-  const spots = m.rounds.map((rd) => {
-    const c = proj(rd.c), e = proj(rd.e);
-    return { x: c.x, y: c.y, r: Math.hypot(e.x - c.x, e.y - c.y) };
-  });
-  ctx.globalCompositeOperation = "source-over";
-  spots.forEach((sp, i) => {
-    const pt = o.paint[i];
-    if (pt && o.lit[i] < 0.3) paintRound(ctx, sp.x, sp.y, sp.r, pt.m, pt.a, o.dots * (1 - o.lit[i] / 0.3));
-  });
-  ctx.globalCompositeOperation = "lighter";
 
   // lines are grouped by colour and by how near they are (nearer = brighter), then drawn in one go per group
   const LEVELS = 5;
@@ -1382,12 +1316,12 @@ function drawRevolver(ctx: CanvasRenderingContext2D, W: number, H: number, o: Re
     const n = l.closed ? q.length : q.length - 1;
     for (let i = 0; i < n; i++) {
       const a = q[i], b = q[(i + 1) % q.length];
-      const near = Math.min(1, Math.max(0, 0.5 - (a.z + b.z) / 2 / 460));
+      const near = Math.min(1, Math.max(0, 0.5 - (a.z + b.z) / 2 / 900));
       const lv = Math.min(LEVELS - 1, Math.floor(near * LEVELS));
       const key = `${l.col}|${lv}|${l.w}`;
       let g = groups.get(key);
       if (!g) {
-        g = { col: l.col, a: (0.2 + 0.8 * (lv + 0.5) / LEVELS) * l.w, path: new Path2D() };
+        g = { col: l.col, a: (0.25 + 0.75 * (lv + 0.5) / LEVELS) * l.w, path: new Path2D() };
         groups.set(key, g);
       }
       g.path.moveTo(a.x, a.y);
@@ -1395,29 +1329,68 @@ function drawRevolver(ctx: CanvasRenderingContext2D, W: number, H: number, o: Re
     }
   }
   ctx.lineCap = "round";
-  for (const g of groups.values()) {
-    ctx.strokeStyle = `rgba(${g.col},${(g.a * 0.12).toFixed(3)})`; // soft glow
-    ctx.lineWidth = 4;
-    ctx.stroke(g.path);
-    ctx.strokeStyle = `rgba(${g.col},${Math.min(1, g.a).toFixed(3)})`;
-    ctx.lineWidth = 1.1;
-    ctx.stroke(g.path);
+  ctx.lineJoin = "round";
+  const glowLine = (path: Path2D, col: string, a: number, width = 1.1) => {
+    ctx.strokeStyle = `rgba(${col},${(a * 0.12).toFixed(3)})`; // soft glow
+    ctx.lineWidth = 4 * (width / 1.1);
+    ctx.stroke(path);
+    ctx.strokeStyle = `rgba(${col},${Math.min(1, a).toFixed(3)})`;
+    ctx.lineWidth = width;
+    ctx.stroke(path);
+  };
+  for (const g of groups.values()) glowLine(g.path, g.col, g.a);
+
+  // ---- the aperture blades. The opening shrinks from f/1.8 (wide open) to f/11 (tiny), and the blades
+  // turn a little as it closes, like a real lens. ----
+  if (o.iris > 0.01) {
+    const N = APERTURE_BLADES, R = IRIS_R, fN = fNumber(o.stop);
+    const r = R * 0.94 * (APERTURE_STOPS[0] / fN); // the opening's size: halves for every two stops
+    const rot = -0.25 + (1 - r / R) * 1.2;
+    const at = (x: number, y: number) => ({ x: LENS_X + x, y: LENS_Y + y, z: IRIS_Z });
+    const v = Array.from({ length: N }, (_, i) => {
+      const a = rot + (i / N) * Math.PI * 2;
+      return { x: r * Math.cos(a), y: r * Math.sin(a) };
+    });
+    // the blades: everything between the housing and the opening, lightly filled
+    const fill = new Path2D();
+    trace(fill, Array.from({ length: 72 }, (_, k) => at(R * Math.cos((k / 72) * Math.PI * 2), R * Math.sin((k / 72) * Math.PI * 2))), true);
+    trace(fill, v.map((p) => at(p.x, p.y)), true);
+    ctx.fillStyle = `rgba(${CAMERA_BLADES},${(0.08 * o.iris).toFixed(3)})`;
+    ctx.fill(fill, "evenodd");
+    // each blade's edge carries on past the corner of the opening, curving a little, out to the housing
+    const edges = new Path2D();
+    for (let i = 0; i < N; i++) {
+      const a = v[i], b = v[(i + 1) % N];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      const dl = Math.hypot(dx, dy) || 1;
+      dx /= dl; dy /= dl;
+      // how far along that line the housing is: |b + t*d| = R
+      const pb = b.x * dx + b.y * dy, t = -pb + Math.sqrt(Math.max(0, pb * pb - (b.x * b.x + b.y * b.y - R * R)));
+      const bend = t * 0.1;
+      const pts: V3[] = [];
+      for (let k = 0; k <= 10; k++) {
+        const u = k / 10, off = Math.sin(u * Math.PI) * bend;
+        pts.push(at(b.x + dx * t * u - dy * off, b.y + dy * t * u + dx * off));
+      }
+      trace(edges, pts, false);
+      // the pin at the outer end of each blade: they slide round the housing as the blades turn
+      const ex = b.x + dx * t, ey = b.y + dy * t;
+      trace(edges, Array.from({ length: 16 }, (_, k) => at(ex * 0.93 + 5 * Math.cos((k / 16) * Math.PI * 2), ey * 0.93 + 5 * Math.sin((k / 16) * Math.PI * 2))), true);
+    }
+    glowLine(edges, CAMERA_BLADES, 0.75 * o.iris, 1);
+    // the edge of the opening
+    const hole = new Path2D();
+    trace(hole, v.map((p) => at(p.x, p.y)), true);
+    glowLine(hole, mixRgb(CAMERA_BLADES, CAMERA_LIT, 0.4 + 0.6 * o.lit), (0.7 + 0.3 * o.lit) * o.iris, 1.3);
   }
 
-  // the numbers: drawn the size of the bullet inside the chamber, fading in and out with the white
-  ctx.globalCompositeOperation = "source-over";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  for (const l of m.labels) {
-    const q = proj(l.p);
-    const size = 13 * s * (F / (F + q.z)); // 13 = the bullet's width in the model's units
-    if (size < 4) continue;
-    ctx.font = `700 ${size.toFixed(1)}px Arial, Helvetica, sans-serif`;
-    ctx.fillStyle = `rgba(${REVOLVER_LIT},${l.a.toFixed(3)})`;
-    ctx.fillText(l.text, q.x, q.y + size * 0.04);
-  }
   ctx.restore();
-  return spots;
+}
+
+// mix two "r,g,b" colours: t = 0 gives a, t = 1 gives b
+function mixRgb(a: string, b: string, t: number): string {
+  const x = a.split(",").map(Number), y = b.split(",").map(Number);
+  return x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(",");
 }
 
 /* ---------- Page ---------- */
@@ -1425,11 +1398,11 @@ function drawRevolver(ctx: CanvasRenderingContext2D, W: number, H: number, o: Re
 export default function Home() {
   const aboutTitleRef = useRef<HTMLHeadingElement>(null);
   const lenisRef = useRef<Lenis | null>(null);
-  const revRef = useRef<HTMLElement>(null);
-  const revCanvasRef = useRef<HTMLCanvasElement>(null);
-  const revHintRef = useRef<HTMLDivElement>(null);
-  const revDragRef = useRef<HTMLDivElement>(null);
-  const panelEls = useRef<(HTMLDivElement | null)[]>([]); // the info for each chamber
+  const camRef = useRef<HTMLElement>(null);
+  const camCanvasRef = useRef<HTMLCanvasElement>(null);
+  const camHintRef = useRef<HTMLDivElement>(null);
+  const camDragRef = useRef<HTMLDivElement>(null);
+  const panelEls = useRef<(HTMLDivElement | null)[]>([]); // the info for each stop
 
   // the concrete wall you break through when you first arrive (see WallIntro)
   const [phase, setPhase] = useState<"wall" | "breaking" | "none">(() =>
@@ -1474,22 +1447,18 @@ export default function Home() {
     };
   }, [introOn]);
 
-  // The revolver. As you scroll: first it turns to point at you and the camera zooms in until only the
-  // cylinder is left (the rest of the gun fades away). Then the cylinder glides round and settles on one
-  // chamber at a time; the lit chamber's info shows next to it. You can also drag the cylinder sideways.
-  // It leans a little towards the mouse and sways gently, so you can see it's 3D.
+  // The camera. As you scroll: first it turns its lens towards you and zooms in until only the lens is left
+  // (the body and cage fade away). Then the aperture steps down one stop at a time, from f/1.8 to f/11;
+  // each stop shows one section's info next to the lens. You can also drag sideways over the lens.
+  // At the start it leans a little towards the mouse and sways gently, so you can see it's 3D.
   useEffect(() => {
-    const box = revRef.current, cv = revCanvasRef.current, hint = revHintRef.current, drag = revDragRef.current;
+    const box = camRef.current, cv = camCanvasRef.current, hint = camHintRef.current, drag = camDragRef.current;
     const c = cv?.getContext("2d");
     if (!box || !cv || !c) return;
     let raf = 0, last = performance.now(), ps = 0, w = 0, h = 0, dpr = 1, tv = 0;
-    let mx = 0, my = 0, ex = 0, ey = 0, cx0 = -1e4, cy0 = -1e4; // cx0/cy0 = the pointer, in page pixels
+    let mx = 0, my = 0, ex = 0, ey = 0;
     let dragging = false, lastX = 0;
-    // painting the cartridges: how far each one is painted, how strongly it shows, and whether it's being painted
-    const paint = [0, 1, 2, 3, 4, 5].map(() => ({ m: new Float32Array(PAINT_MARKS.length), a: 1, fade: false, any: false }));
-    let spots: { x: number; y: number; r: number }[] = [];
-    let section = 0, brush = false, lastPx = -1e4, lastPy = -1e4;
-    let lastScroll = performance.now(), snapping = false, snapAt = 0; // when the page last moved, and whether it is gliding to a chamber
+    let lastScroll = performance.now(), snapping = false, snapAt = 0; // when the page last moved, and whether it is gliding to a stop
     const onScroll = () => { if (!snapping) lastScroll = performance.now(); };
     const size = () => {
       const r = cv.getBoundingClientRect();
@@ -1502,11 +1471,9 @@ export default function Home() {
     const onMove = (e: PointerEvent) => {
       mx = (e.clientX / window.innerWidth) * 2 - 1;
       my = (e.clientY / window.innerHeight) * 2 - 1;
-      cx0 = e.clientX;
-      cy0 = e.clientY;
       if (dragging) {
-        // dragging left moves on to the next chamber (it scrolls the page for you)
-        const d = (lastX - e.clientX) * REVOLVER_DRAG;
+        // dragging left moves on to the next stop (it scrolls the page for you)
+        const d = (lastX - e.clientX) * CAMERA_DRAG;
         lastX = e.clientX;
         const l = lenisRef.current;
         if (l) l.scrollTo(l.targetScroll + d, { immediate: true });
@@ -1538,105 +1505,62 @@ export default function Home() {
       ex += (mx - ex) * (1 - Math.exp(-dt * 3));
       ey += (my - ey) * (1 - Math.exp(-dt * 3));
 
-      const A = REVOLVER_FACE;
-      const f = smooth(0, A, ps); // 0 = the whole gun side on, 1 = zoomed in on the cylinder
-      // after that, the scrolling is split into six: one stop per chamber
+      const A = CAMERA_FACE;
+      const f = smooth(0, A, ps); // 0 = the whole camera, 1 = zoomed in on the lens
+      // after that, the scrolling is split into six: one stop each
       const u = clamp((ps - A) / (1 - A), 0, 1) * 6;
       const k = Math.min(5, Math.floor(u));
       const target = Math.min(5, k + smooth(0.6, 1, u - k));
-      tv += (target - tv) * (1 - Math.exp(-dt * 6)); // glides after the scroll and settles softly on each chamber
+      tv += (target - tv) * (1 - Math.exp(-dt * 6)); // glides after the scroll and settles softly on each stop
       const shown = smooth(A * 0.8, A, ps);
       const lit = [0, 1, 2, 3, 4, 5].map((i) => (1 - clamp(Math.abs(tv - i) * 2, 0, 1)) * shown);
 
-      // Snapping: if the page stops while the cylinder is turning between two chambers (where neither one's
-      // info can be clicked), glide on to whichever chamber is closer.
+      // Snapping: if the page stops while the aperture is changing between two stops (where neither one's
+      // info can be clicked), glide on to whichever stop is closer.
       const l = lenisRef.current;
-      if (snapping && now - snapAt > REVOLVER_SNAP * 1000 + 400) snapping = false; // in case a new scroll cut the glide short
-      if (REVOLVER_SNAP > 0 && l && !snapping && !dragging && !l.isTouching && !l.isScrolling && now - lastScroll > 200) {
+      if (snapping && now - snapAt > CAMERA_SNAP * 1000 + 400) snapping = false; // in case a new scroll cut the glide short
+      if (CAMERA_SNAP > 0 && l && !snapping && !dragging && !l.isTouching && !l.isScrolling && now - lastScroll > 200) {
         const pu = clamp((p - A) / (1 - A), 0, 1) * 6, pk = Math.floor(pu), pf = pu - pk;
         if (pk < 5 && pf > 0.6) {
-          const goal = pf < 0.8 ? pk + 0.5 : pk + 1.05; // just inside the resting spot of the nearer chamber
+          const goal = pf < 0.8 ? pk + 0.5 : pk + 1.05; // just inside the resting spot of the nearer stop
           const y = window.scrollY + br.top + (A + (goal / 6) * (1 - A)) * (br.height - h);
           snapping = true;
           snapAt = now;
-          l.scrollTo(y, { duration: REVOLVER_SNAP, onComplete: () => { snapping = false; lastScroll = performance.now(); } });
+          l.scrollTo(y, { duration: CAMERA_SNAP, onComplete: () => { snapping = false; lastScroll = performance.now(); } });
         }
-      }
-
-      // Painting: once zoomed in, touching an amber cartridge with the pointer paints it in.
-      // When the cylinder turns to the next section, the paint fades away.
-      const now0 = Math.round(tv);
-      if (now0 !== section) {
-        section = now0;
-        paint.forEach((pt) => { if (pt.any) pt.fade = true; });
-      }
-      let over = false;
-      const cr = cv.getBoundingClientRect();
-      const px = cx0 - cr.left, py = cy0 - cr.top;
-      if (shown > 0.95 && spots.length === 6) {
-        spots.forEach((sp, i) => {
-          const pt = paint[i];
-          if (lit[i] > 0.3 || pt.fade) return;
-          if (Math.hypot(px - sp.x, py - sp.y) < sp.r) over = true;
-          // brush every stroke near the line the pointer moved along since the last frame (so fast swipes don't skip)
-          const br = sp.r * PAINT_BRUSH;
-          const seg = Math.hypot(px - lastPx, py - lastPy);
-          const steps = seg > sp.r * 4 ? 1 : Math.max(1, Math.ceil(seg / (br * 0.4)));
-          for (let k = 1; k <= steps; k++) {
-            const t = k / steps;
-            const bx = steps === 1 ? px : lastPx + (px - lastPx) * t, by = steps === 1 ? py : lastPy + (py - lastPy) * t;
-            if (Math.hypot(bx - sp.x, by - sp.y) > sp.r + br) continue;
-            PAINT_MARKS.forEach((mk, j) => {
-              if (pt.m[j] === 0 && Math.hypot(sp.x + mk.u * sp.r - bx, sp.y + mk.v * sp.r - by) < br * mk.jit) {
-                pt.m[j] = 0.01;
-                pt.any = true;
-              }
-            });
-          }
-        });
-      }
-      lastPx = px;
-      lastPy = py;
-      paint.forEach((pt) => {
-        if (pt.fade) {
-          pt.a -= dt / 0.45;
-          if (pt.a <= 0) { pt.m.fill(0); pt.a = 1; pt.fade = false; pt.any = false; }
-        } else if (pt.any) {
-          // painted strokes light up quickly, one after another, as the brush passes
-          for (let j = 0; j < pt.m.length; j++) if (pt.m[j] > 0 && pt.m[j] < 1) pt.m[j] = Math.min(1, pt.m[j] + dt * 7);
-        }
-      });
-      if (over !== brush) {
-        brush = over;
-        document.documentElement.classList.toggle("brush-on", over);
       }
 
       if (br.bottom > 0 && br.top < window.innerHeight) {
-        const small = w < 768; // phones: the cylinder sits at the top and the info goes underneath
-        // at the start: the whole revolver, side on, in the middle of the screen
-        const sSide = Math.min((w * 0.8) / 800, (h * 0.7) / 450) * REVOLVER_START_SIZE;
-        // zoomed in: the drum seen from the front, its middle on the right edge of the screen, so half of it shows.
-        // (its radius is 76 in the model's units, and its front is a little nearer, so it looks about 6% bigger)
-        const radius = small ? Math.min(h * 0.22, w * 0.45) : (h * REVOLVER_ZOOM) / 2;
-        const sCyl = radius / (76 * 1.06);
+        const small = w < 768; // phones: the lens sits at the top and the info goes underneath
+        // at the start: the whole camera, facing you, in the middle of the screen
+        const sStart = small ? Math.min((w * 0.62) / 760, (h * 0.5) / 720) : Math.min((w * 0.8) / 1000, (h * 0.75) / 720) * CAMERA_START_SIZE;
+        // zoomed in: the whole front of the lens, facing you, to the right of the info (above it on phones).
+        // The middle of the opening is kept clear, ready for photos later.
+        const rad = small ? Math.min(h * 0.21, w * 0.44) : Math.min(h * CAMERA_LENS_SIZE, w * 0.27);
+        const sLens = rad / LENS_R;
         const z = f * f; // the zoom speeds up towards the end, like a camera pushing in
         const t = now / 1000;
-        const wob = 1 - f; // it stops leaning and swaying once zoomed in, so the drum sits perfectly still
-        drawPose(c, {
-          turn: tv, lit, paint, dots: smooth(0.95, 1, shown),
-          gun: 1 - smooth(0.3, 0.75, f),
-          // a quarter turn: from side on to the bullets pointing straight at you
-          yaw: (lerp(REVOLVER_YAW, (REVOLVER_FLIP ? -1 : 1) * 90, f) + (ex * REVOLVER_MOUSE + Math.sin(t * 0.6) * 1.5) * wob) * deg,
-          tilt: (REVOLVER_TILT * (1 - f) + (ey * REVOLVER_MOUSE * 0.5 + Math.sin(t * 0.45)) * wob) * deg,
-          cx: lerp(w / 2, w, f),
-          cy: lerp(h / 2, small ? h * 0.25 : h * 0.5, f),
-          scale: lerp(sSide, sCyl, z),
-          px: lerp(593, 504, f),
-          py: lerp(335, 256, f),
+        const wob = 1 - f; // it stops leaning and swaying once zoomed in, so the lens sits perfectly still
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        c.clearRect(0, 0, w, h);
+        drawCamera(c, {
+          stop: tv,
+          lit: Math.max(...lit),
+          body: 1 - smooth(0.25, 0.65, f),
+          lens: 1, // 1 = the whole lens stays (lower it to fade the lens and leave only the blades)
+          iris: 0.4 + 0.6 * f,
+          yaw: (lerp(CAMERA_YAW, 0, f) + (ex * CAMERA_MOUSE + Math.sin(t * 0.6) * 1.5) * wob) * deg,
+          tilt: (lerp(CAMERA_TILT, 0, f) + (ey * CAMERA_MOUSE * 0.5 + Math.sin(t * 0.45)) * wob) * deg,
+          cx: lerp(w / 2, small ? w / 2 : w - rad - w * 0.05, f),
+          cy: lerp(h / 2, small ? h * 0.27 : h * 0.5, f),
+          scale: lerp(sStart, sLens, z),
+          px: lerp(0, LENS_X, f),
+          py: lerp(0, LENS_Y, f),
+          pz: lerp(-150, LENS_FRONT, f),
+          depth: lerp(4000, 1600, f), // flatter at the start, so the lens isn't blown up in front of the body
         });
-
       }
-      // the info for each chamber fades in while its chamber is lit
+      // the info for each stop fades in while it's showing
       panelEls.current.forEach((el, i) => {
         if (!el) return;
         const v = lit[i];
@@ -1649,11 +1573,6 @@ export default function Home() {
       if (drag) drag.style.opacity = String(shown * (1 - smooth(0.97, 1, ps)));
       raf = requestAnimationFrame(frame);
     };
-    const drawPose = (cc: CanvasRenderingContext2D, pose: RevolverPose) => {
-      cc.setTransform(dpr, 0, 0, dpr, 0, 0);
-      cc.clearRect(0, 0, w, h);
-      spots = drawRevolver(cc, w, h, pose);
-    };
     raf = requestAnimationFrame(frame);
     return () => {
       cancelAnimationFrame(raf);
@@ -1662,7 +1581,6 @@ export default function Home() {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("scroll", onScroll);
       cv.removeEventListener("pointerdown", onDown);
-      document.documentElement.classList.remove("brush-on");
     };
   }, []);
 
@@ -1718,28 +1636,28 @@ export default function Home() {
 
       <style>{INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + BG_CSS + WALL_CSS}</style>
 
-      {/* The revolver behind the wall. Scrolling through this tall block zooms in on its cylinder, then turns the
-          cylinder round one chamber at a time. Each chamber holds some info (edit ABOUT_TITLE, ABOUT_TEXT and CHAMBERS at the top). */}
-      <section ref={revRef} className="relative -mt-16" style={{ height: REVOLVER_HEIGHT }}>
+      {/* The camera behind the wall. Scrolling through this tall block zooms in on its lens, then steps the aperture
+          down one stop at a time. Each stop holds some info (edit ABOUT_TITLE, ABOUT_TEXT and STOPS at the top). */}
+      <section ref={camRef} className="relative -mt-16" style={{ height: CAMERA_HEIGHT }}>
         <div className="sticky top-0 h-dvh w-full overflow-hidden">
-          <canvas ref={revCanvasRef} role="img" aria-label="A see-through 3D revolver" className="absolute inset-0 h-full w-full" />
+          <canvas ref={camCanvasRef} role="img" aria-label="A see-through 3D camera with a zoom lens" className="absolute inset-0 h-full w-full" />
 
-          {/* the info in each chamber: to the left of the cylinder (underneath it on phones) */}
-          <div className="pointer-events-none absolute inset-x-6 bottom-6 top-[50%] md:inset-y-0 md:left-[7%] md:right-auto md:w-[52%]">
-            {/* chamber 1: who am i? */}
+          {/* the info for each stop: to the left of the lens (underneath it on phones) */}
+          <div className="pointer-events-none absolute inset-x-6 bottom-6 top-[50%] md:inset-y-0 md:left-[7%] md:right-auto md:w-[34%]">
+            {/* stop 1 (f/1.8): who am i? */}
             <div
               ref={(el) => { panelEls.current[0] = el; }}
               className="absolute inset-0 flex items-start md:items-center"
               style={{ opacity: 0, visibility: "hidden" }}
             >
-              {/* just the text: a thin blue line runs from it to the lit chamber (drawn with the revolver) */}
               <div className="w-full">
                 <div>
+                  <p className="mb-3 text-sm font-bold tracking-[0.2em] sm:text-base lg:mb-4" style={{ color: `rgb(${CAMERA_BLADES})` }}>f/{APERTURE_STOPS[0]}</p>
                   <h2
                     ref={aboutTitleRef}
                     aria-label={ABOUT_TITLE}
                     className="whitespace-nowrap font-bold leading-[1.02] tracking-tight"
-                    style={{ fontSize: CHAMBER_TITLE_SIZE }}
+                    style={{ fontSize: TITLE_SIZE }}
                   >
                     {ABOUT_TITLE.split(" ").map((word, wi, words) => (
                       <span key={wi} aria-hidden="true">
@@ -1761,8 +1679,8 @@ export default function Home() {
               </div>
             </div>
 
-            {/* chambers 2 to 6 */}
-            {CHAMBERS.slice(0, 5).map((ch, i) => (
+            {/* stops 2 to 6 */}
+            {STOPS.slice(0, 5).map((ch, i) => (
               <div
                 key={i}
                 ref={(el) => { panelEls.current[i + 1] = el; }}
@@ -1770,7 +1688,8 @@ export default function Home() {
                 style={{ opacity: 0, visibility: "hidden" }}
               >
                 <div className="max-w-2xl">
-                  <h2 className="whitespace-nowrap font-bold leading-[1.02] tracking-tight" style={{ fontSize: CHAMBER_TITLE_SIZE }}>{ch.title}</h2>
+                  <p className="mb-3 text-sm font-bold tracking-[0.2em] sm:text-base lg:mb-4" style={{ color: `rgb(${CAMERA_BLADES})` }}>f/{APERTURE_STOPS[i + 1]}</p>
+                  <h2 className="whitespace-nowrap font-bold leading-[1.02] tracking-tight" style={{ fontSize: TITLE_SIZE }}>{ch.title}</h2>
                   <p className="mt-6 text-base leading-relaxed text-neutral-400 sm:text-xl lg:mt-8 lg:text-2xl">{ch.text}</p>
                   {ch.link && (
                     <div className="mt-8">
@@ -1792,12 +1711,12 @@ export default function Home() {
             ))}
           </div>
 
-          {/* like a carousel: you can drag the cylinder round too */}
-          <div ref={revDragRef} className="pointer-events-none absolute bottom-8 left-[7%] hidden text-xs uppercase tracking-[0.3em] text-neutral-500 md:block" style={{ opacity: 0 }}>
+          {/* like a carousel: you can drag over the lens too */}
+          <div ref={camDragRef} className="pointer-events-none absolute bottom-8 left-[7%] hidden text-xs uppercase tracking-[0.3em] text-neutral-500 md:block" style={{ opacity: 0 }}>
             drag / scroll
           </div>
 
-          <div ref={revHintRef} className="pointer-events-none absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3 text-xs uppercase tracking-[0.3em] text-neutral-400">
+          <div ref={camHintRef} className="pointer-events-none absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3 text-xs uppercase tracking-[0.3em] text-neutral-400">
             scroll
             <span className="sc-hint block h-10 w-px bg-white/60" />
           </div>

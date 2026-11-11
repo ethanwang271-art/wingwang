@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/navbar";
+import IrisTransition from "./components/iris";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -82,6 +83,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         <Navbar />
         {children}
+        {/* the aperture that closes and opens when you go between photos, videos and projects */}
+        <IrisTransition />
       </body>
     </html>
   );
