@@ -5,9 +5,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 const INSTAGRAM_URL = "https://instagram.com/etnwingwang";
 const LINKEDIN_URL = "https://www.linkedin.com/in/ethan-wang-9206563a1/";
+
+// After this long with no mouse, keyboard, scrolling or touching, the browser tab's title changes to IDLE_TITLE.
+// It changes back as soon as you do anything. (The navbar is on every page, so this works site-wide.)
+const IDLE_MINUTES = 5;
+const IDLE_TITLE = "come back!! \u{1F622}";
 
 const pageLinks = [
   { href: "/photos", label: "photos" },
@@ -50,6 +56,24 @@ function LinkedInIcon() {
 // capitalised functions as components, and usePathname is a hook.
 export default function Navbar() {
   const pathname = usePathname();
+
+  // the "come back!!" tab title
+  useEffect(() => {
+    let timer = 0, saved = "";
+    const wake = () => {
+      if (saved) { document.title = saved; saved = ""; }
+      clearTimeout(timer);
+      timer = window.setTimeout(() => { saved = document.title; document.title = IDLE_TITLE; }, IDLE_MINUTES * 60 * 1000);
+    };
+    const events = ["pointermove", "pointerdown", "keydown", "wheel", "scroll", "touchstart", "focus"];
+    events.forEach((e) => window.addEventListener(e, wake, { passive: true }));
+    wake();
+    return () => {
+      clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, wake));
+      if (saved) document.title = saved;
+    };
+  }, []);
   const onContact = pathname.startsWith("/contact");
 
   // a page link: grey, white on hover, white and underlined on the page you're on

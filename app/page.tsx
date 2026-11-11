@@ -220,7 +220,6 @@ function Cursor() {
 const WALL_HITS = 4;                  // hits it takes to break through (keep it at 4 or less)
 const WALL_PROMPT = "break the wall";       // the big text in the middle
 const WALL_PROMPT_TOUCH = "break the wall"; // the same text on phones and tablets
-const WALL_SOUND = true;              // thud sounds when you hit the wall
 const WALL_HOLE_SIZE = 1;             // how big the hole from each hit is (1 = normal, 1.5 = half as big again)
 const WALL_COLOR = "#0f1012";         // the colour of the wall (black)
 const WALL_TEXT_COLOR = "#f5f5f3";    // the colour of the "break the wall" text (white)
@@ -659,52 +658,6 @@ function paintWall(ctx: CanvasRenderingContext2D, W: number, H: number) {
   ctx.fillRect(0, 0, W, H);
 }
 
-// thud + rubble, made from scratch with the browser's audio (no sound files needed)
-let audioCtx: AudioContext | null = null;
-function getAudio(): AudioContext | null {
-  if (!WALL_SOUND) return null;
-  if (audioCtx) return audioCtx;
-  const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AC) return null;
-  audioCtx = new AC();
-  return audioCtx;
-}
-function playThud(big: boolean) {
-  const ac = getAudio();
-  if (!ac) return;
-  if (ac.state === "suspended") void ac.resume();
-  const t = ac.currentTime;
-  const dur = big ? 1.1 : 0.35;
-
-  const osc = ac.createOscillator();
-  const og = ac.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(big ? 90 : 120, t);
-  osc.frequency.exponentialRampToValueAtTime(35, t + dur);
-  og.gain.setValueAtTime(big ? 0.9 : 0.7, t);
-  og.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  osc.connect(og);
-  og.connect(ac.destination);
-  osc.start(t);
-  osc.stop(t + dur);
-
-  const len = Math.floor(ac.sampleRate * dur);
-  const buf = ac.createBuffer(1, len, ac.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, big ? 1.5 : 3);
-  const src = ac.createBufferSource();
-  src.buffer = buf;
-  const lp = ac.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = big ? 2200 : 1400;
-  const ng = ac.createGain();
-  ng.gain.value = big ? 0.7 : 0.5;
-  src.connect(lp);
-  lp.connect(ng);
-  ng.connect(ac.destination);
-  src.start(t);
-}
-
 // is point (x, y) inside this outline?
 function inPoly(pts: Pt[], x: number, y: number): boolean {
   let inside = false;
@@ -930,7 +883,6 @@ function startWall(
       shakeT = 0.22;
       shakeAmp = 4 + hits * 2.5;
     }
-    playThud(last);
     prompt.style.opacity = "0";
     dirty = true;
     if (last) breakWall(x, y);
@@ -939,7 +891,6 @@ function startWall(
   const doHit = (x: number, y: number) => {
     if (busy || broken) return;
     busy = true;
-    getAudio(); // wake the sound up while the click is still fresh
     impact(x, y);
     timers.push(window.setTimeout(() => { busy = false; }, 140));
   };
@@ -953,10 +904,7 @@ function startWall(
   const onKey = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
       e.preventDefault();
-      if (!broken) {
-        playThud(true);
-        breakWall(W / 2, H / 2);
-      }
+      if (!broken) breakWall(W / 2, H / 2);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       doHit(px, py);
