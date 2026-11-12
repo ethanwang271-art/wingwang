@@ -24,15 +24,15 @@ const ABOUT_CIRCLE = "ethan";
 // Keep each one to a line or two so it all fits on a phone. You can delete a row or add one (5 or so per side fits best).
 const ABOUT_PRO: { title: string; text: string }[] = [
   { title: "what i do", text: "currently a student, trying to make and do cool things" },
-  { title: "what i shoot", text: "events, street and sports," },
+  { title: "what i shoot", text: "events, street and sports" },
   { title: "tools", text: "canon r8, photos editied on lightroom classic" },
   { title: "open to", text: "freelance shoots, collaborations, and job opportunities" },
 ];
 const ABOUT_PERSONAL: { title: string; text: string }[] = [
   { title: "where i'm from", text: "based in Toronto" },
   { title: "why photos", text: "photography has always been cool to me" },
-  { title: "outside of photos", text: "[sports, music, games, other hobbies]" },
-  { title: "currently into", text: "[what you're listening to, watching or learning]" },
+  { title: "outside of photos", text: "i like to play games & hang out w my friends" },
+  { title: "currently into", text: "building my portfilio " },
   { title: "what's next", text: "trying to develop new projects" },
 ];
 
@@ -53,6 +53,7 @@ const HOME_COVERS: Record<string, { photo: string; focus?: string }> = {
 const HOME_VIDEO = { title: "coming soon", caption: "to be annnounced", src: "", poster: "" };
 // projects: a short list. Copy the example block (without the //) to add one, newest first.
 const HOME_PROJECTS: { date: string; title: string; text: string; href: string }[] = [
+  { date: "nov '26", title: "mini robot desk assistant", text: "a unfinished small desk robot with a face & emotions, built around a pico 2 w, its my personal starting project in robotics. it currently is a work in progress and its in its development phase", href: "/projects/robot" },
   // { date: "mar '26", title: "my project", text: "one line about it", href: "/projects" },
 ];
 
@@ -212,12 +213,14 @@ function LogoDots() {
     };
     const draw = (show: number) => {
       ctx.clearRect(0, 0, W, H);
-      const base = LOGO_DOT_GAP * 0.34;
+      const base = LOGO_DOT_SIZE;
       for (const d of dots) {
         const v = d.lit;
-        const size = base * (1 + 0.45 * v);
+        const size = base * (1 + 0.35 * v);
         ctx.fillStyle = `rgba(${d.blue ? LOGO_BLUE : LOGO_INK},${((v > 0 ? 0.3 + 0.7 * v : LOGO_DOT_FAINT) * show).toFixed(3)})`;
-        ctx.fillRect(d.x - size / 2, d.y - size / 2, size, size);
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, size / 2, 0, Math.PI * 2); // round dots
+        ctx.fill();
       }
     };
     let px = -1e5, py = -1e5, bx = -1e5, by = -1e5, raf = 0, last = performance.now(), shown = -1;
@@ -354,8 +357,9 @@ function Cursor() {
 
 /* ---------- The camera ---------- */
 
-const CAMERA_HEIGHT = "600vh";              // how much scrolling the whole camera part takes (more = slower)
-const CAMERA_TURN = 0.2;                    // how much of that scrolling it takes to turn round and zoom in on the screen (0.2 = the first 20%). The rest swipes through the screen's pages
+const CAMERA_TURN_SCROLL = 100;             // how much scrolling it takes to turn round and zoom in on the screen, in % of the window's height
+const CAMERA_PAGE_SCROLL = 130;             // how much scrolling each page on the screen takes, in % of the window's height (more = harder to scroll past one by accident)
+const CAMERA_SCREEN_WHEEL = 2;              // how far each flick of the wheel or trackpad goes while you're on the screen (the rest of the page uses LENIS_WHEEL; lower = slower)
 const CAMERA_START_SIZE = 0.62;             // how big the whole camera is at the start (1 = as big as fits)
 const CAMERA_SCREEN_SIZE = 0.86;            // once zoomed in, how much of the window's width the camera's screen may fill (it also always fits the height)
 const CAMERA_SWIPE = 50;                    // how far (px) you have to swipe or drag across the screen to go to the next page
@@ -377,7 +381,8 @@ const CAMERA_XRAY_LINES = "30,48,80";       // in x-ray view, r,g,b of the fine 
 const CAMERA_APERTURE_BLADES = 7;           // how many blades the aperture inside the lens has (the kit lens has 7)
 // ---- your W logo behind the camera, made of dots that light up where the pointer passes (like the camera's screen) ----
 const LOGO_SIZE = 0.78;            // how tall the logo is, compared to the window (it also always fits the width)
-const LOGO_DOT_GAP = 8;            // how far apart its dots are, in px (lower = more, finer dots)
+const LOGO_DOT_GAP = 4.5;          // how far apart its dots are, in px (lower = more, finer dots)
+const LOGO_DOT_SIZE = 1.3;         // how wide each dot is, in px (it grows a little when lit)
 const LOGO_DOT_FAINT = 0.1;        // how visible the dots are before the pointer passes over them (0 = hidden until lit)
 const LOGO_BRUSH = 0.05;           // how big the patch that lights up under the pointer is, compared to the window
 const LOGO_INK = "17,17,17";       // r,g,b of the black parts of the W
@@ -393,6 +398,10 @@ const LOGO_BOX = { x: 140, y: 100, w: 285, h: 260 }; // the area the blades abov
 
 // the pages on the camera's screen, in order
 const SCREEN_PAGES = ["who am i", "photos", "videos", "projects", "contact"];
+// worked out from the settings above: how tall the camera part is, and how much of its scrolling is the turn
+const CAMERA_SCROLL = CAMERA_TURN_SCROLL + CAMERA_PAGE_SCROLL * SCREEN_PAGES.length;
+const CAMERA_HEIGHT = `${CAMERA_SCROLL + 100}vh`;
+const CAMERA_TURN = CAMERA_TURN_SCROLL / CAMERA_SCROLL;
 
 // where the camera is and which way it faces. cx/cy = where it sits on the page, scale = how big (pixels per unit),
 // yaw/tilt/roll = turned round / tipped forward / tipped on its side (radians),
@@ -1703,6 +1712,8 @@ export default function Home() {
 
       // Snapping: if the scrolling stops part way between two pages, glide on to whichever is closer
       const l = lenisRef.current;
+      // scrolling is gentler while you're on the screen, so a normal flick doesn't skip a page
+      if (l) l.options.wheelMultiplier = p > T * 0.95 && p < 1 ? CAMERA_SCREEN_WHEEL : LENIS_WHEEL;
       if (snapping && now - snapAt > 1500) { snapping = false; forced = -1; } // in case a new scroll cut the glide short
       if (CAMERA_SNAP > 0 && l && !snapping && !spinning && !swipe && !l.isTouching && !l.isScrolling && now - lastScroll > 200) {
         const pu = clamp((p - T) / (1 - T), 0, 1) * n, pk = Math.floor(pu), pf = pu - pk;

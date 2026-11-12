@@ -15,6 +15,13 @@ import Link from "next/link";
 //   link         optional: where clicking the card goes (a full web address, or a page on your site).
 //                Leave it "" to make the card not clickable.
 const PROJECTS: { title: string; date: string; description: string; media: string; link: string }[] = [
+  {
+    title: "mini robot desk assistant",
+    date: "nov '26",
+    description: "a small desk robot with a face, built around a raspberry pi pico 2 w. nine parts, the goal is under $70. a prototype design: a 3d model you can turn and x-ray, how it works, and every part it needs.",
+    media: "/projects/robot-simple.png",
+    link: "/projects/robot",
+  },
   // Copy this block (without the // at the start of each line) to add a project:
   // {
   //   title: "my project",

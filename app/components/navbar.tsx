@@ -1,6 +1,6 @@
 "use client";
 // app/components/navbar.tsx
-// Page links on the left, the wingwang logo in the middle, contact and your profiles on the right.
+// Page links (and contact) on the left, the wingwang logo in the middle, your profiles on the right.
 // It has no background and no line, so the page shows through behind it. Its writing is set to white with
 // "mix-blend-difference", which shows it as the opposite of whatever is behind: black on the white pages,
 // and white when something dark (like the camera) is behind it.
@@ -17,20 +17,14 @@ const LINKEDIN_URL = "https://www.linkedin.com/in/ethan-wang-9206563a1/";
 const IDLE_MINUTES = 5;
 const IDLE_TITLE = "come back!! \u{1F622}";
 
+// the page links on the left. videos and projects are hidden until they're ready: to bring them back,
+// remove the // in front of their lines
 const pageLinks = [
   { href: "/photos", label: "photos" },
-  { href: "/videos", label: "videos" },
-  { href: "/projects", label: "projects" },
+  // { href: "/videos", label: "videos" },
+  // { href: "/projects", label: "projects" },
+  { href: "/contact", label: "contact" },
 ];
-
-function MailIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="M3 7l9 6 9-6" />
-    </svg>
-  );
-}
 
 function InstagramIcon() {
   return (
@@ -76,7 +70,6 @@ export default function Navbar() {
       if (saved) document.title = saved;
     };
   }, []);
-  const onContact = pathname.startsWith("/contact");
 
   // a page link: grey, white on hover, white and underlined on the page you're on
   const linkClass = (active: boolean) =>
@@ -115,15 +108,8 @@ export default function Navbar() {
           wingwang
         </Link>
 
-        {/* right: contact and your profiles */}
+        {/* right: your profiles */}
         <div className="row-start-2 flex items-center justify-end gap-1 sm:col-start-3 sm:row-start-1 sm:gap-3">
-          {/* "contact" as a word on bigger screens, a mail icon on phones */}
-          <Link href="/contact" aria-current={onContact ? "page" : undefined} className={`hidden text-base sm:mr-2 sm:block ${linkClass(onContact)}`}>
-            contact
-          </Link>
-          <Link href="/contact" aria-label="Contact me" className={`${iconButton} sm:hidden`}>
-            <MailIcon />
-          </Link>
           <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className={iconButton}>
             <InstagramIcon />
           </a>
