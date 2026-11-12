@@ -26,7 +26,7 @@ const PROJECTS: { title: string; date: string; description: string; media: strin
 ];
 
 // ---- colours (same as the rest of the site) ----
-const PAGE_BLACK = "11,13,15";
+const PAGE_BG = "255,255,255"; // the page's background (white)
 const BLUE = "100,159,255"; // the hand-drawn underline and circle
 
 export const metadata: Metadata = {
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 };
 
 const CSS = `
-html, body { background-color: rgb(${PAGE_BLACK}) !important; }
+html, body { background-color: rgb(${PAGE_BG}) !important; }
 
 /* cards rise in one after another when the page opens */
 @keyframes pj-rise { from { opacity: 0; transform: translateY(28px); } }
@@ -80,7 +80,7 @@ function Circle() {
 function Media({ src, title }: { src: string; title: string }) {
   if (!src) {
     return (
-      <div className="pj-media flex h-full w-full items-center justify-center text-sm text-neutral-600">
+      <div className="pj-media flex h-full w-full items-center justify-center text-sm text-neutral-400">
         add a picture or video in PROJECTS
       </div>
     );
@@ -93,21 +93,21 @@ function Media({ src, title }: { src: string; title: string }) {
 
 export default function ProjectsPage() {
   return (
-    <main className="min-h-[calc(100dvh-4rem)] text-white" style={{ background: `rgb(${PAGE_BLACK})` }}>
+    <main className="min-h-[calc(100dvh-4rem)] text-neutral-900" style={{ background: `rgb(${PAGE_BG})` }}>
       <style>{CSS}</style>
       <div className="mx-auto max-w-6xl px-6 pb-24 pt-12 sm:pt-16">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">projects</h1>
 
         {/* while there are no projects in PROJECTS yet */}
         {PROJECTS.length === 0 && (
-          <p className="pj-card mt-6 text-lg text-neutral-400 sm:text-xl">coming soon</p>
+          <p className="pj-card mt-6 text-lg text-neutral-600 sm:text-xl">coming soon</p>
         )}
 
         <div className="mt-10 grid gap-x-12 gap-y-16 sm:mt-12 md:grid-cols-2 md:gap-y-24">
           {PROJECTS.map((p, i) => {
             const inner = (
               <>
-                <div className="relative aspect-[16/10] overflow-hidden rounded-md bg-neutral-900">
+                <div className="relative aspect-[16/10] overflow-hidden rounded-md bg-neutral-200">
                   <Media src={p.media} title={p.title} />
                 </div>
                 <div className="mt-6 flex items-baseline justify-between gap-6">
@@ -115,12 +115,12 @@ export default function ProjectsPage() {
                     {p.title}
                     <Underline />
                   </h2>
-                  <span className="relative shrink-0 px-1 text-lg text-neutral-400 sm:text-xl">
+                  <span className="relative shrink-0 px-1 text-lg text-neutral-600 sm:text-xl">
                     {p.date}
                     <Circle />
                   </span>
                 </div>
-                <p className="mt-4 max-w-prose text-base leading-relaxed text-neutral-400 sm:text-lg">{p.description}</p>
+                <p className="mt-4 max-w-prose text-base leading-relaxed text-neutral-600 sm:text-lg">{p.description}</p>
               </>
             );
             const style = { "--i": i } as CSSProperties;
@@ -131,11 +131,11 @@ export default function ProjectsPage() {
             return (
               <article key={i} className="pj-card" style={style}>
                 {external ? (
-                  <a href={p.link} target="_blank" rel="noopener noreferrer" className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-white">
+                  <a href={p.link} target="_blank" rel="noopener noreferrer" className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-black">
                     {inner}
                   </a>
                 ) : (
-                  <Link href={p.link} className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-white">
+                  <Link href={p.link} className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-black">
                     {inner}
                   </Link>
                 )}

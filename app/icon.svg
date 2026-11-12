@@ -1,0 +1,10 @@
+<!-- app/icon.svg: the little logo in the browser tab (the W, same blades as the dotted one on the home page) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="112.5 60 340 340">
+  <rect x="112.5" y="60" width="340" height="340" rx="72" fill="#0c0e10"/>
+  <g fill="#f4f4f2">
+    <path d="M140 100 Q150 270 230 360 Q215 240 140 100 Z"/>
+    <path d="M230 360 Q250 240 283 175 Q285 270 230 360 Z"/>
+    <path d="M425 100 Q415 270 335 360 Q350 240 425 100 Z"/>
+  </g>
+  <path d="M283 175 Q280 270 335 360 Q318 240 283 175 Z" fill="#6aa5ff"/>
+</svg>

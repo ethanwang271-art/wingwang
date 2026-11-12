@@ -12,9 +12,9 @@ const IRIS_SECTIONS = ["/photos", "/videos", "/projects"]; // going between any 
 const IRIS_CLOSE = 0.5;               // seconds for the blades to close
 const IRIS_OPEN = 0.6;                // seconds for them to open again on the new page
 const IRIS_BLADES = 9;                // how many blades (the same as the lens on the home page)
-const BLADE_LINE = "255,190,110";     // r,g,b of the blades' edges (the amber from the home page)
-const OPENING_LINE = "255,255,255";   // r,g,b of the edge of the opening
-const PAGE_BLACK = "11,13,15";        // r,g,b of the blades themselves (the page's black)
+const BLADE_LINE = "40,40,46";        // r,g,b of the blades' edges (dark grey)
+const OPENING_LINE = "0,0,0";         // r,g,b of the edge of the opening
+const PAGE_BG = "255,255,255";     // r,g,b of the blades themselves (the page's white)
 const BLADE_CURVE = 1.1;              // how much each blade's edge curves (0 = straight lines; same as the home page)
 
 // which of the sections above a page belongs to (or none)
@@ -38,7 +38,7 @@ function drawIris(ctx: CanvasRenderingContext2D, W: number, H: number, open: num
   blades.rect(0, 0, W, H);
   v.forEach((p, i) => (i ? blades.lineTo(p.x, p.y) : blades.moveTo(p.x, p.y)));
   blades.closePath();
-  ctx.fillStyle = `rgb(${PAGE_BLACK})`;
+  ctx.fillStyle = `rgb(${PAGE_BG})`;
   ctx.fill(blades, "evenodd");
   ctx.fillStyle = `rgba(${BLADE_LINE},0.035)`;
   ctx.fill(blades, "evenodd");

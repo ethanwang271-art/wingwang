@@ -69,8 +69,8 @@ const LANGUAGES = ["english", "hakka chinese"];
 const FOOTNOTE = "last updated [NOV 2026] · references available on request";
 
 // ---- colours (same as the rest of the site) ----
-const PAGE_BLACK = "11,13,15";
-const AMBER = "255,190,110"; // the section headings
+const PAGE_BG = "255,255,255"; // the page's background (white)
+const AMBER = "178,104,14"; // the section headings (a deeper amber, so they read on white)
 const BLUE = "100,159,255";  // the download button's outline
 
 // the whole resume as plain text, for the "copy text" button
@@ -90,7 +90,7 @@ function resumeText(): string {
 }
 
 const CSS = `
-html, body { background-color: rgb(${PAGE_BLACK}) !important; }
+html, body { background-color: rgb(${PAGE_BG}) !important; }
 
 /* the printed / PDF version: white paper, black text, one letter page, no navbar or buttons */
 @media print {
@@ -126,7 +126,7 @@ function Tags({ title, items }: { title: string; items: string[] }) {
       <SectionTitle>{title}</SectionTitle>
       <ul className="flex flex-wrap gap-2">
         {items.map((t, i) => (
-          <li key={i} className="rs-tag rounded-md bg-white/[0.06] px-2.5 py-1 text-sm text-neutral-200">{t}</li>
+          <li key={i} className="rs-tag rounded-md bg-black/[0.06] px-2.5 py-1 text-sm text-neutral-800">{t}</li>
         ))}
       </ul>
     </section>
@@ -144,36 +144,36 @@ export default function ResumePage() {
       // some browsers block the clipboard; then the button just stays as it is
     }
   };
-  const btn = "inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
+  const btn = "inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black";
 
   return (
-    <main className="rs-page min-h-[calc(100dvh-4rem)] text-white" style={{ background: `rgb(${PAGE_BLACK})` }}>
+    <main className="rs-page min-h-[calc(100dvh-4rem)] text-neutral-900" style={{ background: `rgb(${PAGE_BG})` }}>
       <style>{CSS}</style>
       <div className="mx-auto max-w-5xl px-4 pb-24 pt-8 sm:px-6 sm:pt-10">
         {/* the bar above the resume (hidden when printed) */}
         <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="font-mono text-xs text-neutral-400 transition hover:text-white">&larr; home</Link>
+          <Link href="/" className="font-mono text-xs text-neutral-600 transition hover:text-black">&larr; home</Link>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => window.print()} className={`${btn} text-white hover:bg-white/5`} style={{ borderColor: `rgb(${BLUE})`, background: `rgba(${BLUE},.08)` }}>
+            <button type="button" onClick={() => window.print()} className={`${btn} text-neutral-900 hover:bg-black/5`} style={{ borderColor: `rgb(${BLUE})`, background: `rgba(${BLUE},.08)` }}>
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
               download pdf
             </button>
-            <button type="button" onClick={copy} className={`${btn} border-white/15 text-white hover:bg-white/5`} aria-live="polite">
+            <button type="button" onClick={copy} className={`${btn} border-black/15 text-neutral-900 hover:bg-black/5`} aria-live="polite">
               {copied ? "copied" : "copy text"}
             </button>
-            <Link href="/contact" className={`${btn} border-white/15 text-white hover:bg-white/5`}>contact me</Link>
+            <Link href="/contact" className={`${btn} border-black/15 text-neutral-900 hover:bg-black/5`}>contact me</Link>
           </div>
         </div>
 
         {/* the resume */}
-        <article className="rs-card rounded-2xl border border-white/10 bg-white/[0.02] px-6 py-10 sm:px-12 sm:py-14">
+        <article className="rs-card rounded-2xl border border-black/10 bg-black/[0.02] px-6 py-10 sm:px-12 sm:py-14">
           {/* name, headline and contact */}
-          <div className="rs-top flex flex-col gap-6 border-b border-white/10 pb-8 sm:flex-row sm:items-start sm:justify-between">
+          <div className="rs-top flex flex-col gap-6 border-b border-black/10 pb-8 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1 className="text-5xl font-bold tracking-tight sm:text-6xl">{NAME}</h1>
-              <p className="rs-muted mt-3 text-neutral-400 sm:text-lg">{HEADLINE}</p>
+              <p className="rs-muted mt-3 text-neutral-600 sm:text-lg">{HEADLINE}</p>
             </div>
-            <ul className="space-y-1 font-mono text-xs text-neutral-300 sm:text-right">
+            <ul className="space-y-1 font-mono text-xs text-neutral-700 sm:text-right">
               {CONTACT.map((c, i) => (
                 <li key={i}>
                   {c.href ? <a href={c.href} target="_blank" rel="noopener noreferrer" className="hover:underline">{c.text}</a> : c.text}
@@ -193,23 +193,23 @@ export default function ResumePage() {
                       <h3 className="text-lg font-medium">{e.school}</h3>
                       <span className="rs-muted shrink-0 font-mono text-xs text-neutral-500">{e.dates}</span>
                     </div>
-                    <p className="rs-muted mt-1 text-sm text-neutral-400">{e.details}</p>
-                    <p className="mt-1 text-sm text-neutral-200">{e.courses}</p>
+                    <p className="rs-muted mt-1 text-sm text-neutral-600">{e.details}</p>
+                    <p className="mt-1 text-sm text-neutral-800">{e.courses}</p>
                   </div>
                 ))}
               </section>
 
               <section className="mb-10">
                 <SectionTitle>experience</SectionTitle>
-                <div className="divide-y divide-white/10 border-t border-white/10">
+                <div className="divide-y divide-black/10 border-t border-black/10">
                   {EXPERIENCE.map((x, i) => (
                     <div key={i} className="break-inside-avoid py-5">
                       <div className="flex items-baseline justify-between gap-4">
                         <h3 className="text-lg font-medium">{x.role}</h3>
                         <span className="rs-muted shrink-0 font-mono text-xs text-neutral-500">{x.dates}</span>
                       </div>
-                      <p className="rs-muted mt-1 text-sm text-neutral-400">{x.where}</p>
-                      <ul className="mt-3 list-disc space-y-1 pl-4 text-sm text-neutral-200 marker:text-neutral-500">
+                      <p className="rs-muted mt-1 text-sm text-neutral-600">{x.where}</p>
+                      <ul className="mt-3 list-disc space-y-1 pl-4 text-sm text-neutral-800 marker:text-neutral-500">
                         {x.points.map((pt, j) => <li key={j}>{pt}</li>)}
                       </ul>
                     </div>
@@ -219,14 +219,14 @@ export default function ResumePage() {
 
               <section className="mb-10">
                 <SectionTitle>projects</SectionTitle>
-                <div className="divide-y divide-white/10 border-t border-white/10">
+                <div className="divide-y divide-black/10 border-t border-black/10">
                   {PROJECTS.map((p, i) => (
                     <div key={i} className="break-inside-avoid py-5">
                       <div className="flex items-baseline justify-between gap-4">
                         <h3 className="text-lg font-medium">{p.name}</h3>
                         <span className="rs-muted shrink-0 font-mono text-xs text-neutral-500">{p.year}</span>
                       </div>
-                      <p className="mt-2 text-sm leading-relaxed text-neutral-200">{p.text}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-neutral-800">{p.text}</p>
                     </div>
                   ))}
                 </div>
@@ -234,12 +234,12 @@ export default function ResumePage() {
 
               <section className="mb-4">
                 <SectionTitle>leadership + activities</SectionTitle>
-                <ul className="divide-y divide-white/10 border-t border-white/10">
+                <ul className="divide-y divide-black/10 border-t border-black/10">
                   {ACTIVITIES.map((a, i) => (
                     <li key={i} className="flex items-baseline justify-between gap-4 py-3.5">
                       <span>
                         <span className="font-medium">{a.name}</span>
-                        <span className="rs-muted text-neutral-400"> · {a.detail}</span>
+                        <span className="rs-muted text-neutral-600"> · {a.detail}</span>
                       </span>
                       <span className="rs-muted shrink-0 font-mono text-xs text-neutral-500">{a.years}</span>
                     </li>
@@ -257,7 +257,7 @@ export default function ResumePage() {
             </aside>
           </div>
 
-          <p className="rs-muted mt-8 border-t border-white/10 pt-6 font-mono text-xs text-neutral-500">{FOOTNOTE}</p>
+          <p className="rs-muted mt-8 border-t border-black/10 pt-6 font-mono text-xs text-neutral-500">{FOOTNOTE}</p>
         </article>
 
         <p className="no-print mt-6 max-w-2xl text-sm leading-relaxed text-neutral-500">

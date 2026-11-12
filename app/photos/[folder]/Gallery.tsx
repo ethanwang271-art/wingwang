@@ -31,7 +31,7 @@ const CSS = `
 }
 .fp-reveal.fp-on { opacity: 1; transform: none; }
 
-.lb { position: fixed; inset: 0; z-index: 100; background: rgba(11,13,15,.92);
+.lb { position: fixed; inset: 0; z-index: 100; background: rgba(255,255,255,.96);
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: lb-fade .3s ease backwards; }
 .lb.lb-out { opacity: 0; transition: opacity .22s ease; }
 .lb-frame { animation: lb-fade .3s ease backwards; will-change: transform; }
@@ -165,7 +165,7 @@ export default function Gallery({ photos }: { photos: Photo[] }) {
                 type="button"
                 onClick={(e) => show(p.i, e.currentTarget)}
                 aria-label={`Open photo ${p.i + 1} of ${n}`}
-                className="relative block w-full cursor-zoom-in rounded-md transition duration-500 ease-[cubic-bezier(.22,1,.36,1)] hover:z-10 hover:scale-[1.03] hover:shadow-[0_18px_40px_-12px_rgba(0,0,0,.9)] focus-visible:z-10 focus-visible:scale-[1.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                className="relative block w-full cursor-zoom-in rounded-md transition duration-500 ease-[cubic-bezier(.22,1,.36,1)] hover:z-10 hover:scale-[1.03] hover:shadow-[0_18px_40px_-12px_rgba(0,0,0,.45)] focus-visible:z-10 focus-visible:scale-[1.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
               >
                 <Image
                   src={p.src}
@@ -173,7 +173,7 @@ export default function Gallery({ photos }: { photos: Photo[] }) {
                   width={p.w}
                   height={p.h}
                   sizes={THUMB_SIZES}
-                  className="h-auto w-full rounded-md bg-neutral-900"
+                  className="h-auto w-full rounded-md bg-neutral-200"
                 />
               </button>
             </Reveal>
@@ -213,7 +213,7 @@ export default function Gallery({ photos }: { photos: Photo[] }) {
             <div
               key={open}
               ref={frameRef}
-              className="lb-frame pointer-events-auto relative overflow-hidden rounded-lg bg-neutral-900"
+              className="lb-frame pointer-events-auto relative overflow-hidden rounded-lg bg-neutral-200"
               style={{
                 aspectRatio: `${cur.w} / ${cur.h}`,
                 width: `min(94vw, ${((88 * cur.w) / cur.h).toFixed(2)}dvh)`,
@@ -240,7 +240,7 @@ export default function Gallery({ photos }: { photos: Photo[] }) {
             type="button"
             aria-label="Close"
             onClick={(e) => { e.stopPropagation(); close(); }}
-            className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full bg-black/10 text-neutral-900 transition hover:bg-black/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M6 6l12 12M18 6L6 18" />
@@ -253,7 +253,7 @@ export default function Gallery({ photos }: { photos: Photo[] }) {
                 type="button"
                 aria-label="Previous photo"
                 onClick={(e) => { e.stopPropagation(); go(-1); }}
-                className="absolute left-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:grid"
+                className="absolute left-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/10 text-neutral-900 transition hover:bg-black/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:grid"
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M15 5l-7 7 7 7" />
@@ -263,7 +263,7 @@ export default function Gallery({ photos }: { photos: Photo[] }) {
                 type="button"
                 aria-label="Next photo"
                 onClick={(e) => { e.stopPropagation(); go(1); }}
-                className="absolute right-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:grid"
+                className="absolute right-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/10 text-neutral-900 transition hover:bg-black/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:grid"
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M9 5l7 7-7 7" />
@@ -272,7 +272,7 @@ export default function Gallery({ photos }: { photos: Photo[] }) {
             </>
           )}
 
-          <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 text-sm tabular-nums text-neutral-400">
+          <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 text-sm tabular-nums text-neutral-600">
             {open + 1} / {n}
           </div>
 

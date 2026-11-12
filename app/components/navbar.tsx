@@ -1,7 +1,9 @@
 "use client";
 // app/components/navbar.tsx
 // Page links on the left, the wingwang logo in the middle, contact and your profiles on the right.
-// It has no background and no line, so the page shows through behind it.
+// It has no background and no line, so the page shows through behind it. Its writing is set to white with
+// "mix-blend-difference", which shows it as the opposite of whatever is behind: black on the white pages,
+// and white when something dark (like the camera) is behind it.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -82,14 +84,16 @@ export default function Navbar() {
       active ? "text-white underline decoration-1 underline-offset-[6px]" : "text-white hover:opacity-70"
     }`;
   const iconButton =
-    "rounded-full p-1.5 text-white transition hover:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:p-2";
+    "rounded-full p-1 text-white transition hover:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:p-2";
 
   return (
     // h-16 is fixed so pages can size themselves with calc(100dvh - 4rem)
-    <header className="sticky top-0 z-50 h-16 bg-transparent text-white">
-      <nav aria-label="Main" className="grid h-full grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-8">
+    <header className="sticky top-0 z-50 h-16 bg-transparent text-white mix-blend-difference">
+      {/* on phones it's two rows (the logo centred on top, the pages and icons underneath), since one row doesn't fit;
+          on bigger screens it's one row with the logo in the middle */}
+      <nav aria-label="Main" className="grid h-full grid-cols-2 content-center items-center gap-x-3 px-4 sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-8">
         {/* left: the pages */}
-        <ul className="flex items-center gap-3 text-sm sm:gap-6 sm:text-base">
+        <ul className="row-start-2 flex items-center gap-4 text-sm sm:col-start-1 sm:row-start-1 sm:gap-6 sm:text-base">
           {pageLinks.map((link) => {
             const active = pathname.startsWith(link.href);
             return (
@@ -105,14 +109,14 @@ export default function Navbar() {
         {/* middle: the logo, which takes you home (Comic Sans, with fallbacks for devices that don't have it) */}
         <Link
           href="/"
-          className="text-lg font-bold tracking-tight sm:text-xl"
+          className="col-span-2 row-start-1 justify-self-center text-lg font-bold leading-7 tracking-tight sm:col-span-1 sm:col-start-2 sm:text-xl"
           style={{ fontFamily: '"Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive' }}
         >
           wingwang
         </Link>
 
         {/* right: contact and your profiles */}
-        <div className="flex items-center justify-end gap-1 sm:gap-3">
+        <div className="row-start-2 flex items-center justify-end gap-1 sm:col-start-3 sm:row-start-1 sm:gap-3">
           {/* "contact" as a word on bigger screens, a mail icon on phones */}
           <Link href="/contact" aria-current={onContact ? "page" : undefined} className={`hidden text-base sm:mr-2 sm:block ${linkClass(onContact)}`}>
             contact

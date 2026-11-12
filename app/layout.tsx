@@ -55,8 +55,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0d0f", // the colour of the browser bar on phones
-  colorScheme: "dark",
+  themeColor: "#ffffff", // the colour of the browser bar on phones
+  colorScheme: "light",
 };
 
 // tells Google who the site belongs to (a "Person"), with links to your profiles

@@ -5,28 +5,29 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Lenis from "lenis";
+import * as THREE from "three";
 
 // ---- About me section: edit these ----
 const ABOUT_TITLE = "who am i?";
 // Each line in quotes is one paragraph. Change them, add more, or delete some.
 const ABOUT_TEXT = [
   "hi my names ethan",
-  "site is a work in progress",
+  "site is still a work in progress!",
 ];
+
+// a word in ABOUT_TEXT that gets written and circled in blue, like with a marker, when the "who am i" page shows ("" = none)
+const ABOUT_CIRCLE = "ethan";
 
 // ---- The rest of your about me: edit these ----
 // These show under "who am i?" on the first page of the camera's screen, in two columns: the professional side
-// and the personal side. Anything in [square brackets] is a placeholder: swap it for your own words (and drop the brackets).
+// on the left and the personal side on the right. Anything in [square brackets] is a placeholder: swap it for your own words (and drop the brackets).
 // Keep each one to a line or two so it all fits on a phone. You can delete a row or add one (5 or so per side fits best).
-const ABOUT_PRO_TITLE = "professional";
 const ABOUT_PRO: { title: string; text: string }[] = [
-  { title: "what i do", text: "currently a student at [school], [program / grade, grad year]" },
-  { title: "what i shoot", text: "[events, portraits, street, sports, concerts...]" },
-  { title: "experience", text: "[clubs, teams, clients or events you've shot for]" },
+  { title: "what i do", text: "currently a student, trying to make and do cool things" },
+  { title: "what i shoot", text: "events, street and sports," },
   { title: "tools", text: "canon r8, photos editied on lightroom classic" },
-  { title: "open to", text: "freelance shoots, collaborations, internships" },
+  { title: "open to", text: "freelance shoots, collaborations, and job opportunities" },
 ];
-const ABOUT_PERSONAL_TITLE = "personal";
 const ABOUT_PERSONAL: { title: string; text: string }[] = [
   { title: "where i'm from", text: "based in Toronto" },
   { title: "why photos", text: "photography has always been cool to me" },
@@ -36,11 +37,20 @@ const ABOUT_PERSONAL: { title: string; text: string }[] = [
 ];
 
 // ---- The other pages on the camera's screen (photos, videos, projects): edit these ----
-// photos: which albums to show (the folder names inside public/photos). If one isn't found, another album fills its spot.
-const HOME_ALBUMS = ["summer '26", "OASIS", "senior sunrise"];
+// photos: the three albums shot most recently show up by themselves, newest first (by the date stored in the photos).
+// To always show certain albums instead, put their folder names here, e.g. ["OASIS", "senior sunrise"]
+const HOME_ALBUMS: string[] = [];
+// which photo each album shows on this page, and which part of it stays in view (the tiles are tall and thin).
+// "photo" is the file name inside the album's folder, written exactly. "focus" is optional: "50% 50%" is the middle,
+// "50% 20%" keeps nearer the top, "30% 50%" keeps more of the left. Albums not listed use their normal cover.
+// (the covers on the main photos page are set separately, in app/photos/FolderCarousel.tsx)
+const HOME_COVERS: Record<string, { photo: string; focus?: string }> = {
+  "senior volleyball team '26-27": { photo: "christian.jpg" },
+  "OASIS": { photo: "IMG_9842.JPG" },
+};
 // videos: the one video to feature. Put the file in public/videos/ and write its path, for example "/videos/reel.mp4".
 // Leave src "" to show a "coming soon" box. poster = an optional picture shown before it plays.
-const HOME_VIDEO = { title: "coming soon", caption: "the first videos are on the way.", src: "", poster: "" };
+const HOME_VIDEO = { title: "coming soon", caption: "to be annnounced", src: "", poster: "" };
 // projects: a short list. Copy the example block (without the //) to add one, newest first.
 const HOME_PROJECTS: { date: string; title: string; text: string; href: string }[] = [
   // { date: "mar '26", title: "my project", text: "one line about it", href: "/projects" },
@@ -49,6 +59,20 @@ const HOME_PROJECTS: { date: string; title: string; text: string; href: string }
 // the last page on the camera's screen
 const CONTACT_TITLE = "contact me";
 const CONTACT_TEXT = "want to shoot something together, or just say hi?";
+// the details next to it (underneath on phones), one per row. Anything in [square brackets] is a placeholder:
+// swap it for your own words (and drop the brackets). Delete a row or add one (5 or 6 fits best).
+// A row can have `links` instead of `text`: each one shows as its name and opens in a new tab.
+const CONTACT_MORE: { title: string; text?: string; links?: { label: string; href: string }[] }[] = [
+  { title: "best for", text: "event coverage, portraits, sports, & collabs" },
+  { title: "availability", text: "weekends" },
+  { title: "reply time", text: "usually within a day" },
+  { title: "based in", text: "Toronto" },
+  { title: "find me on", links: [
+    { label: "instagram", href: "https://instagram.com/etnwingwang" },
+    { label: "github", href: "https://github.com/ethanwang271-art" },
+    { label: "linkedin", href: "https://www.linkedin.com/in/ethan-wang-9206563a1/" },
+  ] },
+];
 
 // ---- tweak these (smooth scrolling) ----
 const LENIS_LERP = 0.12;  // higher = snappier, the page catches up to your scrolling faster; lower = floatier glide (try 0.06 to 0.2)
@@ -78,7 +102,9 @@ const smooth = (a: number, b: number, x: number) => {
 // ---- tweak these ----
 
 // ---- colours ----
-const PAGE_BLACK = "11,13,15";    // r,g,b of the page's black (taken from your swatch)
+const PAGE_BG = "255,255,255";    // r,g,b of the page's background (white)
+const PAGE_INK = "17,17,17";      // r,g,b of the writing on it (near black)
+const MARKER_BLUE = "100,159,255"; // r,g,b of your name on "who am i" and the marker circle round it (the site blue)
 const BLUE = "100,159,255";       // r,g,b of the blue (taken from your new swatch, #649FFF). Used by the line, the glow, the button and the cursor
 
 /* ---------- Custom cursor ---------- */
@@ -99,6 +125,15 @@ const CURSOR_CSS = `
 `;
 
 // the "Contact me" button: dark blue-tinted box, blue border, monospace text
+// the marker circle: drawn round its word over about a second, each time the "who am i" page comes up
+const MARKER_CSS = `
+.marker { position: relative; display: inline-block; white-space: nowrap; }
+.marker svg { position: absolute; left: -0.45em; right: -0.45em; top: -0.32em; bottom: -0.38em; width: calc(100% + 0.9em); height: calc(100% + 0.7em); overflow: visible; pointer-events: none; }
+.marker path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .1s linear; }
+.marker.drawn path { stroke-dashoffset: 0; transition: stroke-dashoffset 1s cubic-bezier(.55,.1,.35,1) .35s; }
+@media (prefers-reduced-motion: reduce) { .marker path, .marker.drawn path { stroke-dashoffset: 0; transition: none; } }
+`;
+
 const CONTACT_CSS = `
 .contact-btn {
   display: inline-flex;
@@ -115,6 +150,9 @@ const CONTACT_CSS = `
   text-decoration: none;
   transition: transform .3s ease, background .3s ease, border-color .3s ease, box-shadow .3s ease;
 }
+/* the same button on the white page (the ones on the camera's black screen keep the light writing) */
+.contact-btn.on-light { color: #0d2350; background: rgba(${BLUE}, .1); }
+.contact-btn.on-light:hover, .contact-btn.on-light:focus-visible { background: rgba(${BLUE}, .22); box-shadow: 0 0 22px rgba(${BLUE}, .3); }
 .contact-arrow { width: 1em; height: 1em; flex-shrink: 0; transition: transform .3s ease; }
 .contact-btn:hover .contact-arrow, .contact-btn:focus-visible .contact-arrow { transform: translate(2px, -2px); }
 .contact-btn:hover, .contact-btn:focus-visible {
@@ -126,9 +164,9 @@ const CONTACT_CSS = `
 }
 `;
 
-// make the whole page (and anything on it that uses plain black) the same black
+// make the whole page the same white
 const BG_CSS = `
-html, body, .bg-black { background-color: rgb(${PAGE_BLACK}) !important; }
+html, body { background-color: rgb(${PAGE_BG}) !important; }
 `;
 
 // small up-right arrow shown on the Résumé and Contact me buttons
@@ -139,6 +177,92 @@ function ArrowUpRight() {
       <path d="M8 7h9v9" />
     </svg>
   );
+}
+
+// the W logo in dots, behind the camera. Faint at first; each dot fills in as the pointer passes over it, and
+// they all fade away as you scroll in towards the camera's screen (then start fresh next time)
+function LogoDots() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const cv = ref.current, ctx = cv?.getContext("2d");
+    const section = cv?.closest("section");
+    if (!cv || !ctx || !section) return;
+    const blades = LOGO_BLADES.map((b) => ({ path: new Path2D(b.d), blue: b.blue }));
+    let dots: { x: number; y: number; blue: boolean; lit: number; jit: number }[] = [];
+    let W = 0, H = 0, dirty = true, anyLit = false;
+    const layout = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = cv.clientWidth; H = cv.clientHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      const sc = Math.min((H * LOGO_SIZE) / LOGO_BOX.h, (W * 0.92) / LOGO_BOX.w);
+      const ox = W / 2 - (LOGO_BOX.x + LOGO_BOX.w / 2) * sc, oy = H / 2 - (LOGO_BOX.y + LOGO_BOX.h / 2) * sc;
+      // a grid of dots over the logo (rows offset like brick), keeping the ones inside a blade
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const g = LOGO_DOT_GAP;
+      dots = [];
+      for (let y = oy + LOGO_BOX.y * sc + g / 2, row = 0; y < oy + (LOGO_BOX.y + LOGO_BOX.h) * sc; y += g, row++) {
+        for (let x = ox + LOGO_BOX.x * sc + (row % 2 ? g : g / 2); x < ox + (LOGO_BOX.x + LOGO_BOX.w) * sc; x += g) {
+          const lx = (x - ox) / sc, ly = (y - oy) / sc;
+          const b = blades.find((bl) => ctx.isPointInPath(bl.path, lx, ly));
+          if (b) dots.push({ x, y, blue: b.blue, lit: 0, jit: 0.75 + Math.random() * 0.5 });
+        }
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      anyLit = false; dirty = true;
+    };
+    const draw = (show: number) => {
+      ctx.clearRect(0, 0, W, H);
+      const base = LOGO_DOT_GAP * 0.34;
+      for (const d of dots) {
+        const v = d.lit;
+        const size = base * (1 + 0.45 * v);
+        ctx.fillStyle = `rgba(${d.blue ? LOGO_BLUE : LOGO_INK},${((v > 0 ? 0.3 + 0.7 * v : LOGO_DOT_FAINT) * show).toFixed(3)})`;
+        ctx.fillRect(d.x - size / 2, d.y - size / 2, size, size);
+      }
+    };
+    let px = -1e5, py = -1e5, bx = -1e5, by = -1e5, raf = 0, last = performance.now(), shown = -1;
+    const onMove = (e: PointerEvent) => { px = e.clientX; py = e.clientY; };
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      // fade out as you scroll on towards the screen
+      const r = section.getBoundingClientRect();
+      const p = clamp(-r.top / Math.max(1, r.height - window.innerHeight), 0, 1);
+      const show = 1 - smooth(0.04, 0.3, p / CAMERA_TURN);
+      if (Math.abs(show - shown) > 0.002) { shown = show; dirty = true; }
+      if (show <= 0.001 && anyLit) { dots.forEach((d) => (d.lit = 0)); anyLit = false; dirty = true; }
+      // light every dot near the line the pointer moved along since last frame (so fast moves don't skip any)
+      const c = cv.getBoundingClientRect(), x = px - c.left, y = py - c.top;
+      if (show > 0.6 && (x !== bx || y !== by) && px > -1e4) {
+        const rad = Math.min(W, H) * LOGO_BRUSH;
+        const fx = bx < -1e4 ? x : bx, fy = by < -1e4 ? y : by;
+        const sx = x - fx, sy = y - fy, sl = sx * sx + sy * sy;
+        for (const d of dots) {
+          if (d.lit !== 0) continue;
+          const u = sl > 0 ? clamp(((d.x - fx) * sx + (d.y - fy) * sy) / sl, 0, 1) : 0;
+          const dx = d.x - (fx + sx * u), dy = d.y - (fy + sy * u);
+          if (dx * dx + dy * dy < (rad * d.jit) ** 2) { d.lit = 0.01; anyLit = true; dirty = true; }
+        }
+      }
+      bx = x; by = y;
+      // lit dots fill in quickly, one after another, as the brush passes
+      if (anyLit) for (const d of dots) if (d.lit > 0 && d.lit < 1) { d.lit = Math.min(1, d.lit + dt * 6); dirty = true; }
+      if (dirty) { draw(Math.max(0, show)); dirty = false; }
+      raf = requestAnimationFrame(tick);
+    };
+    layout();
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerdown", onMove, { passive: true });
+    window.addEventListener("resize", layout);
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onMove);
+      window.removeEventListener("resize", layout);
+    };
+  }, []);
+  return <canvas ref={ref} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />;
 }
 
 function Cursor() {
@@ -222,963 +346,13 @@ function Cursor() {
   };
   return (
     <>
-      <div ref={ringRef} aria-hidden="true" className="cursor-ring" style={{ ...base, width: CURSOR_RING, height: CURSOR_RING, border: "1px solid rgba(255,255,255,.4)" }} />
+      <div ref={ringRef} aria-hidden="true" className="cursor-ring" style={{ ...base, width: CURSOR_RING, height: CURSOR_RING, border: "1px solid rgba(255,255,255,.75)", mixBlendMode: "difference" }} />
       <div ref={dotRef} aria-hidden="true" className="cursor-dot" style={{ ...base, width: CURSOR_DOT, height: CURSOR_DOT, background: `rgb(${BLUE})`, boxShadow: `0 0 10px rgba(${BLUE},.9)` }} />
     </>
   );
 }
 
-/* ---------- Wall intro: break through a concrete wall when you first arrive ---------- */
-
-// ---- tweak these ----
-const WALL_HITS = 3;                  // hits it takes to break through (keep it at 4 or less). Each one knocks a big chunk out
-const WALL_PROMPT = "break the wall";       // the big text in the middle
-const WALL_PROMPT_TOUCH = "break the wall"; // the same text on phones and tablets
-const WALL_HOLE_SIZE = 1;             // how big the chunk knocked out by each hit is (1 = normal, 1.5 = half as big again)
-const WALL_HIT_AREA = 0.15;           // where the wall can be broken: within this far of the middle (0.15 = 15% of the screen's smaller side).
-                                      // A click further out still hits, just pulled in to the edge of that area
-const WALL_ZOOM_DELAY = 0.2;          // after the last hit, how long it waits before flying through the opening (seconds)
-const WALL_ZOOM_TIME = 0.9;           // how long the fly-through takes (seconds)
-const WALL_COLOR = "#0f1012";         // the colour of the wall (black)
-const WALL_TEXT_COLOR = "#f5f5f3";    // the colour of the "break the wall" text (white)
-
-const WALL_CSS = `
-/* no normal arrow on the wall: only the dot and ring cursor shows */
-.wall-root, .wall-root * { cursor: none !important; }
-`;
-
-// Module level on purpose: it survives clicking around the site (so the "wingwang" logo doesn't bring the
-// wall back) but starts fresh every time the page is loaded from scratch (a new visit, a new tab, a refresh).
-let introSeen = false;
-
-function shouldPlayIntro(): boolean {
-  if (introSeen) return false;
-  try {
-    // only when you arrived on the home page (if you landed on /photos and clicked "wingwang" later: no wall)
-    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-    if (nav && new URL(nav.name).pathname !== "/") return false;
-  } catch {}
-  return true;
-}
-
-type Pt = { x: number; y: number };
-type Branch = { at: number; pts: Pt[]; cum: number[]; len: number };
-type Ray = { pts: Pt[]; cum: number[]; len: number; branches: Branch[] };
-type Star = { x: number; y: number; hit: number; rays: Ray[] };
-// one piece of the broken-up wall: its outline, and which piece is on the other side of each edge
-type Cell = { pts: Pt[]; nb: number[]; cx: number; cy: number; d: number; tint: number };
-// the pieces around one hit. out[i] = that piece has come out of the wall
-type Patch = { x: number; y: number; hit: number; cells: Cell[]; out: boolean[]; rc: number; depth: number; final: boolean };
-// a solid chunk flying through the air: a flat outline with a thickness, a position, a spin and a speed
-type Chunk = {
-  pts: Pt[]; nrm: Pt[]; h: number;
-  x: number; y: number; z: number; vx: number; vy: number; vz: number;
-  rx: number; ry: number; rz: number; wx: number; wy: number; wz: number;
-  life: number; max: number; tone: number; side: number; far: boolean; g: number; // g = how heavy it falls (1 = normal)
-};
-type Puff = { x: number; y: number; vx: number; vy: number; r: number; grow: number; life: number; max: number };
-
-// a small seeded random number generator, so a crack pattern is the same every time it is redrawn
-function rng(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// one set of cracks spreading out from where the wall was hit (a star of jagged lines, with side branches)
-function makeStar(x: number, y: number, hit: number, seed: number, scale: number): Star {
-  const r = rng(seed);
-  const walk = (sx: number, sy: number, ang: number, len: number) => {
-    const pts: Pt[] = [{ x: sx, y: sy }];
-    const cum = [0];
-    let px = sx, py = sy, a = ang, d = 0;
-    while (d < len) {
-      const step = 14 + r() * 22;
-      a += (r() - 0.5) * 0.7;
-      px += Math.cos(a) * step;
-      py += Math.sin(a) * step;
-      d += step;
-      pts.push({ x: px, y: py });
-      cum.push(d);
-    }
-    return { pts, cum, len: d };
-  };
-
-  const n = 5 + Math.floor(r() * 3);
-  const off = r() * Math.PI * 2;
-  const rays: Ray[] = [];
-  for (let i = 0; i < n; i++) {
-    const a0 = off + (i / n) * Math.PI * 2 + (r() - 0.5) * 0.5;
-    const main = walk(x, y, a0, (200 + r() * 320) * scale);
-    const branches: Branch[] = [];
-    const nb = 1 + Math.floor(r() * 3);
-    for (let b = 0; b < nb; b++) {
-      const target = (0.25 + r() * 0.55) * main.len;
-      let k = 1;
-      while (k < main.cum.length - 1 && main.cum[k] < target) k++;
-      const base = main.pts[k];
-      const ang = a0 + (r() < 0.5 ? -1 : 1) * (0.5 + r() * 0.7);
-      const br = walk(base.x, base.y, ang, main.len * (0.25 + r() * 0.3));
-      branches.push({ at: main.cum[k] / main.len, ...br });
-    }
-    rays.push({ ...main, branches });
-  }
-  return { x, y, hit, rays };
-}
-
-// draw the first `maxLen` pixels of a jagged line, getting thinner towards the end
-function strokePartial(ctx: CanvasRenderingContext2D, pts: Pt[], cum: number[], maxLen: number, w0: number, w1: number) {
-  const total = cum[cum.length - 1] || 1;
-  let prev = pts[0];
-  for (let i = 1; i < pts.length; i++) {
-    const t0 = cum[i - 1], t1 = cum[i];
-    if (t0 >= maxLen) break;
-    let q = pts[i];
-    if (t1 > maxLen) {
-      const u = (maxLen - t0) / (t1 - t0);
-      q = { x: prev.x + (q.x - prev.x) * u, y: prev.y + (q.y - prev.y) * u };
-    }
-    ctx.lineWidth = w0 + (w1 - w0) * (t0 / total);
-    ctx.beginPath();
-    ctx.moveTo(prev.x, prev.y);
-    ctx.lineTo(q.x, q.y);
-    ctx.stroke();
-    prev = pts[i];
-  }
-}
-
-// ---- the 3D part ----
-// The wall is drawn on a flat canvas, but the pieces are worked out in 3D and then squashed onto the screen
-// with perspective (things further away are drawn smaller). x goes right, y goes down, z goes INTO the screen.
-const WALL_FOCAL = 560;                             // how strong the perspective is (lower = more dramatic)
-const WALL_LIGHT = { x: -0.42, y: -0.62, z: -0.66 }; // the light comes from the top left, in front of the wall
-const WALL_GRAVITY = 1500;
-const WALL_CRUMBLE = 2.6;                           // how fast the wall's chunks drop at the end (1 = normal gravity, higher = heavier)
-const WALL_MAX_PIXELS = 1_700_000;                    // lower = runs faster, a little less sharp
-
-// Break the area around (x, y) into pieces, the way real concrete shatters: small pieces near the hit,
-// bigger ones further out. (This is a Voronoi pattern: every piece is the area closest to one random point.)
-// spacing = the smallest gap between piece centres, as a share of the radius (smaller = more, smaller pieces)
-function makeCells(x: number, y: number, radius: number, count: number, power: number, r: () => number, spacing = 0.085): Cell[] {
-  const sites: Pt[] = [{ x: x + (r() - 0.5) * radius * 0.06, y: y + (r() - 0.5) * radius * 0.06 }];
-  const minD = radius * spacing;
-  let tries = 0;
-  while (sites.length < count && tries < count * 12) {
-    tries++;
-    const a = r() * Math.PI * 2, rr = radius * Math.pow(r(), power);
-    const p = { x: x + Math.cos(a) * rr, y: y + Math.sin(a) * rr };
-    let ok = true;
-    for (const s of sites) if (Math.hypot(s.x - p.x, s.y - p.y) < minD) { ok = false; break; }
-    if (ok) sites.push(p);
-  }
-  const inner = sites.length;
-  // a ring of extra points around the outside, only there to close off the outer pieces
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2 + r() * 0.2, rr = radius * (1.22 + r() * 0.1);
-    sites.push({ x: x + Math.cos(a) * rr, y: y + Math.sin(a) * rr });
-  }
-
-  const half = radius * 2;
-  const cells: Cell[] = [];
-  for (let i = 0; i < inner; i++) {
-    const s = sites[i];
-    let poly: { x: number; y: number; nb: number }[] = [
-      { x: x - half, y: y - half, nb: -1 }, { x: x + half, y: y - half, nb: -1 },
-      { x: x + half, y: y + half, nb: -1 }, { x: x - half, y: y + half, nb: -1 },
-    ];
-    for (let j = 0; j < sites.length && poly.length > 2; j++) {
-      if (j === i) continue;
-      const o = sites[j];
-      const dx = o.x - s.x, dy = o.y - s.y, mx = (o.x + s.x) / 2, my = (o.y + s.y) / 2;
-      const side = (p: Pt) => (p.x - mx) * dx + (p.y - my) * dy; // above 0 = closer to the other point: cut it off
-      const next: { x: number; y: number; nb: number }[] = [];
-      for (let k = 0; k < poly.length; k++) {
-        const a = poly[k], b = poly[(k + 1) % poly.length];
-        const fa = side(a), fb = side(b);
-        if (fa <= 0) {
-          next.push(a);
-          if (fb > 0) { const u = fa / (fa - fb); next.push({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, nb: j }); }
-        } else if (fb <= 0) {
-          const u = fa / (fa - fb);
-          next.push({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, nb: a.nb });
-        }
-      }
-      poly = next;
-    }
-    let cx = 0, cy = 0;
-    for (const p of poly) { cx += p.x; cy += p.y; }
-    cx /= Math.max(1, poly.length);
-    cy /= Math.max(1, poly.length);
-    cells.push({
-      pts: poly.map((p) => ({ x: p.x, y: p.y })),
-      nb: poly.map((p) => (p.nb >= inner ? -1 : p.nb)),
-      cx, cy, d: Math.hypot(s.x - x, s.y - y), tint: r(),
-    });
-  }
-  return cells;
-}
-
-// one outline made of all the pieces that have come out
-function cellsPath(cells: Cell[], out: boolean[]): Path2D {
-  const path = new Path2D();
-  cells.forEach((c, i) => {
-    if (!out[i] || c.pts.length < 3) return;
-    c.pts.forEach((p, k) => { if (k) path.lineTo(p.x, p.y); else path.moveTo(p.x, p.y); });
-    path.closePath();
-  });
-  return path;
-}
-
-// The inside edge of an opening: the thickness of the wall that you can see once pieces have come out.
-// Each bit of edge is shaded by which way it faces (bright if it faces the light, dark if it faces away).
-// `inset` says where the back of the wall is for a point on the front.
-// `gone` says if a point is already open from another hole: the edge there has no wall left, so it isn't drawn
-function drawRim(ctx: CanvasRenderingContext2D, cells: Cell[], out: boolean[], cx: number, cy: number, inset: (p: Pt) => Pt, gone?: (x: number, y: number) => boolean) {
-  ctx.lineJoin = "round";
-  for (let i = 0; i < cells.length; i++) {
-    if (!out[i]) continue;
-    const c = cells[i], n = c.pts.length;
-    for (let k = 0; k < n; k++) {
-      const j = c.nb[k];
-      if (j >= 0 && out[j]) continue; // the piece next door is gone too: no wall left between them
-      const a = c.pts[k], b = c.pts[(k + 1) % n];
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      let nx = b.y - a.y, ny = a.x - b.x;
-      const len = Math.hypot(nx, ny) || 1;
-      nx /= len;
-      ny /= len;
-      if (nx * (c.cx - mx) + ny * (c.cy - my) < 0) { nx = -nx; ny = -ny; } // point it into the opening
-      if (nx * (cx - mx) + ny * (cy - my) <= 0) continue;                  // facing away from the viewer
-      if (gone && gone(mx - nx * 3, my - ny * 3)) continue;                 // the wall behind this edge is already gone
-      const a2 = inset(a), b2 = inset(b);
-      const lit = 0.5 + 0.5 * (nx * -0.6 + ny * -0.8);
-      const v1 = Math.round(30 + 75 * lit), v2 = Math.round(v1 * 0.55);
-      const g = ctx.createLinearGradient(mx, my, (a2.x + b2.x) / 2, (a2.y + b2.y) / 2);
-      g.addColorStop(0, `rgb(${v1},${v1},${v1 + 2})`);
-      g.addColorStop(1, `rgb(${v2},${v2},${v2 + 3})`);
-      ctx.fillStyle = g;
-      ctx.strokeStyle = g;
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.lineTo(b2.x, b2.y);
-      ctx.lineTo(a2.x, a2.y);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      // a crisp line where the front of the wall ends
-      ctx.strokeStyle = "rgba(200,202,206,.3)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-    }
-  }
-}
-
-// Every hit shatters the area around it, and the damage from the earlier hits spreads further too.
-function drawCracks(ctx: CanvasRenderingContext2D, stars: Star[], patches: Patch[], hits: number, W: number, H: number) {
-  ctx.clearRect(0, 0, W, H);
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-
-  // long cracks running away from each hit
-  for (const s of stars) {
-    const age = hits - s.hit;
-    const f = Math.min(1, 0.3 + 0.2 * age + 0.12 * (s.hit - 1)); // how much of each crack is showing
-    const pass = (dx: number, dy: number, color: string, k: number) => {
-      ctx.save();
-      ctx.translate(dx, dy);
-      ctx.strokeStyle = color;
-      for (const ray of s.rays) {
-        strokePartial(ctx, ray.pts, ray.cum, f * ray.len, 2.4 * k, 0.5 * k);
-        for (const br of ray.branches) {
-          if (f > br.at) strokePartial(ctx, br.pts, br.cum, Math.min(br.len, (f - br.at) * ray.len * 1.2), 1.6 * k, 0.4 * k);
-        }
-      }
-      ctx.restore();
-    };
-    pass(1.4, 1.8, "rgba(0,0,0,.6)", 1);      // a soft shadow under the crack
-    pass(0, 0, "rgba(225,227,230,.8)", 1);   // the crack itself (light, so it shows on the black wall)
-  }
-
-  for (const p of patches) {
-    const age = hits - p.hit;
-    const reach = p.final ? p.rc * 1.5 : p.rc * (2 + 0.65 * age); // how far the shattering spreads
-
-    // loose pieces sit at slightly different angles, so each one catches the light a little differently
-    p.cells.forEach((c, i) => {
-      const near = 1 - c.d / (reach * 0.8);
-      if (p.out[i] || near <= 0 || c.pts.length < 3) return;
-      const a = near * near * (0.02 + 0.085 * c.tint);
-      ctx.fillStyle = `rgba(230,232,236,${(a * 0.6).toFixed(3)})`;
-      ctx.beginPath();
-      c.pts.forEach((q, k) => { if (k) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
-      ctx.closePath();
-      ctx.fill();
-    });
-
-    // the cracks between the pieces: strong near the hit, fading out further away
-    const segs: { a: Pt; b: Pt; s: number }[] = [];
-    p.cells.forEach((c, i) => {
-      const n = c.pts.length;
-      for (let k = 0; k < n; k++) {
-        const j = c.nb[k];
-        if (j >= 0 && j < i) continue;               // already drawn from the other side
-        if (p.out[i] && j >= 0 && p.out[j]) continue; // inside the crater
-        const a = c.pts[k], b = c.pts[(k + 1) % n];
-        const d = Math.hypot((a.x + b.x) / 2 - p.x, (a.y + b.y) / 2 - p.y);
-        if (d >= reach) continue;
-        segs.push({ a, b, s: Math.pow(1 - d / reach, 1.15) });
-      }
-    });
-    for (const sg of segs) {
-      ctx.strokeStyle = `rgba(0,0,0,${(0.5 * sg.s).toFixed(3)})`;
-      ctx.lineWidth = 0.8 + 2 * sg.s;
-      ctx.beginPath();
-      ctx.moveTo(sg.a.x + 1.3, sg.a.y + 1.7);
-      ctx.lineTo(sg.b.x + 1.3, sg.b.y + 1.7);
-      ctx.stroke();
-    }
-    for (const sg of segs) {
-      ctx.strokeStyle = `rgba(225,227,230,${(0.15 + 0.6 * sg.s).toFixed(3)})`;
-      ctx.lineWidth = 0.6 + 1.7 * sg.s;
-      ctx.beginPath();
-      ctx.moveTo(sg.a.x, sg.a.y);
-      ctx.lineTo(sg.b.x, sg.b.y);
-      ctx.stroke();
-    }
-
-  }
-}
-
-// turn an outline on the wall into a solid chunk (its points are stored around its own middle)
-function makeBody(pts: Pt[], cx: number, cy: number, h: number): Chunk {
-  const local = pts.map((p) => ({ x: p.x - cx, y: p.y - cy }));
-  const nrm = local.map((a, k) => {
-    const b = local[(k + 1) % local.length];
-    let nx = b.y - a.y, ny = a.x - b.x;
-    const len = Math.hypot(nx, ny) || 1;
-    nx /= len;
-    ny /= len;
-    if (nx * (a.x + b.x) + ny * (a.y + b.y) < 0) { nx = -nx; ny = -ny; } // point outwards
-    return { x: nx, y: ny };
-  });
-  return {
-    pts: local, nrm, h, x: cx, y: cy, z: 0, vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0, wx: 0, wy: 0, wz: 0,
-    life: 1, max: 1, tone: 22, side: 70, far: false, g: 1,
-  };
-}
-
-// Draw one chunk: spin it, move it, squash it onto the screen with perspective, then paint only the faces
-// that point at the viewer, each one lit by how much it faces the light. (vx, vy) is where the viewer looks.
-function drawBody(ctx: CanvasRenderingContext2D, b: Chunk, vx: number, vy: number) {
-  const F = WALL_FOCAL;
-  const cx = Math.cos(b.rx), sx = Math.sin(b.rx), cy = Math.cos(b.ry), sy = Math.sin(b.ry), cz = Math.cos(b.rz), sz = Math.sin(b.rz);
-  const m00 = cz * cy, m01 = cz * sy * sx - sz * cx, m02 = cz * sy * cx + sz * sx;
-  const m10 = sz * cy, m11 = sz * sy * sx + cz * cx, m12 = sz * sy * cx - cz * sx;
-  const m20 = -sy, m21 = cy * sx, m22 = cy * cx;
-  const n = b.pts.length, hh = b.h / 2;
-  if (n < 3) return;
-
-  // where every corner ends up on the screen (front corners first, then the back ones)
-  const X: number[] = [], Y: number[] = [];
-  for (let side = 0; side < 2; side++) {
-    const lz = side === 0 ? -hh : hh;
-    for (let i = 0; i < n; i++) {
-      const p = b.pts[i];
-      const wx = b.x + m00 * p.x + m01 * p.y + m02 * lz;
-      const wy = b.y + m10 * p.x + m11 * p.y + m12 * lz;
-      const wz = b.z + m20 * p.x + m21 * p.y + m22 * lz;
-      if (F + wz < 40) return; // right in the viewer's face: skip it
-      const s = F / (F + wz);
-      X.push(vx + (wx - vx) * s);
-      Y.push(vy + (wy - vy) * s);
-    }
-  }
-
-  const fade = Math.min(1, b.life / 0.35);
-  const fog = Math.min(1, Math.max(0, b.z / 2600)) * 0.88; // far away pieces sink into the dark
-  ctx.globalAlpha = fade;
-  ctx.lineWidth = 0.7;
-  ctx.lineJoin = "round";
-
-  // is this face pointing at the viewer? (nx,ny,nz = which way it faces, px,py,pz = a point on it)
-  const face = (idx: number[], base: number, nx: number, ny: number, nz: number, px: number, py: number, pz: number) => {
-    const wnx = m00 * nx + m01 * ny + m02 * nz, wny = m10 * nx + m11 * ny + m12 * nz, wnz = m20 * nx + m21 * ny + m22 * nz;
-    const wx = b.x + m00 * px + m01 * py + m02 * pz, wy = b.y + m10 * px + m11 * py + m12 * pz, wz = b.z + m20 * px + m21 * py + m22 * pz;
-    if (wnx * (wx - vx) + wny * (wy - vy) + wnz * (wz + F) >= 0) return;
-    const lam = Math.max(0, wnx * WALL_LIGHT.x + wny * WALL_LIGHT.y + wnz * WALL_LIGHT.z);
-    const v = base * Math.min(1, 0.36 + lam);
-    const cr = Math.round(v * (1 - fog) + 11 * fog), cg = Math.round(v * (1 - fog) + 13 * fog), cb = Math.round((v - 2) * (1 - fog) + 15 * fog);
-    ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
-    ctx.beginPath();
-    idx.forEach((q, k) => { if (k) ctx.lineTo(X[q], Y[q]); else ctx.moveTo(X[q], Y[q]); });
-    ctx.closePath();
-    ctx.fill();
-  };
-
-  const front: number[] = [], back: number[] = [];
-  for (let i = 0; i < n; i++) { front.push(i); back.push(n + i); }
-  face(back, b.side + 14, 0, 0, 1, 0, 0, hh);
-  for (let i = 0; i < n; i++) {
-    const k = (i + 1) % n;
-    face([i, k, n + k, n + i], b.side, b.nrm[i].x, b.nrm[i].y, 0, (b.pts[i].x + b.pts[k].x) / 2, (b.pts[i].y + b.pts[k].y) / 2, 0);
-  }
-  face(front, b.tone, 0, 0, -1, 0, 0, -hh);
-  ctx.globalAlpha = 1;
-}
-
-// paint a clean black concrete wall: near black with only a faint grain and a few deeper black patches
-function paintWall(ctx: CanvasRenderingContext2D, W: number, H: number) {
-  const r = rng(1234);
-  ctx.fillStyle = WALL_COLOR;
-  ctx.fillRect(0, 0, W, H);
-
-  // a few soft deep-black patches
-  for (let i = 0; i < 40; i++) {
-    const x = r() * W, y = r() * H, rad = 140 + r() * 320;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
-    g.addColorStop(0, "rgba(0,0,0,.55)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
-  }
-
-  // very fine, very faint grain so it still reads as concrete
-  const tile = document.createElement("canvas");
-  tile.width = tile.height = 192;
-  const tctx = tile.getContext("2d");
-  if (tctx) {
-    const img = tctx.createImageData(192, 192);
-    for (let i = 0; i < img.data.length; i += 4) {
-      const v = 20 + r() * 40;
-      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-      img.data[i + 3] = 38;
-    }
-    tctx.putImageData(img, 0, 0);
-    const pat = ctx.createPattern(tile, "repeat");
-    if (pat) {
-      ctx.fillStyle = pat;
-      ctx.fillRect(0, 0, W, H);
-    }
-  }
-
-  // the faintest shading towards the corners
-  const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.4, W / 2, H / 2, Math.max(W, H) * 0.78);
-  v.addColorStop(0, "rgba(0,0,0,0)");
-  v.addColorStop(1, "rgba(0,0,0,.35)");
-  ctx.fillStyle = v;
-  ctx.fillRect(0, 0, W, H);
-}
-
-// is point (x, y) inside this outline?
-function inPoly(pts: Pt[], x: number, y: number): boolean {
-  let inside = false;
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const a = pts[i], b = pts[j];
-    if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
-  }
-  return inside;
-}
-
-// A black concrete wall covers the screen, with the camera behind it. Click it: each hit knocks a big chunk
-// clean out of the wall (with real wall thickness around the edge), and the pieces tumble down towards you.
-// Only the middle can be broken. After the last hit it flies you through the opening by itself, onto the site.
-// (Esc skips it: the whole wall crumbles.)
-function startWall(
-  root: HTMLDivElement, canvas: HTMLCanvasElement, prompt: HTMLDivElement, promptText: HTMLParagraphElement,
-  onBreak: () => void, onDone: () => void,
-): () => void {
-  const wallC = document.createElement("canvas");  // the plain wall
-  const crackC = document.createElement("canvas"); // the cracks
-  const flatC = document.createElement("canvas");  // the wall with the damage already painted on (one picture = fast to draw)
-  const farC = document.createElement("canvas");   // bits falling away behind the wall (only seen through the holes)
-  const ctx = canvas.getContext("2d");
-  const wctx = wallC.getContext("2d"), cctx = crackC.getContext("2d"), fctx = flatC.getContext("2d"), farx = farC.getContext("2d");
-  if (!ctx || !wctx || !cctx || !fctx || !farx) {
-    // can't draw here: skip the intro rather than trap the visitor behind a blank wall
-    onBreak();
-    onDone();
-    return () => {};
-  }
-
-  const coarse = window.matchMedia("(pointer: coarse)").matches;
-  promptText.textContent = coarse ? WALL_PROMPT_TOUCH : WALL_PROMPT;
-
-  // a soft round blob of dust, drawn once and reused
-  const dustC = document.createElement("canvas");
-  dustC.width = dustC.height = 64;
-  const dctx = dustC.getContext("2d");
-  if (dctx) {
-    const g = dctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    g.addColorStop(0, "rgba(150,152,156,.35)");
-    g.addColorStop(0.5, "rgba(150,152,156,.12)");
-    g.addColorStop(1, "rgba(150,152,156,0)");
-    dctx.fillStyle = g;
-    dctx.fillRect(0, 0, 64, 64);
-  }
-
-  // a hole punched through the wall. k = how much smaller the back of the hole looks than the front
-  type Hole = { patch: Patch; path: Path2D; k: number };
-  // the last hit: the whole wall in pieces, and when each piece lets go
-  type Collapse = { patch: Patch; order: number[]; when: number[]; next: number; t: number; path: Path2D | null; k: number; thick: number };
-
-  let W = 0, H = 0, dpr = 1;
-  const stars: Star[] = [];
-  const patches: Patch[] = [];
-  const bodies: Chunk[] = [];
-  const puffs: Puff[] = [];
-  const holes: Hole[] = [];
-  let collapse: Collapse | null = null;
-  let hits = 0, busy = false, broken = false, gone = false, finished = false, dirty = true;
-  let shakeT = 0, shakeAmp = 0;
-  let px = 0, py = 0; // where the pointer last was (for Enter / Space)
-  // flying through: whether it has started, how far it has got (pass, 0 to 1),
-  // the point it flies towards (fx, fy) and how much it has to zoom for the opening to fill the screen
-  let flying = false, flyT = 0, pass = 0, fx = 0, fy = 0, zoomTo = 1;
-  // is (x, y) open in this hole?
-  const openAt = (h: Hole, x: number, y: number) => h.patch.cells.some((c, i) => h.patch.out[i] && c.pts.length >= 3 && inPoly(c.pts, x, y));
-  const timers: number[] = [];
-  const rand = (a: number, b: number) => a + Math.random() * (b - a);
-  // where the back edge of a hole ends up: pulled a little towards the middle of the screen (perspective)
-  const inset = (k: number) => (q: Pt): Pt => ({ x: W / 2 + (q.x - W / 2) * k, y: H / 2 + (q.y - H / 2) * k });
-
-  const redrawCracks = () => {
-    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawCracks(cctx, stars, patches, hits, W, H);
-    fctx.setTransform(1, 0, 0, 1, 0, 0);
-    fctx.drawImage(wallC, 0, 0);
-    fctx.drawImage(crackC, 0, 0);
-  };
-
-  const setup = () => {
-    W = window.innerWidth;
-    H = window.innerHeight;
-    // keep the number of pixels down: big sharp screens are what made each hit lag
-    dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(WALL_MAX_PIXELS / Math.max(1, W * H))));
-    for (const c of [canvas, wallC, crackC, flatC, farC]) {
-      c.width = Math.round(W * dpr);
-      c.height = Math.round(H * dpr);
-    }
-    wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    paintWall(wctx, W, H);
-    redrawCracks();
-    dirty = true;
-  };
-
-  const spawnPuffs = (x: number, y: number, n: number, spread: number) => {
-    for (let i = 0; i < n && puffs.length < 36; i++) {
-      const a = Math.random() * Math.PI * 2, sp = Math.random() * spread;
-      const max = rand(0.8, 1.5);
-      puffs.push({
-        x: x + rand(-10, 10), y: y + rand(-10, 10),
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30,
-        r: rand(16, 44), grow: rand(50, 140), life: max, max,
-      });
-    }
-  };
-
-  // small solid bits of concrete that fly out towards you and drop
-  const spawnChips = (x: number, y: number, n: number, power: number) => {
-    for (let i = 0; i < n && bodies.length < 70; i++) {
-      const size = rand(3, 10) * (Math.random() < 0.15 ? 1.8 : 1);
-      const corners = 4 + Math.floor(Math.random() * 3);
-      const pts: Pt[] = [];
-      for (let k = 0; k < corners; k++) {
-        const a = (k / corners) * Math.PI * 2 + rand(-0.25, 0.25), rr = size * rand(0.65, 1.1);
-        pts.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr });
-      }
-      const b = makeBody(pts, 0, 0, size * rand(0.5, 1.1));
-      const a = -Math.PI / 2 + rand(-1, 1) * Math.PI * 0.75, sp = rand(120, 520) * power;
-      b.x = x + rand(-8, 8);
-      b.y = y + rand(-8, 8);
-      b.z = -b.h;
-      b.vx = Math.cos(a) * sp;
-      b.vy = Math.sin(a) * sp;
-      b.vz = -rand(50, 300);
-      b.rx = rand(0, 6); b.ry = rand(0, 6); b.rz = rand(0, 6);
-      b.wx = rand(-9, 9); b.wy = rand(-9, 9); b.wz = rand(-6, 6);
-      b.max = b.life = rand(0.7, 1.1);
-      b.tone = rand(18, 34);
-      b.side = rand(50, 90);
-      bodies.push(b);
-    }
-  };
-
-  const finish = () => {
-    if (finished) return;
-    finished = true;
-    onDone();
-  };
-
-  // a hit: a big chunk of the wall breaks clean out, in a few large pieces that tip towards you and drop
-  const punch = (x: number, y: number, size: number) => {
-    const rc = (95 + 30 * hits) * size * WALL_HOLE_SIZE;
-    // few, large pieces (spacing 0.2 = big chunks), so it breaks into slabs instead of gravel
-    const cells = makeCells(x, y, rc * 2.1, 30, 1.0, rng(5000 + hits * 71 + Math.floor(x * 3 + y * 7)), 0.2);
-    const patch: Patch = { x, y, hit: hits, cells, out: cells.map((c) => c.pts.length >= 3 && c.d < rc), rc, depth: 0, final: false };
-    patches.push(patch);
-    const thick = 40 * size;
-    holes.push({ patch, path: cellsPath(cells, patch.out), k: WALL_FOCAL / (WALL_FOCAL + thick) });
-    cells.forEach((c, i) => {
-      if (!patch.out[i]) return;
-      const b = makeBody(c.pts, c.cx, c.cy, thick);
-      const dx = c.cx - x, dy = c.cy - y, d = Math.hypot(dx, dy) || 1;
-      b.z = thick / 2; // its front starts level with the front of the wall
-      b.vx = (dx / d) * rand(40, 180);
-      b.vy = (dy / d) * rand(20, 120) - rand(40, 160); // a small pop up, then it drops
-      b.vz = -rand(120, 320);                           // towards you
-      b.wx = rand(-2.6, 2.6); b.wy = rand(-2.6, 2.6); b.wz = rand(-1.6, 1.6);
-      b.g = WALL_CRUMBLE * 0.8;
-      b.max = b.life = 1.8;
-      b.tone = rand(18, 32);
-      b.side = rand(50, 85);
-      bodies.push(b);
-    });
-  };
-
-  // How far the opening reaches from (x, y) in every direction: the nearest point of its edge.
-  // That says how much the view has to zoom in for the opening to cover the whole screen.
-  const reachFrom = (h: Hole, x: number, y: number) => {
-    let best = Infinity;
-    h.patch.cells.forEach((c, i) => {
-      if (!h.patch.out[i]) return;
-      const n = c.pts.length;
-      for (let k = 0; k < n; k++) {
-        const j = c.nb[k];
-        if (j >= 0 && h.patch.out[j]) continue; // not an edge of the opening
-        const a = c.pts[k], b = c.pts[(k + 1) % n];
-        const ex = b.x - a.x, ey = b.y - a.y, l2 = ex * ex + ey * ey || 1;
-        const t = Math.max(0, Math.min(1, ((x - a.x) * ex + (y - a.y) * ey) / l2));
-        best = Math.min(best, Math.hypot(a.x + ex * t - x, a.y + ey * t - y));
-      }
-    });
-    return best;
-  };
-
-  // the wall is broken: pick the biggest opening and fly through it
-  const getReady = () => {
-    let bestR = 0;
-    for (const h of holes) {
-      const r = reachFrom(h, h.patch.x, h.patch.y);
-      if (r > bestR) { bestR = r; fx = h.patch.x; fy = h.patch.y; }
-    }
-    zoomTo = (Math.hypot(W, H) / 2 / Math.max(20, bestR)) * 1.35;
-    flying = true;
-    dirty = true;
-  };
-
-  // one piece of the wall lets go: it tips towards you and drops off the screen
-  const release = (i: number) => {
-    if (!collapse) return;
-    const p = collapse.patch, c = p.cells[i];
-    p.out[i] = true;
-    // a piece that was mostly a hole already has nothing left to fall
-    if (holes.some((h) => h.patch.cells.some((hc, j) => h.patch.out[j] && hc.pts.length >= 3 && inPoly(hc.pts, c.cx, c.cy)))) return;
-    const dx = c.cx - p.x, dy = c.cy - p.y, d = Math.hypot(dx, dy) || 1;
-    const b = makeBody(c.pts, c.cx, c.cy, collapse.thick);
-    b.z = collapse.thick / 2;
-    // no upward pop: it just lets go and drops, tipping forward a little
-    b.vx = (dx / d) * rand(10, 90);
-    b.vy = rand(60, 220);
-    b.vz = rand(-40, 30);
-    b.wx = rand(-0.9, 0.9); b.wy = rand(-0.6, 0.6); b.wz = rand(-0.8, 0.8);
-    b.g = WALL_CRUMBLE;
-    b.max = b.life = 1.6;
-    b.tone = rand(18, 30);
-    b.side = rand(50, 80);
-    bodies.push(b);
-    if (Math.random() < 0.05) spawnPuffs(c.cx, c.cy, 1, 80);
-  };
-
-  // the last hit: cracks run across the whole wall and it crumbles, starting where you clicked
-  const breakWall = (x: number, y: number) => {
-    if (broken) return;
-    broken = true;
-    dirty = true;
-    const far = Math.max(Math.hypot(x, y), Math.hypot(W - x, y), Math.hypot(x, H - y), Math.hypot(W - x, H - y));
-    const size = Math.max(0.7, Math.min(1.25, Math.min(W, H) / 800));
-    const cells = makeCells(x, y, far * 1.25, 170, 1.1, rng(4242 + Math.floor(x * 5 + y * 11)), 0.05);
-    const order: number[] = [], when: number[] = [];
-    cells.forEach((c, i) => {
-      when.push((c.d / far) * 0.28); // the break spreads outwards from the hit
-      const onScreen = c.pts.some((q) => q.x > -50 && q.x < W + 50 && q.y > -50 && q.y < H + 50);
-      if (c.pts.length >= 3 && onScreen) order.push(i);
-    });
-    order.sort((a, b) => when[a] - when[b]);
-    const patch: Patch = { x, y, hit: hits, cells, out: cells.map(() => false), rc: far, depth: 0, final: true };
-    patches.push(patch);
-    const thick = 40 * size;
-    collapse = { patch, order, when, next: 0, t: 0, path: null, k: WALL_FOCAL / (WALL_FOCAL + thick), thick };
-    redrawCracks();
-    root.style.background = "transparent";
-    root.style.pointerEvents = "none";
-    prompt.style.opacity = "0";
-    spawnPuffs(x, y, 4, 200);
-    spawnChips(x, y, 10, 0.8);
-    shakeT = 0.3;
-    shakeAmp = 12;
-    onBreak();
-  };
-
-  // a hit: a hole, shattered concrete around it, flying chips, a shake and a thud
-  const impact = (x: number, y: number) => {
-    hits++;
-    const last = hits >= WALL_HITS;
-    const size = Math.max(0.7, Math.min(1.25, Math.min(W, H) / 800));
-    stars.push(makeStar(x, y, hits, 9000 + hits * 131 + Math.floor(x * 7 + y * 3), 0.85 + 0.12 * (hits - 1)));
-    root.style.background = "transparent"; // from now on the page shows through the holes
-    punch(x, y, size);
-    redrawCracks();
-    spawnChips(x, y, 8 + hits * 3, 1.1);
-    spawnPuffs(x, y, 3 + hits, 170);
-    shakeT = 0.26;
-    shakeAmp = 7 + hits * 3;
-    prompt.style.opacity = "0";
-    dirty = true;
-    if (last) timers.push(window.setTimeout(getReady, WALL_ZOOM_DELAY * 1000));
-  };
-
-  const doHit = (x: number, y: number) => {
-    if (busy || broken || hits >= WALL_HITS) return;
-    // only the middle of the wall can be broken: a click further out is pulled in to the edge of that area
-    const lim = Math.min(W, H) * WALL_HIT_AREA, dx = x - W / 2, dy = y - H / 2, d = Math.hypot(dx, dy);
-    if (d > lim) { x = W / 2 + (dx / d) * lim; y = H / 2 + (dy / d) * lim; }
-    busy = true;
-    impact(x, y);
-    timers.push(window.setTimeout(() => { busy = false; }, 140));
-  };
-
-  const onMove = (e: PointerEvent) => { px = e.clientX; py = e.clientY; };
-  const onDown = (e: PointerEvent) => {
-    px = e.clientX;
-    py = e.clientY;
-    doHit(e.clientX, e.clientY);
-  };
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      if (!broken) breakWall(W / 2, H / 2);
-    } else if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      doHit(px, py);
-    }
-  };
-  const onResize = () => { if (!broken) setup(); };
-
-  const update = (dt: number) => {
-    if (shakeT > 0) { shakeT -= dt; dirty = true; }
-    if (flying && !broken && pass < 1) {
-      flyT += dt / WALL_ZOOM_TIME;
-      pass = flyT >= 1 ? 1 : smooth(0, 1, flyT);
-      canvas.style.opacity = String(1 - smooth(0.82, 1, pass)); // the last of the wall fades as it goes past you
-      dirty = true;
-      if (pass >= 1) {
-        root.style.pointerEvents = "none";
-        onBreak();
-        finish();
-      }
-    }
-    for (let i = bodies.length - 1; i >= 0; i--) {
-      const b = bodies[i];
-      b.life -= dt;
-      if (b.life <= 0 || WALL_FOCAL + b.z < 60 || (!b.far && b.y > H + 200)) { bodies.splice(i, 1); continue; }
-      b.vy += WALL_GRAVITY * b.g * dt;
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-      b.z += b.vz * dt;
-      b.rx += b.wx * dt;
-      b.ry += b.wy * dt;
-      b.rz += b.wz * dt;
-    }
-    for (let i = puffs.length - 1; i >= 0; i--) {
-      const p = puffs[i];
-      p.life -= dt;
-      if (p.life <= 0) { puffs.splice(i, 1); continue; }
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.r += p.grow * dt;
-    }
-    if (collapse) {
-      const c = collapse;
-      c.t += dt;
-      dirty = true;
-      let changed = false;
-      while (c.next < c.order.length && c.when[c.order[c.next]] <= c.t) {
-        release(c.order[c.next++]);
-        changed = true;
-      }
-      if (changed) c.path = cellsPath(c.patch.cells, c.patch.out);
-      if (!gone && c.next >= c.order.length) {
-        gone = true; // every piece has let go: no wall left
-        timers.push(window.setTimeout(finish, 1000));
-      }
-      if (gone && bodies.length === 0 && puffs.length === 0) finish();
-    }
-  };
-
-  const render = () => {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const k = shakeT > 0 ? Math.max(0, Math.min(1, shakeT / 0.22)) : 0;
-    const sx = (Math.random() - 0.5) * 2 * shakeAmp * k, sy = (Math.random() - 0.5) * 2 * shakeAmp * k;
-    // flying through: zoom in on the opening while it slides to the middle of the screen
-    const zs = pass > 0 ? Math.pow(zoomTo, pass * pass) : 1;
-    const slide = smooth(0, 0.7, pass);
-    const ox = fx + (W / 2 - fx) * slide - fx * zs, oy = fy + (H / 2 - fy) * slide - fy * zs;
-    const tf = (c: CanvasRenderingContext2D) => c.setTransform(dpr * zs, 0, 0, dpr * zs, (ox + sx) * dpr, (oy + sy) * dpr);
-    tf(ctx);
-    bodies.sort((a, b) => b.z - a.z); // furthest away first, so nearer chunks are painted on top
-
-    if (!gone) {
-      // the wall, with a plain strip around it so the shake never shows a gap at the edge of the screen
-      if (k > 0) {
-        ctx.fillStyle = WALL_COLOR;
-        ctx.fillRect(-20, -20, W + 40, H + 40);
-      }
-      ctx.drawImage(flatC, 0, 0, W, H);
-
-      // cut the holes out (the page shows through), then paint the thickness of the wall inside each one
-      const cut = (path: Path2D) => {
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.fillStyle = ctx.strokeStyle = "#000";
-        ctx.lineWidth = 1.2;
-        ctx.fill(path);
-        ctx.stroke(path);
-        ctx.globalCompositeOperation = "source-over";
-      };
-      for (const h of holes) cut(h.path);
-      // (where two holes overlap, an edge of one can sit inside the other: those bits are skipped)
-      for (const h of holes) drawRim(ctx, h.patch.cells, h.patch.out, W / 2, H / 2, inset(h.k), (x, y) => holes.some((o) => o !== h && openAt(o, x, y)));
-      if (collapse && collapse.path) {
-        cut(collapse.path);
-        drawRim(ctx, collapse.patch.cells, collapse.patch.out, W / 2, H / 2, inset(collapse.k));
-      }
-
-      // the bits falling away behind the wall: painted BEHIND what's already there, so they only show through the holes
-      if (bodies.some((b) => b.far)) {
-        farx.setTransform(1, 0, 0, 1, 0, 0);
-        farx.clearRect(0, 0, farC.width, farC.height);
-        tf(farx);
-        for (const b of bodies) if (b.far) drawBody(farx, b, W / 2, H / 2);
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalCompositeOperation = "destination-over";
-        ctx.drawImage(farC, 0, 0);
-        ctx.restore();
-      }
-
-      // the shadows the bits flying towards you throw on the wall
-      for (const b of bodies) {
-        if (b.far || b.z >= 0) continue;
-        const off = -b.z * 0.4, s = WALL_FOCAL / (WALL_FOCAL + b.z * 0.25);
-        const a = 0.16 * Math.max(0, 1 + b.z / 420) * Math.min(1, b.life / 0.35);
-        if (a <= 0.004) continue;
-        const c = Math.cos(b.rz), sn = Math.sin(b.rz);
-        ctx.fillStyle = `rgba(0,0,0,${Math.min(0.6, a * 3).toFixed(3)})`;
-        ctx.beginPath();
-        b.pts.forEach((q, i) => {
-          const qx = b.x + off * 0.6 + (q.x * c - q.y * sn) * s, qy = b.y + off * 0.8 + (q.x * sn + q.y * c) * s;
-          if (i) ctx.lineTo(qx, qy); else ctx.moveTo(qx, qy);
-        });
-        ctx.closePath();
-        ctx.fill();
-      }
-    } else {
-      for (const b of bodies) if (b.far) drawBody(ctx, b, W / 2, H / 2);
-    }
-
-    // the bits coming towards you (chips, and the big chunks when the wall crumbles)
-    for (const b of bodies) if (!b.far) drawBody(ctx, b, W / 2, H / 2);
-
-    for (const p of puffs) {
-      ctx.globalAlpha = Math.min(1, (p.life / p.max) * 1.2);
-      ctx.drawImage(dustC, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
-    }
-    ctx.globalAlpha = 1;
-  };
-
-  setup();
-  px = W / 2;
-  py = H / 2;
-  let raf = 0, last = performance.now();
-  const frame = (now: number) => {
-    const dt = Math.min(0.05, (now - last) / 1000);
-    last = now;
-    update(dt);
-    if (dirty || bodies.length > 0 || puffs.length > 0) {
-      render();
-      dirty = false;
-    }
-    raf = requestAnimationFrame(frame);
-  };
-  raf = requestAnimationFrame(frame);
-
-  root.addEventListener("pointermove", onMove);
-  root.addEventListener("pointerdown", onDown);
-  window.addEventListener("keydown", onKey);
-  window.addEventListener("resize", onResize);
-  return () => {
-    cancelAnimationFrame(raf);
-    timers.forEach((t) => window.clearTimeout(t));
-    root.removeEventListener("pointermove", onMove);
-    root.removeEventListener("pointerdown", onDown);
-    window.removeEventListener("keydown", onKey);
-    window.removeEventListener("resize", onResize);
-  };
-}
-
-function WallIntro({ onBreak, onDone }: { onBreak: () => void; onDone: () => void }) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const promptRef = useRef<HTMLDivElement>(null);
-  const promptTextRef = useRef<HTMLParagraphElement>(null);
-
-  useEffect(() => {
-    const root = rootRef.current, canvas = canvasRef.current, prompt = promptRef.current, promptText = promptTextRef.current;
-    if (!root || !canvas || !prompt || !promptText) return;
-    return startWall(root, canvas, prompt, promptText, onBreak, onDone);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return (
-    <div
-      ref={rootRef}
-      className="wall-root"
-      role="dialog"
-      aria-label="Break the wall to enter the site"
-      style={{ position: "fixed", inset: 0, zIndex: 10000, touchAction: "none", userSelect: "none", background: WALL_COLOR }}
-    >
-      <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
-
-      {/* the big message in the middle, in the same font as "who am i?" (it goes away on the first hit) */}
-      <div
-        ref={promptRef}
-        style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", padding: "0 1.5rem", pointerEvents: "none", transition: "opacity .45s ease" }}
-      >
-        <p
-          ref={promptTextRef}
-          style={{
-            margin: 0, textAlign: "center", fontFamily: "Arial, Helvetica, sans-serif", fontWeight: 700, lineHeight: 1.02,
-            letterSpacing: "-0.025em", fontSize: "clamp(3.5rem, 12vw, 10rem)", color: WALL_TEXT_COLOR,
-          }}
-        >
-          {WALL_PROMPT}
-        </p>
-      </div>
-
-    </div>
-  );
-}
-
-/* ---------- The camera behind the wall ---------- */
+/* ---------- The camera ---------- */
 
 const CAMERA_HEIGHT = "600vh";              // how much scrolling the whole camera part takes (more = slower)
 const CAMERA_TURN = 0.2;                    // how much of that scrolling it takes to turn round and zoom in on the screen (0.2 = the first 20%). The rest swipes through the screen's pages
@@ -1188,292 +362,84 @@ const CAMERA_SWIPE = 50;                    // how far (px) you have to swipe or
 const CAMERA_YAW = 0;                       // how far it's turned at the start, in degrees (0 = facing you straight on)
 const CAMERA_TILT = 0;                      // how much you look down on it at the start, in degrees
 const CAMERA_SPIN = 0.45;                   // at the start you can drag the camera round to look at it from any side: degrees it turns per pixel dragged
-const CAMERA_SPIN_BACK = 0.45;              // once you scroll, it lets go of your drag and carries on turning in about this many seconds
 const CAMERA_MOUSE = 6;                     // how much it leans to follow the mouse at the start, in degrees (0 = not at all)
-const CAMERA_LINE = BLUE;                   // r,g,b of the body and lens lines
-const CAMERA_GLASS = "170,215,255";         // r,g,b of the glass inside the lens
-const CAMERA_BLADES = "255,190,110";        // r,g,b of the aperture blades
-const CAMERA_LIT = "255,255,255";           // r,g,b of the edge of the opening
+const CAMERA_SPIN_UNTIL = 0.48;              // you can still drag the camera round until it has zoomed this far towards its screen (0 = only before any scrolling, 1 = right up to the screen)
 const CAMERA_SNAP = 0.35;                   // when you stop scrolling between two pages, it glides to the nearest one in this many seconds (0 = off)
-const CAMERA_DOTS = "100,159,255";         // r,g,b of the little dots on the camera's back screen (the blue)
-const CAMERA_DOTS_LIT = "160,205,255";      // r,g,b of a dot once the pointer has passed over it (a lighter blue)
+const CAMERA_DOTS = "235,235,235";          // r,g,b of the little dots on the camera's back screen (soft white)
+const CAMERA_DOTS_LIT = "255,255,255";      // r,g,b of a dot once the pointer has passed over it (bright white)
 const CAMERA_DOT_GAP = 7;                   // how far apart the dots on the screen are (lower = more, finer dots; about 4.5 = 1mm)
 const CAMERA_DOT_FAINT = 0.2;               // how visible the dots are before you hover over them (0 = hidden until lit)
-const CAMERA_DOT_TURN = -0.3;               // how far round you have to turn the camera before the dots light up (-1 = even from the front, 0 = side on, 1 = only straight from the back)
+const CAMERA_DOT_TURN = 0.05;               // the dots only light up when you can see the screen: how much it has to face you (0 = side on, 1 = straight from the back)
 const CAMERA_BRUSH = 0.05;                  // how big the patch that lights up under the pointer is, compared to the window (0.05 = 5% of its shorter side)
-const CAMERA_SHARPNESS = 1.5;               // how sharp the camera is drawn on high-resolution screens (2 = fully sharp but slower, 1 = fastest)
-const CAMERA_FILL = 0.035;                  // how see-through the surfaces are (0 = only lines, higher = more solid)
-const CAMERA_FSTOP = 2.8;                   // the aperture you can see in the lens (1.8 = wide open, 8 = small)
-const APERTURE_BLADES = 9;                  // how many blades the aperture has
-// the pages on the camera's screen, in order (the words shown in the bar along its top)
+const CAMERA_SHARPNESS = 2;                 // how sharp the camera is drawn on high-resolution screens (2 = fully sharp, 1 = fastest)
+const CAMERA_XRAY_GHOST = 0.055;             // in x-ray view, how visible the outside of the camera stays (0 = gone, 1 = solid)
+const CAMERA_XRAY_LINES = "30,48,80";       // in x-ray view, r,g,b of the fine lines round the edges of the outside
+const CAMERA_APERTURE_BLADES = 7;           // how many blades the aperture inside the lens has (the kit lens has 7)
+// ---- your W logo behind the camera, made of dots that light up where the pointer passes (like the camera's screen) ----
+const LOGO_SIZE = 0.78;            // how tall the logo is, compared to the window (it also always fits the width)
+const LOGO_DOT_GAP = 8;            // how far apart its dots are, in px (lower = more, finer dots)
+const LOGO_DOT_FAINT = 0.1;        // how visible the dots are before the pointer passes over them (0 = hidden until lit)
+const LOGO_BRUSH = 0.05;           // how big the patch that lights up under the pointer is, compared to the window
+const LOGO_INK = "17,17,17";       // r,g,b of the black parts of the W
+const LOGO_BLUE = "31,95,217";     // r,g,b of the blue part of the W
+// the four blades of the W, traced from your logo (each is two curves meeting at its tips). blue = the blue blade
+const LOGO_BLADES = [
+  { d: "M140 100 Q150 270 230 360 Q215 240 140 100 Z", blue: false },
+  { d: "M230 360 Q250 240 283 175 Q285 270 230 360 Z", blue: false },
+  { d: "M283 175 Q280 270 335 360 Q318 240 283 175 Z", blue: true },
+  { d: "M425 100 Q415 270 335 360 Q350 240 425 100 Z", blue: false },
+];
+const LOGO_BOX = { x: 140, y: 100, w: 285, h: 260 }; // the area the blades above fill
+
+// the pages on the camera's screen, in order
 const SCREEN_PAGES = ["who am i", "photos", "videos", "projects", "contact"];
 
-// where the camera is and which way it faces. lit = how bright the edge of the opening is (0 to 1), body = how
-// visible the body is, lens = how visible the lens around the blades is, iris = how bright the blades are,
-// fstop = how far the aperture is closed, cx/cy = where it sits on the screen, scale = how big,
+// where the camera is and which way it faces. cx/cy = where it sits on the page, scale = how big (pixels per unit),
 // yaw/tilt/roll = turned round / tipped forward / tipped on its side (radians),
 // px/py/pz = the point on the model it turns around, depth = how strong the perspective is (higher = flatter)
-// dots = the dots on the back screen: how lit each one is (0 = not yet .. 1 = fully), where each one landed on the page
-// (filled in while drawing, for the pointer to find them) and how visible they all are (show)
-type CameraPose = { dots: { lit: Float32Array; xy: Float32Array; show: number } | null; fstop: number; lit: number; body: number; lens: number; iris: number; yaw: number; tilt: number; roll: number; cx: number; cy: number; scale: number; px: number; py: number; pz: number; depth: number };
+type CameraPose = { yaw: number; tilt: number; roll: number; cx: number; cy: number; scale: number; px: number; py: number; pz: number; depth: number };
 
-// The camera is a see-through 3D model made of lines, built from simple shapes: flat outlines given a thickness
-// (body, hump, screen), outlines stacked at different heights (grip) and round shapes spun around a line (lens, dials). Then every point is turned, put in
-// perspective and drawn on a flat canvas. Units are about 4.5 per millimetre. x = right, y = down,
-// z = away from you when the lens points at you (the lens sticks out towards -z, the body sits from z 0 to 170).
+// The camera is a solid 3D model, built here out of simple pieces: flat outlines given a thickness, round shapes
+// spun around a line, and boxes. Units are about 4.5 per millimetre. x = right, y = down, z = away from you when
+// the lens points at you (so the lens sticks out towards -z, and the body sits from z 0 to 185).
 type V3 = { x: number; y: number; z: number };
-type Line3 = { pts: V3[]; closed: boolean; col: string; w: number }; // w = how bright (1 = normal)
-type Model = { lines: Line3[]; faces: { pts: V3[]; col: string; w?: number }[] };
 
-// turn an outline written like an SVG path ("M x y L x y Q ... C ... Z") into points.
-// corner[i] = that point is the end of a piece (where the edges across the thickness get drawn)
-const pathCache = new Map<string, { pts: Pt[]; corner: boolean[] }>();
-function pathPts(d: string): { pts: Pt[]; corner: boolean[] } {
-  const hit = pathCache.get(d);
-  if (hit) return hit;
-  const t = d.match(/[MLQCZ]|-?[\d.]+/g) || [];
-  const pts: Pt[] = [], corner: boolean[] = [];
-  let i = 0, cmd = "", x = 0, y = 0;
-  const n = () => parseFloat(t[i++]);
-  while (i < t.length) {
-    if (/[MLQCZ]/.test(t[i])) cmd = t[i++];
-    if (cmd === "Z") break;
-    if (cmd === "M" || cmd === "L") {
-      x = n(); y = n();
-      pts.push({ x, y });
-      corner.push(true);
-    } else if (cmd === "Q") {
-      const x1 = n(), y1 = n(), x2 = n(), y2 = n();
-      for (let k = 1; k <= 8; k++) {
-        const u = k / 8, v = 1 - u;
-        pts.push({ x: v * v * x + 2 * v * u * x1 + u * u * x2, y: v * v * y + 2 * v * u * y1 + u * u * y2 });
-        corner.push(k === 8);
-      }
-      x = x2; y = y2;
-    } else if (cmd === "C") {
-      const x1 = n(), y1 = n(), x2 = n(), y2 = n(), x3 = n(), y3 = n();
-      for (let k = 1; k <= 12; k++) {
-        const u = k / 12, v = 1 - u;
-        pts.push({
-          x: v * v * v * x + 3 * v * v * u * x1 + 3 * v * u * u * x2 + u * u * u * x3,
-          y: v * v * v * y + 3 * v * v * u * y1 + 3 * v * u * u * y2 + u * u * u * y3,
-        });
-        corner.push(k === 12);
-      }
-      x = x3; y = y3;
-    } else i++;
-  }
-  const out = { pts, corner };
-  pathCache.set(d, out);
-  return out;
-}
-
-// how a flat outline's (u, v) and its thickness (t) map onto the model:
-const FRONT = (u: number, v: number, t: number): V3 => ({ x: u, y: v, z: t }); // drawn as seen from the front, thick front to back
-const SIDE = (u: number, v: number, t: number): V3 => ({ x: t, y: v, z: u });  // drawn as seen from the side (u = front to back), thick left to right
-const TOP = (u: number, v: number, t: number): V3 => ({ x: u, y: t, z: v });   // drawn as seen from above (v = front to back), thick top to bottom
-
-// a flat outline with a thickness: one face at t0, the other at t1, and edges across at the corners
-function prism(m: Model, d: string, t0: number, t1: number, col: string, at = FRONT, w = 1) {
-  const { pts, corner } = pathPts(d);
-  const f = pts.map((p) => at(p.x, p.y, t0)), b = pts.map((p) => at(p.x, p.y, t1));
-  m.lines.push({ pts: f, closed: true, col, w }, { pts: b, closed: true, col, w });
-  pts.forEach((_, i) => { if (corner[i]) m.lines.push({ pts: [f[i], b[i]], closed: false, col, w: 0.6 * w }); });
-  m.faces.push({ pts: f, col, w }, { pts: b, col, w });
-}
-// the same kind of outline at several levels, each one a little different, joined up at the corners.
-// For shapes whose sides curve, like the grip. rings = [the outline, how far along its thickness]; inner = how bright the rings in between are
-function loft(m: Model, rings: [string, number][], col: string, at = FRONT, inner = 0.45) {
-  let prev: V3[] = [];
-  rings.forEach(([d, t], k) => {
-    const { pts, corner } = pathPts(d);
-    const cur = pts.map((q) => at(q.x, q.y, t));
-    m.lines.push({ pts: cur, closed: false, col, w: k === 0 || k === rings.length - 1 ? 1 : inner });
-    if (prev.length === cur.length) {
-      const before = prev;
-      cur.forEach((q, i) => { if (corner[i]) m.lines.push({ pts: [before[i], q], closed: false, col, w: 0.6 }); });
-    }
-    prev = cur;
-  });
-}
-// just the outline (no thickness), for slots and panel edges
-function outline(m: Model, d: string, t: number, col: string, at = FRONT, w = 0.5) {
-  m.lines.push({ pts: pathPts(d).pts.map((p) => at(p.x, p.y, t)), closed: true, col, w });
-}
-
-// a point on a circle around one of the three directions: axis "z" = the lens's direction, "y" = up and down, "x" = left to right.
-// (c1, c2) = the centre, t = how far along the axis
-type Axis = "x" | "y" | "z";
-function around(axis: Axis, c1: number, c2: number, t: number, r: number, a: number): V3 {
-  const p = c1 + r * Math.cos(a), q = c2 + r * Math.sin(a);
-  return axis === "z" ? { x: p, y: q, z: t } : axis === "y" ? { x: p, y: t, z: q } : { x: t, y: q, z: p };
-}
-function circle(m: Model, axis: Axis, c1: number, c2: number, t: number, r: number, col: string, w = 1) {
-  m.lines.push({ pts: Array.from({ length: 56 }, (_, k) => around(axis, c1, c2, t, r, (k / 56) * Math.PI * 2)), closed: true, col, w });
-}
-// a round shape spun around an axis. prof = [how far along, radius, draw a ring here?].
-// view = which way you're looking (so the two edges that make its outline can be found)
-function spin(m: Model, prof: [number, number, boolean][], axis: Axis, c1: number, c2: number, col: string, view: V3, w = 1) {
-  for (const [t, r, on] of prof) if (on && r > 0) circle(m, axis, c1, c2, t, r, col, w);
-  // the view seen across the axis: looking straight down the axis there's no side to see, so the edges fade out
-  const [a1, a2] = axis === "z" ? [view.x, view.y] : axis === "y" ? [view.x, view.z] : [view.z, view.y];
-  const as = Math.atan2(-a1, a2);
-  const sw = w * smooth(0.12, 0.45, Math.hypot(a1, a2));
-  const side = (a: number) => prof.map(([t, r]) => around(axis, c1, c2, t, r, a));
-  const s1 = side(as), s2 = side(as + Math.PI);
-  m.lines.push({ pts: s1, closed: false, col, w: sw }, { pts: s2, closed: false, col, w: sw });
-  m.faces.push({ pts: [...s1, ...s2.reverse()], col, w: sw });
-}
-
-// where the lens is: its middle (x, y), the depth of the aperture blades and how big their housing is
-const LENS_X = 0, LENS_Y = 30, IRIS_Z = -270, IRIS_R = 140, LENS_FRONT = -486, LENS_R = 188;
+// where the lens is (its middle, seen from the front)
+const LENS_X = 0, LENS_Y = 30;
 // the screen on the back: the middle of its picture, its size (3 by 2, like the real one) and how far back it is
 const SCREEN_X = 19, SCREEN_Y = 64.5, SCREEN_W = 338, SCREEN_H = 225, SCREEN_Z = 198;
+// Places to attach other models later (a flash, a microphone, a tripod...), in the camera's own units.
+// To add one: write a function like buildLens below that adds its pieces to the kit, shift its pieces to start
+// at one of these points, and add the function to CAMERA_PARTS.
+const CAMERA_ANCHORS = {
+  hotShoe: { x: 6, y: -208, z: 120 },    // the flash shoe on top of the viewfinder
+  coldShoe: { x: 211, y: -158, z: 23 },  // the extra shoe on the cage, on the arm beside the viewfinder hump
+  tripod: { x: 0, y: 241, z: 95 },       // the screw thread underneath
+  lensFront: { x: LENS_X, y: LENS_Y, z: -477 }, // the front of the filter
+};
 
-// The grip, seen from above, for a grip that sticks out g in front of the body (it's open at the back, where it joins the body)
-const gripPlan = (g: number) =>
-  `M -150 0 Q -182 0 -190 ${-0.35 * g} L -200 ${-0.72 * g} Q -207 ${-g} -246 ${-g} L -300 ${-g} Q -346 ${-g} -350 ${-0.5 * g} L -350 0`;
-// the grip at each height, top to bottom: [how far down, how far it sticks out]. The top slopes forward (where the
-// shutter button sits), then there's a dip for your middle finger, then it fills out
-const GRIP_RINGS: [string, number][] = ([[-128, 38], [-104, 90], [-62, 83], [30, 96], [150, 96], [185, 84]] as const).map(([y, g]) => [gripPlan(g), y]);
-
-function buildCamera(view: V3, body: number, lens: number): Model {
-  const m: Model = { lines: [], faces: [] };
-  const G = CAMERA_LINE, GL = CAMERA_GLASS;
-
-  // ---- the body (a small full-frame mirrorless camera, no logos). Seen from the front, the grip is on the left,
-  // the lens sits a little right of the middle, and the viewfinder hump is above the lens. ----
-  // the main box, drawn from above and given its height
-  prism(m, "M -350 0 L 216 0 Q 246 0 246 30 L 246 155 Q 246 185 216 185 L -320 185 Q -350 185 -350 155 Z", -128, 185, G, TOP);
-  // the grip, sticking out at the front on the left
-  loft(m, GRIP_RINGS, G, TOP);
-  // the viewfinder hump: it leans out a little over the lens mount, with the flash shoe on top
-  prism(m, "M -90 -128 L -66 -184 Q -62 -192 -50 -192 L 62 -192 Q 74 -192 78 -184 L 102 -128 Z", -14, 185, G);
-  prism(m, "M -46 46 L 58 46 L 58 182 L -46 182 Z", -192, -202, G, TOP, 0.7);
-  outline(m, "M -30 62 L 42 62 L 42 182 L -30 182 Z", -202, G, TOP, 0.4);
-  // the viewfinder eyecup on the back, and the window you look through
-  prism(m, "M -66 -160 Q -66 -174 -52 -174 L 64 -174 Q 78 -174 78 -160 L 78 -76 Q 78 -62 64 -62 L -52 -62 Q -66 -62 -66 -76 Z", 185, 212, G);
-  outline(m, "M -34 -150 L 46 -150 L 46 -92 L -34 -92 Z", 212, G);
-
-  // on top, grip side: the shutter button on the slope of the grip, with the main dial just behind it
-  spin(m, [[-116, 22, true], [-129, 22, true], [-132, 14, true]], "y", -282, -60, G, view, 0.8);
-  spin(m, [[-14, 22, true], [16, 22, true]], "z", -298, -122, G, view, 0.8);
-  circle(m, "y", -258, -24, -124, 7, G, 0.5);
-  // the mode dial next to the hump, the record button, and the back dial with the power switch round it
-  spin(m, [[-128, 40, true], [-150, 40, true], [-154, 33, true]], "y", -140, 95, G, view, 0.8);
-  circle(m, "y", -222, 53, -129, 9, G, 0.5);
-  spin(m, [[-128, 45, true], [-135, 45, true], [-135, 36, true], [-153, 36, true]], "y", -272, 124, G, view, 0.8);
-  outline(m, "M -236 150 L -218 158 L -224 172 L -244 162 Z", -132, G, TOP, 0.5);
-  // on top, the other side: the photo / video switch
-  spin(m, [[-128, 30, true], [-144, 30, true], [-147, 24, true]], "y", 176, 120, G, view, 0.8);
-  outline(m, "M 196 84 L 214 92 L 208 104 L 192 98 Z", -134, G, TOP, 0.5);
-
-  // on the front: the ring the lens locks into, the lens release button beside it, and the little lamp by the grip
-  spin(m, [[0, 160, true], [-12, 154, true]], "z", LENS_X, LENS_Y, G, view, 0.8);
-  spin(m, [[0, 20, true], [-8, 20, true]], "z", 208, 8, G, view, 0.6);
-  circle(m, "z", -150, -92, -1, 9, G, 0.5);
-
-  // on the back: the flip-out screen...
-  prism(m, "M -166 -62 L 204 -62 L 204 187 L -166 187 Z", 185, SCREEN_Z, G, FRONT, 0.8);
-  const sx0 = SCREEN_X - SCREEN_W / 2, sx1 = SCREEN_X + SCREEN_W / 2, sy0 = SCREEN_Y - SCREEN_H / 2, sy1 = SCREEN_Y + SCREEN_H / 2;
-  outline(m, `M ${sx0} ${sy0} L ${sx1} ${sy0} L ${sx1} ${sy1} L ${sx0} ${sy1} Z`, SCREEN_Z, G);
-  outline(m, "M 212 -40 L 234 -40 L 234 165 L 212 165 Z", 186, G, FRONT, 0.35); // its hinge
-  // ...and the buttons: menu, AF-ON and the two above the thumb, info, the round pad, play and delete
-  for (const [bx, by, br] of [[178, -78, 13], [-265, -74, 16], [-316, -74, 10], [-320, -38, 10], [-205, 20, 14], [-239, 76, 36], [-239, 76, 14], [-205, 136, 11], [-269, 136, 11]] as const) {
-    circle(m, "z", bx, by, 186, br, G, 0.5);
-  }
-
-  // underneath: the tripod thread and the battery door under the grip
-  circle(m, "y", 0, 95, 185, 13, G, 0.5);
-  circle(m, "y", 0, 95, 185, 26, G, 0.35);
-  outline(m, "M -334 -58 Q -334 -74 -318 -74 L -214 -74 Q -198 -74 -198 -58 L -198 150 Q -198 166 -214 166 L -318 166 Q -334 166 -334 150 Z", 185, G, TOP, 0.4);
-  // on the sides: the strap loops, and the covers over the sockets
-  outline(m, "M 84 -116 L 108 -116 L 108 -92 L 84 -92 Z", 248, G, SIDE);
-  outline(m, "M 84 -116 L 108 -116 L 108 -92 L 84 -92 Z", -352, G, SIDE);
-  outline(m, "M 44 -52 Q 44 -64 56 -64 L 138 -64 Q 150 -64 150 -52 L 150 118 Q 150 130 138 130 L 56 130 Q 44 130 44 118 Z", 246, G, SIDE, 0.4);
-
-  // everything so far fades away as you zoom in on the lens
-  for (const l of m.lines) l.w *= body;
-  for (const f of m.faces) f.w = (f.w ?? 1) * body;
-
-  // ---- the lens (a 24-105mm f4 zoom, no writing on it) ----
-  const lensLines = m.lines.length, lensFaces = m.faces.length;
-  spin(m, [
-    [0, 128, true], [-22, 128, true], [-30, 150, true], [-48, 182, true], [-150, 184, true],
-    [-158, LENS_R, true], [-300, LENS_R, true], [-308, 184, true], [-325, 184, true], [-333, LENS_R, true],
-    [-440, LENS_R, true], [-448, 184, true], [-480, 184, true], [LENS_FRONT, 176, true],
-  ], "z", LENS_X, LENS_Y, G, view);
-  // the rubber grip on the zoom ring and the focus ring
-  for (let k = 0; k < 40; k++) {
-    const a = (k / 40) * Math.PI * 2;
-    for (const [z0, z1] of [[-164, -294], [-339, -398]]) {
-      m.lines.push({ pts: [around("z", LENS_X, LENS_Y, z0, LENS_R + 1, a), around("z", LENS_X, LENS_Y, z1, LENS_R + 1, a)], closed: false, col: G, w: 0.18 });
-    }
-  }
-  // the control ring at the front: a finer, criss-cross grip
-  circle(m, "z", LENS_X, LENS_Y, -406, LENS_R, G, 0.5);
-  for (let k = 0; k < 64; k++) {
-    const a = (k / 64) * Math.PI * 2, tw = Math.PI / 64;
-    for (const d of [tw, -tw]) {
-      m.lines.push({ pts: [around("z", LENS_X, LENS_Y, -410, LENS_R + 1, a - d), around("z", LENS_X, LENS_Y, -436, LENS_R + 1, a + d)], closed: false, col: G, w: 0.16 });
-    }
-  }
-  // the panel of switches on the side of the lens, near the body (it follows the curve of the barrel)
-  const onBarrel = (a0: number, a1: number, z0: number, z1: number, w: number) => {
-    const pts: V3[] = [];
-    for (let k = 0; k <= 6; k++) pts.push(around("z", LENS_X, LENS_Y, z0, 185, a0 + ((a1 - a0) * k) / 6));
-    for (let k = 6; k >= 0; k--) pts.push(around("z", LENS_X, LENS_Y, z1, 185, a0 + ((a1 - a0) * k) / 6));
-    m.lines.push({ pts, closed: true, col: G, w });
+// where a point on the model lands on the page in a pose (z = how far behind the turning point it is)
+function poseProjector(o: CameraPose) {
+  const cY = Math.cos(o.yaw), sY = Math.sin(o.yaw), cT = Math.cos(o.tilt), sT = Math.sin(o.tilt);
+  const cR = Math.cos(o.roll), sR = Math.sin(o.roll), s = o.scale, F = o.depth;
+  return (p: V3) => {
+    const X = p.x - o.px, Y = p.y - o.py, Z = p.z - o.pz;
+    const x1 = X * cY + Z * sY, z1 = -X * sY + Z * cY;
+    const y2 = Y * cT - z1 * sT, z2 = Y * sT + z1 * cT;
+    const k = F / (F + z2);
+    const a = x1 * s * k, b = y2 * s * k;
+    return { x: o.cx + a * cR - b * sR, y: o.cy + a * sR + b * cR, z: z2 };
   };
-  onBarrel(-0.42, 0.42, -62, -142, 0.5);
-  onBarrel(-0.3, -0.08, -84, -120, 0.4);
-  onBarrel(0.08, 0.3, -84, -120, 0.4);
-  // the glass: a domed front element, and more elements further in
-  spin(m, [[-466, 156, true], [-475, 134, true], [-481, 100, true], [-484, 52, false]], "z", LENS_X, LENS_Y, GL, view, 0.8);
-  circle(m, "z", LENS_X, LENS_Y, -472, 166, G, 0.6);
-  for (const [z, r] of [[-400, 146], [-150, 120], [-60, 104]] as const) circle(m, "z", LENS_X, LENS_Y, z, r, GL, 0.3);
-  // the lens fades away too, leaving only the blades
-  for (let i = lensLines; i < m.lines.length; i++) m.lines[i].w *= lens;
-  for (let i = lensFaces; i < m.faces.length; i++) m.faces[i].w = (m.faces[i].w ?? 1) * lens;
-  // the ring that holds the aperture blades
-  circle(m, "z", LENS_X, LENS_Y, IRIS_Z, IRIS_R, CAMERA_BLADES, 0.6);
-  circle(m, "z", LENS_X, LENS_Y, IRIS_Z + 8, IRIS_R + 6, CAMERA_BLADES, 0.35);
-  return m;
 }
 
-// One blade's edge, from corner b of the opening (coming from corner a) out to the housing of radius R.
-// It sets off along the side of the opening and keeps turning outwards, so it sweeps round in a curve.
-// BLADE_CURVE = how much it curves (0 = straight lines).
-const BLADE_CURVE = 1.1;
-function bladeEdge(a: { x: number; y: number }, b: { x: number; y: number }, R: number): { x: number; y: number }[] {
-  let dx = b.x - a.x, dy = b.y - a.y;
-  const dl = Math.hypot(dx, dy);
-  if (dl < 1e-6) { // opening shut to a point: set off sideways from the middle
-    const ang = Math.atan2(b.y, b.x) + Math.PI / 2;
-    dx = Math.cos(ang); dy = Math.sin(ang);
-  } else { dx /= dl; dy /= dl; }
-  const turn = Math.sign(dx * b.y - dy * b.x) || 1; // which way is outwards
-  const step = R / 60, k = (BLADE_CURVE / R) * step * turn;
-  const pts = [{ x: b.x, y: b.y }];
-  let x = b.x, y = b.y;
-  for (let n = 0; n < 400; n++) {
-    // turn a little towards pointing straight out, but never past it
-    const out = Math.atan2(y, x), head = Math.atan2(dy, dx);
-    let diff = out - head;
-    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-    const rot = Math.abs(diff) < Math.abs(k) ? diff : k;
-    const c = Math.cos(rot), s = Math.sin(rot);
-    [dx, dy] = [dx * c - dy * s, dx * s + dy * c];
-    const nx = x + dx * step, ny = y + dy * step;
-    if (Math.hypot(nx, ny) >= R) { // reached the housing: end exactly on it
-      const pb = x * dx + y * dy, t = -pb + Math.sqrt(Math.max(0, pb * pb - (x * x + y * y - R * R)));
-      pts.push({ x: x + dx * t, y: y + dy * t });
-      break;
-    }
-    x = nx; y = ny;
-    pts.push({ x, y });
-  }
-  return pts;
+// where the camera's back screen ends up on the page (its picture area)
+type ScreenBox = { x: number; y: number; w: number; h: number };
+function screenBoxFor(o: CameraPose): ScreenBox {
+  const proj = poseProjector(o);
+  const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => proj({ x: SCREEN_X + (a * SCREEN_W) / 2, y: SCREEN_Y + (b * SCREEN_H) / 2, z: SCREEN_Z }));
+  const xs = q.map((p) => p.x), ys = q.map((p) => p.y);
+  const x = Math.min(...xs), y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
 }
 
 // the dots on the camera's back screen: a grid over its picture (rows offset like brick), worked out once
@@ -1487,147 +453,921 @@ const CAMERA_SCREEN_DOTS: V3[] = (() => {
   return out;
 })();
 
-// where the camera's back screen ended up on the page (its picture area)
-type ScreenBox = { x: number; y: number; w: number; h: number };
+// ---- shape helpers ----
 
-// draw the model in a pose
-function drawCamera(ctx: CanvasRenderingContext2D, o: CameraPose): ScreenBox {
-  const cY = Math.cos(o.yaw), sY = Math.sin(o.yaw), cT = Math.cos(o.tilt), sT = Math.sin(o.tilt);
-  const cR = Math.cos(o.roll), sR = Math.sin(o.roll);
-  // which way you're looking, in the model's own directions
-  const view = { x: -sY * cT, y: sT, z: cY * cT };
-  const m = buildCamera(view, o.body, o.lens);
+// how a flat outline's (u, v) and its thickness (t) map onto the model:
+// "front" = drawn as seen from the front, thick front to back. "side" = drawn from the side (u = front to back),
+// thick left to right. "top" = drawn from above (v = front to back), thick top to bottom.
+type Basis = "front" | "side" | "top";
+const BASIS: Record<Basis, THREE.Matrix4> = {
+  front: new THREE.Matrix4(),
+  side: new THREE.Matrix4().set(0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1),
+  top: new THREE.Matrix4().set(1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1),
+};
 
-  const s = o.scale, F = o.depth;
-  const proj = (p: V3) => {
-    const X = p.x - o.px, Y = p.y - o.py, Z = p.z - o.pz;
-    const x1 = X * cY + Z * sY, z1 = -X * sY + Z * cY;
-    const y2 = Y * cT - z1 * sT, z2 = Y * sT + z1 * cT;
-    const k = F / (F + z2);
-    const a = x1 * s * k, b = y2 * s * k;
-    return { x: o.cx + a * cR - b * sR, y: o.cy + a * sR + b * cR, z: z2 };
-  };
-  const trace = (path: CanvasRenderingContext2D | Path2D, pts: V3[], closed: boolean) => {
-    pts.forEach((p, i) => { const q = proj(p); if (i) path.lineTo(q.x, q.y); else path.moveTo(q.x, q.y); });
-    if (closed) path.closePath();
-  };
-
-  ctx.save();
-  // everything adds light on top of what's under it, so overlapping see-through parts glow a little more
-  ctx.globalCompositeOperation = "lighter";
-
-  // the dots on the screen: faint ones, and the ones the pointer has lit up. Nearer ones are brighter, like the lines
-  if (o.dots && o.dots.show > 0.003) {
-    const D = CAMERA_SCREEN_DOTS, { lit, xy, show } = o.dots;
-    const LV = 4, faint = Array.from({ length: LV }, () => new Path2D()), glow = Array.from({ length: LV }, () => new Path2D());
-    for (let i = 0; i < D.length; i++) {
-      const d = D[i], q = proj(d);
-      xy[i * 2] = q.x;
-      xy[i * 2 + 1] = q.y;
-      const k = F / (F + q.z), size = Math.max(0.9, CAMERA_DOT_GAP * s * k * 0.26);
-      const near = clamp(0.5 - q.z / 900, 0, 1), lv = Math.min(LV - 1, Math.floor(near * LV));
-      const v = lit[i];
-      if (v > 0) {
-        const g = size * (1.2 + 0.6 * v);
-        glow[Math.min(LV - 1, Math.floor(v * LV))].rect(q.x - g / 2, q.y - g / 2, g, g);
-      } else faint[lv].rect(q.x - size / 2, q.y - size / 2, size, size);
-    }
-    faint.forEach((path, lv) => {
-      ctx.fillStyle = `rgba(${CAMERA_DOTS},${(CAMERA_DOT_FAINT * show * (0.35 + 0.65 * (lv + 0.5) / LV)).toFixed(3)})`;
-      ctx.fill(path);
-    });
-    glow.forEach((path, i) => {
-      ctx.fillStyle = `rgba(${CAMERA_DOTS_LIT},${((0.35 + 0.65 * ((i + 1) / LV)) * show).toFixed(3)})`;
-      ctx.fill(path);
-    });
+// turn every triangle to face the other way (needed after a shape is mirrored into place)
+function flipWinding(g: THREE.BufferGeometry) {
+  const idx = g.getIndex();
+  if (idx) {
+    const a = idx.array;
+    for (let i = 0; i < a.length; i += 3) { const t = a[i + 1]; a[i + 1] = a[i + 2]; a[i + 2] = t; }
+    idx.needsUpdate = true;
+  } else {
+    const n = g.getAttribute("position").count, a = new Uint32Array(n);
+    for (let i = 0; i < n; i += 3) { a[i] = i; a[i + 1] = i + 2; a[i + 2] = i + 1; }
+    g.setIndex(new THREE.BufferAttribute(a, 1));
   }
-
-  if (CAMERA_FILL > 0) {
-    for (const f of m.faces) {
-      const fw = f.w ?? 1;
-      if (fw < 0.01) continue;
-      ctx.fillStyle = `rgba(${f.col},${(CAMERA_FILL * fw).toFixed(4)})`;
-      ctx.beginPath();
-      trace(ctx, f.pts, true);
-      ctx.fill();
-    }
-  }
-
-  // lines are grouped by colour and by how near they are (nearer = brighter), then drawn in one go per group
-  const LEVELS = 5;
-  const groups = new Map<string, { col: string; a: number; path: Path2D }>();
-  for (const l of m.lines) {
-    if (l.w < 0.01) continue; // faded out
-    const q = l.pts.map(proj);
-    const n = l.closed ? q.length : q.length - 1;
-    for (let i = 0; i < n; i++) {
-      const a = q[i], b = q[(i + 1) % q.length];
-      const near = Math.min(1, Math.max(0, 0.5 - (a.z + b.z) / 2 / 900));
-      const lv = Math.min(LEVELS - 1, Math.floor(near * LEVELS));
-      const key = `${l.col}|${lv}|${l.w}`;
-      let g = groups.get(key);
-      if (!g) {
-        g = { col: l.col, a: (0.25 + 0.75 * (lv + 0.5) / LEVELS) * l.w, path: new Path2D() };
-        groups.set(key, g);
-      }
-      g.path.moveTo(a.x, a.y);
-      g.path.lineTo(b.x, b.y);
-    }
-  }
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  const glowLine = (path: Path2D, col: string, a: number, width = 1.1) => {
-    ctx.strokeStyle = `rgba(${col},${(a * 0.12).toFixed(3)})`; // soft glow
-    ctx.lineWidth = 4 * (width / 1.1);
-    ctx.stroke(path);
-    ctx.strokeStyle = `rgba(${col},${Math.min(1, a).toFixed(3)})`;
-    ctx.lineWidth = width;
-    ctx.stroke(path);
-  };
-  for (const g of groups.values()) glowLine(g.path, g.col, g.a);
-
-  // ---- the aperture blades. The opening is smaller the higher the f-number, and the blades
-  // turn a little as it closes, like a real lens. ----
-  if (o.iris > 0.01) {
-    const N = APERTURE_BLADES, R = IRIS_R;
-    const r = R * 0.94 * (1.8 / Math.max(1.8, o.fstop)); // the opening's size: nearly the whole ring wide open (f/1.8), halving every two stops
-    const rot = -0.25 + (1 - r / R) * 1.2;
-    const at = (x: number, y: number) => ({ x: LENS_X + x, y: LENS_Y + y, z: IRIS_Z });
-    const v = Array.from({ length: N }, (_, i) => {
-      const a = rot + (i / N) * Math.PI * 2;
-      return { x: r * Math.cos(a), y: r * Math.sin(a) };
-    });
-    // the blades: everything between the housing and the opening, lightly filled
-    const fill = new Path2D();
-    trace(fill, Array.from({ length: 72 }, (_, k) => at(R * Math.cos((k / 72) * Math.PI * 2), R * Math.sin((k / 72) * Math.PI * 2))), true);
-    trace(fill, v.map((p) => at(p.x, p.y)), true);
-    ctx.fillStyle = `rgba(${CAMERA_BLADES},${(0.08 * o.iris).toFixed(3)})`;
-    ctx.fill(fill, "evenodd");
-    // each blade's edge carries on from the corner of the opening and sweeps round in a smooth curve
-    // out to the housing, like the curved blades of a real lens
-    const edges = new Path2D();
-    for (let i = 0; i < N; i++) {
-      trace(edges, bladeEdge(v[i], v[(i + 1) % N], R).map((p) => at(p.x, p.y)), false);
-    }
-    glowLine(edges, CAMERA_BLADES, 0.75 * o.iris, 1);
-    // the edge of the opening
-    const hole = new Path2D();
-    trace(hole, v.map((p) => at(p.x, p.y)), true);
-    glowLine(hole, mixRgb(CAMERA_BLADES, CAMERA_LIT, 0.4 + 0.6 * o.lit), (0.7 + 0.3 * o.lit) * o.iris, 1.3);
-  }
-
-  ctx.restore();
-  // where the screen's corners landed
-  const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => proj({ x: SCREEN_X + (a * SCREEN_W) / 2, y: SCREEN_Y + (b * SCREEN_H) / 2, z: SCREEN_Z }));
-  const xs = q.map((p) => p.x), ys = q.map((p) => p.y);
-  const x = Math.min(...xs), y = Math.min(...ys);
-  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+function place<T extends THREE.BufferGeometry>(g: T, m: THREE.Matrix4): T {
+  g.applyMatrix4(m);
+  if (m.determinant() < 0) flipWinding(g);
+  return g;
 }
 
-// mix two "r,g,b" colours: t = 0 gives a, t = 1 gives b
-function mixRgb(a: string, b: string, t: number): string {
-  const x = a.split(",").map(Number), y = b.split(",").map(Number);
-  return x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(",");
+// an outline written like an SVG path ("M x y L x y Q ... C ... Z")
+function shapeOf(d: string): THREE.Shape {
+  const t = d.match(/[MLQCZ]|-?\d*\.?\d+(?:e-?\d+)?/g) || [];
+  const s = new THREE.Shape();
+  let i = 0, cmd = "";
+  const n = () => parseFloat(t[i++]);
+  while (i < t.length) {
+    if (/[MLQCZ]/.test(t[i])) cmd = t[i++];
+    if (cmd === "Z") { s.closePath(); break; }
+    if (cmd === "M") { s.moveTo(n(), n()); cmd = "L"; }
+    else if (cmd === "L") s.lineTo(n(), n());
+    else if (cmd === "Q") s.quadraticCurveTo(n(), n(), n(), n());
+    else if (cmd === "C") s.bezierCurveTo(n(), n(), n(), n(), n(), n());
+    else i++;
+  }
+  return s;
+}
+// a rectangle with rounded corners, as an outline
+const rr = (x0: number, y0: number, x1: number, y1: number, r: number) =>
+  `M ${x0 + r} ${y0} L ${x1 - r} ${y0} Q ${x1} ${y0} ${x1} ${y0 + r} L ${x1} ${y1 - r} Q ${x1} ${y1} ${x1 - r} ${y1} L ${x0 + r} ${y1} Q ${x0} ${y1} ${x0} ${y1 - r} L ${x0} ${y0 + r} Q ${x0} ${y0} ${x0 + r} ${y0} Z`;
+
+// a flat outline with a thickness, from t0 to t1. bevel = how rounded its edges are, holes = [x, y, radius] drilled through
+function extrude(d: string | THREE.Shape, t0: number, t1: number, basis: Basis = "front", bevel = 0, holes: [number, number, number][] = []) {
+  const shape = typeof d === "string" ? shapeOf(d) : d;
+  for (const [x, y, r] of holes) {
+    const h = new THREE.Path();
+    h.absarc(x, y, r, 0, Math.PI * 2, true);
+    shape.holes.push(h);
+  }
+  const b = Math.max(0, Math.min(bevel, (t1 - t0) / 2 - 0.05));
+  const g = new THREE.ExtrudeGeometry(shape, { depth: t1 - t0 - 2 * b, bevelEnabled: b > 0, bevelThickness: b, bevelSize: b, bevelOffset: -b, bevelSegments: 3, curveSegments: 8 });
+  g.translate(0, 0, t0 + b);
+  return place(g, BASIS[basis]);
+}
+
+function box(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number) {
+  const g = new THREE.BoxGeometry(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0));
+  g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  return g;
+}
+
+// a point on a circle around one of the three directions: axis "z" = the lens's direction, "y" = up and down, "x" = left to right.
+// (c1, c2) = the centre (x,y for "z"; x,z for "y"; y,z for "x"), t = how far along the axis
+type Axis = "x" | "y" | "z";
+function around(axis: Axis, c1: number, c2: number, t: number, r: number, a: number): V3 {
+  const p = c1 + r * Math.cos(a), q = c2 + r * Math.sin(a);
+  return axis === "z" ? { x: p, y: q, z: t } : axis === "y" ? { x: p, y: t, z: q } : { x: t, y: p, z: q };
+}
+
+// a round part: prof = [how far along the axis, radius] going round the outline of its cross-section (a closed loop)
+function lathe(prof: [number, number][], axis: Axis, c1: number, c2: number, segs = 72) {
+  let loop = prof.map(([t, r]) => new THREE.Vector2(Math.max(r, 0.001), t));
+  // go round the way that puts the outside on the outside
+  let area = 0;
+  loop.forEach((p, i) => { const q = loop[(i + 1) % loop.length]; area += p.x * q.y - q.x * p.y; });
+  if (area < 0) loop = loop.reverse();
+  loop.push(loop[0].clone());
+  // sharp corners stay sharp: a corner gets two points, so each side keeps its own shading
+  const pts: THREE.Vector2[] = [];
+  loop.forEach((q, i) => {
+    pts.push(q);
+    if (i === 0 || i === loop.length - 1) return;
+    const a = loop[i - 1], b = loop[i + 1];
+    const turn = Math.abs(Math.atan2((q.x - a.x) * (b.y - q.y) - (q.y - a.y) * (b.x - q.x), (q.x - a.x) * (b.x - q.x) + (q.y - a.y) * (b.y - q.y)));
+    if (turn > 0.45) pts.push(q.clone());
+  });
+  const g = new THREE.LatheGeometry(pts, segs);
+  const m = new THREE.Matrix4();
+  if (axis === "z") m.set(1, 0, 0, c1, 0, 0, 1, c2, 0, 1, 0, 0, 0, 0, 0, 1);
+  else if (axis === "y") m.set(1, 0, 0, c1, 0, 1, 0, 0, 0, 0, 1, c2, 0, 0, 0, 1);
+  else m.set(0, 1, 0, 0, 1, 0, 0, c1, 0, 0, 1, c2, 0, 0, 0, 1);
+  return place(g, m);
+}
+// a ring (or with r0 = 0, a solid cylinder) from t0 to t1 along the axis. chamfer = how much its outer edges are cut off
+function ring(r0: number, r1: number, t0: number, t1: number, axis: Axis, c1: number, c2: number, chamfer = 0, segs = 72) {
+  const c = Math.min(chamfer, Math.abs(t1 - t0) / 2, (r1 - r0) / 2);
+  const p: [number, number][] = c > 0
+    ? [[t0, r0], [t0, r1 - c], [t0 + Math.sign(t1 - t0) * c, r1], [t1 - Math.sign(t1 - t0) * c, r1], [t1, r1 - c], [t1, r0]]
+    : [[t0, r0], [t0, r1], [t1, r1], [t1, r0]];
+  return lathe(p, axis, c1, c2, segs);
+}
+const cyl = (r: number, t0: number, t1: number, axis: Axis, c1: number, c2: number, chamfer = 0, segs = 48) => ring(0, r, t0, t1, axis, c1, c2, chamfer, segs);
+
+// a surface made from a grid of points: f(u, v) gives the point (u and v go from 0 to 1). closeU = it joins up
+// with itself going round. It's made to face away from `inside`. flat = every little face is flat (for ridges)
+function surface(nu: number, nv: number, f: (u: number, v: number) => V3, closeU: boolean, inside: V3, flat = false) {
+  const cols = closeU ? nu : nu + 1, rows = nv + 1;
+  const pos = new Float32Array(cols * rows * 3), uv = new Float32Array(cols * rows * 2);
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < cols; i++) {
+      const p = f(i / nu, j / nv), k = j * cols + i;
+      pos[k * 3] = p.x; pos[k * 3 + 1] = p.y; pos[k * 3 + 2] = p.z;
+      uv[k * 2] = (i / nu) * 14; uv[k * 2 + 1] = (j / nv) * 18;
+    }
+  }
+  const idx: number[] = [];
+  let vote = 0;
+  const P = (k: number) => new THREE.Vector3(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]);
+  const mid = new THREE.Vector3(inside.x, inside.y, inside.z);
+  for (let j = 0; j < nv; j++) {
+    for (let i = 0; i < nu; i++) {
+      const a = j * cols + i, b = j * cols + ((i + 1) % cols), c = (j + 1) * cols + ((i + 1) % cols), d = (j + 1) * cols + i;
+      idx.push(a, b, c, a, c, d);
+      const A = P(a), n = P(b).sub(A).cross(P(c).sub(A));
+      vote += Math.sign(n.dot(A.sub(mid)));
+    }
+  }
+  let g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  if (vote < 0) flipWinding(g);
+  if (flat) g = g.toNonIndexed();
+  g.computeVertexNormals();
+  return g;
+}
+// a ridged ring, like the grip on a dial or a zoom ring: radius r at the top of the ridges, `depth` deep, from t0 to t1
+function ribbed(r: number, depth: number, teeth: number, t0: number, t1: number, axis: Axis, c1: number, c2: number) {
+  const nu = teeth * 4, at = [0.12, 0.3, 0.7, 0.88], rad = [r - depth, r, r, r - depth];
+  return surface(nu, 1, (u, v) => {
+    const i = Math.round(u * nu) % nu, tooth = Math.floor(i / 4), ph = i % 4;
+    return around(axis, c1, c2, t0 + (t1 - t0) * v, rad[ph], ((tooth + at[ph]) / teeth) * Math.PI * 2);
+  }, true, around(axis, c1, c2, (t0 + t1) / 2, 0, 0), true);
+}
+
+// a diamond-knurled ring (a grid of tiny pyramids, like the grip on a metal dial): n pyramids round it, `rows` along it
+function knurled(r: number, depth: number, n: number, rows: number, t0: number, t1: number, axis: Axis, c1: number, c2: number) {
+  const nu = n * 2, nv = rows * 2;
+  return surface(nu, nv, (u, v) => {
+    const i = Math.round(u * nu) % nu, j = Math.round(v * nv);
+    return around(axis, c1, c2, t0 + (t1 - t0) * v, r - ((i + j) % 2 ? depth : 0), (i / nu) * Math.PI * 2);
+  }, true, around(axis, c1, c2, (t0 + t1) / 2, 0, 0), true);
+}
+
+// a picture drawn on a little canvas, to stick onto the model (button labels, dial letters, the screen's dots)
+function drawnTexture(w: number, h: number, draw: (c: CanvasRenderingContext2D, w: number, h: number) => void) {
+  const cv = document.createElement("canvas");
+  cv.width = w;
+  cv.height = h;
+  const c = cv.getContext("2d");
+  if (c) draw(c, w, h);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+// white writing (each line in `lines` on its own row)
+const label = (lines: string[], size = 0) => drawnTexture(256, 256, (c, w, h) => {
+  const longest = Math.max(...lines.map((l) => l.length));
+  const px = size || Math.min(200 / lines.length, 330 / Math.max(1.6, longest));
+  c.fillStyle = "#e9e9e9";
+  c.font = `700 ${px}px Arial, Helvetica, sans-serif`;
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  lines.forEach((l, i) => c.fillText(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * px * 1.05));
+});
+// a flat picture stuck on the model at `at`, w wide and h tall. right / up = which way its right and its top point
+function decal(tex: THREE.Texture, w: number, h: number, at: V3, right: V3, up: V3) {
+  const g = new THREE.PlaneGeometry(w, h);
+  const r = new THREE.Vector3(right.x, right.y, right.z).normalize(), u = new THREE.Vector3(up.x, up.y, up.z).normalize();
+  g.applyMatrix4(new THREE.Matrix4().makeBasis(r, u, new THREE.Vector3().crossVectors(r, u)).setPosition(at.x, at.y, at.z));
+  return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+}
+
+// ---- what it's made of ----
+function cameraMaterials() {
+  const std = (color: number, roughness: number, metalness = 0, more: THREE.MeshStandardMaterialParameters = {}) =>
+    new THREE.MeshStandardMaterial({ color, roughness, metalness, ...more });
+  const glass = (color: number, opacity: number, more: THREE.MeshPhysicalMaterialParameters = {}) =>
+    new THREE.MeshPhysicalMaterial({ color, roughness: 0.04, metalness: 0, transparent: true, opacity, depthWrite: false, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6, ...more });
+  // a fine leather-like grain for the rubber on the grip
+  const grain = drawnTexture(128, 128, (c, w, h) => {
+    // pebbles like the leather-look rubber on the real camera: rounded bumps with dark creases between them
+    c.fillStyle = "#2c2c2c";
+    c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 150; i++) {
+      const x = Math.random() * w, y = Math.random() * h, r = 6 + Math.random() * 6;
+      // drawn again past each edge, so the pattern repeats without a seam
+      for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) {
+        const g = c.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+        g.addColorStop(0, "#e2e2e2");
+        g.addColorStop(0.7, "#b0b0b0");
+        g.addColorStop(1, "#3c3c3c");
+        c.fillStyle = g;
+        c.beginPath();
+        c.arc(x + ox, y + oy, r, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  });
+  grain.wrapS = grain.wrapT = THREE.RepeatWrapping;
+  grain.colorSpace = THREE.NoColorSpace;
+  return {
+    // the outside
+    body: std(0x171718, 0.6),                                   // the body's matt black plastic
+    gloss: std(0x0c0c0d, 0.3),                                  // buttons and dials
+    rubber: std(0x121213, 0.82, 0, { bumpMap: grain, bumpScale: 3 }), // the grip
+    rubberPlain: std(0x0f0f10, 0.92),                           // eyecup, thumb rest, covers
+    cage: std(0x1b1c1f, 0.46, 0.85),                            // the cage's dark metal
+    silver: std(0xc6c7cb, 0.28, 1),                             // the lens mount, the flash shoe
+    steel: std(0x9c9ea3, 0.36, 1),                              // screws
+    dimSilver: std(0x7d7f84, 0.35, 1),                          // the thin ring on the lens
+    barrel: std(0x131314, 0.48),                                // the lens's plastic
+    barrelSoft: std(0x161617, 0.7, 0, { side: THREE.DoubleSide }), // the hood
+    ribs: std(0x0d0d0e, 0.88),                                  // the rubber rings on the lens
+    black: std(0x030303, 1),                                    // inside the lens: nothing shines
+    red: std(0xc2221d, 0.4),                                    // the dot on the record button
+    lamp: std(0x3a0d0a, 0.15),                                  // the little lamp on the front
+    screenGlass: new THREE.MeshPhysicalMaterial({ color: 0x030304, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.05 }),
+    // glass
+    lensGlass: glass(0xcfe6f2, 0.3, { iridescence: 0.9, iridescenceIOR: 1.6 }),
+    filterGlass: glass(0xffffff, 0.1),
+    blade: std(0x26262b, 0.42, 0.85),                           // the aperture blades
+    // the insides
+    pcb: std(0x0e5a3c, 0.55),                                   // circuit boards
+    chip: std(0x18181b, 0.45),
+    chipTop: std(0x6c6f76, 0.35, 0.6),
+    can: std(0xb9bbc0, 0.42, 1),                                // metal covers, motors, sockets
+    gold: std(0xd9ab45, 0.3, 1),
+    copper: std(0xc0763a, 0.35, 1),
+    flex: std(0xd07e2c, 0.55),                                  // the orange ribbon cables
+    frame: std(0x3a3d44, 0.5, 0.6),
+    cell: std(0x2a2b30, 0.6),                                   // the rings that hold each piece of glass
+    ceramic: std(0xd2d2ca, 0.6),
+    sensor: new THREE.MeshPhysicalMaterial({ color: 0x1d3a4a, roughness: 0.12, metalness: 0.5, iridescence: 1, iridescenceIOR: 1.9, clearcoat: 1 }),
+    battery: std(0x2a2c31, 0.6),
+    paper: std(0x9da0a6, 0.7),                                  // labels
+    card: std(0x1e52b0, 0.5),
+    brass: std(0xb9953f, 0.35, 1),
+    conn: std(0xd8d2bf, 0.6),                                   // plastic plugs on the boards
+    oled: std(0x0b1020, 0.3, 0, { emissive: 0x7fb0ff, emissiveIntensity: 0.9 }), // the tiny screen inside the viewfinder
+  };
+}
+type CameraMaterials = ReturnType<typeof cameraMaterials>;
+
+// The kit the parts are built with: shell = something on the outside (it goes see-through in x-ray view),
+// inside = something inside (only seen in x-ray view), glass = lens glass and other parts that are always there,
+// mark = writing or a picture stuck on the outside
+type Kit = {
+  M: CameraMaterials;
+  shell: (g: THREE.BufferGeometry, m: THREE.Material, lines?: boolean) => THREE.Mesh;
+  inside: (g: THREE.BufferGeometry, m: THREE.Material) => THREE.Mesh;
+  glass: (g: THREE.BufferGeometry, m: THREE.Material) => THREE.Mesh;
+  mark: (mesh: THREE.Mesh) => void;
+};
+
+// ---- the body (a small full-frame mirrorless camera, no logos). Seen from the front, the grip is on the left,
+// the lens sits a little right of the middle, and the viewfinder hump is above the lens. ----
+function buildBody(k: Kit) {
+  const { M } = k;
+  // the main box, drawn from above and given its height
+  k.shell(extrude("M -350 0 L 216 0 Q 246 0 246 30 L 246 155 Q 246 185 216 185 L -320 185 Q -350 185 -350 155 Z", -128, 185, "top", 12), M.body);
+
+  // the grip: its outline from above at each height, top to bottom [how far down, how far it sticks out], smoothed.
+  // The top slopes forward (where the shutter button sits), then a dip for your middle finger, then it fills out
+  const gripPlan = (g: number) =>
+    shapeOf(`M -150 0 Q -182 0 -190 ${-0.35 * g} L -200 ${-0.72 * g} Q -207 ${-g} -246 ${-g} L -300 ${-g} Q -346 ${-g} -350 ${-0.5 * g} L -350 0`).getPoints(10);
+  const K: [number, number][] = [[-125, 8], [-120, 40], [-104, 88], [-62, 82], [30, 96], [150, 96], [176, 92], [184, 76]];
+  const spline = (a: number, b: number, c: number, d: number, t: number) => 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t * t * t);
+  const levels = 36, rings: V3[][] = [];
+  for (let j = 0; j <= levels; j++) {
+    const s = (j / levels) * (K.length - 1), i = Math.min(K.length - 2, Math.floor(s)), t = s - i;
+    const q = (n: number) => K[clamp(n, 0, K.length - 1)];
+    const y = spline(q(i - 1)[0], q(i)[0], q(i + 1)[0], q(i + 2)[0], t), g = spline(q(i - 1)[1], q(i)[1], q(i + 1)[1], q(i + 2)[1], t);
+    rings.push(gripPlan(g).map((p) => ({ x: p.x, y, z: p.y })));
+  }
+  // close it over at the top and the bottom
+  const capOf = (r: V3[]) => r.map(() => ({ x: r.reduce((s, p) => s + p.x, 0) / r.length, y: r[0].y, z: r.reduce((s, p) => s + p.z, 0) / r.length }));
+  rings.unshift(capOf(rings[0]));
+  rings.push(capOf(rings[rings.length - 1]));
+  const gn = rings[0].length - 1;
+  k.shell(surface(gn, rings.length - 1, (u, v) => rings[Math.round(v * (rings.length - 1))][Math.round(u * gn)], false, { x: -260, y: 30, z: -30 }), M.rubber, false);
+
+  // the viewfinder hump: it leans out a little over the lens mount, with the flash shoe on top
+  k.shell(extrude("M -92 -120 L -66 -184 Q -62 -192 -50 -192 L 62 -192 Q 74 -192 78 -184 L 104 -120 Z", -14, 185, "front", 7), M.body);
+  k.shell(box(-40, 52, -196, -191, 62, 180), M.silver);
+  for (const [a, b, c, d] of [[-40, -30, -207, -196], [42, 52, -207, -196], [-40, -22, -209, -205], [34, 52, -209, -205]]) k.shell(box(a, b, c, d, 62, 180), M.silver);
+  k.shell(box(-30, 42, -197.5, -195.5, 70, 176), M.gloss);
+  // the viewfinder eyecup on the back, and the window you look through
+  // a soft rubber rim, open in the middle...
+  const cup = shapeOf("M -70 -184 L 82 -184 Q 96 -184 98 -170 L 106 -72 Q 106 -52 86 -52 L -74 -52 Q -94 -52 -94 -72 L -86 -170 Q -84 -184 -70 -184 Z");
+  cup.holes.push(shapeOf(rr(-70, -168, 82, -68, 18)));
+  k.shell(extrude(cup, 178, 214, "front", 5), M.rubberPlain);
+  // ...and set back inside it: the floor, a raised frame, the wide window you look through, and the eye sensor beside it
+  k.shell(box(-74, 86, -172, -64, 178, 199), M.rubberPlain, false);
+  k.shell(extrude(rr(-60, -160, 72, -76, 12), 199, 205, "front", 2), M.body);
+  k.shell(extrude(rr(-14, -152, 64, -84, 9), 205, 206.6, "front", 0.6), M.screenGlass, false);
+  k.shell(extrude(rr(-52, -146, -24, -92, 7), 205, 206.4, "front", 0.6), M.black, false);
+
+  // the ring the lens locks into
+  k.shell(ring(150, 166, -9, 3, "z", LENS_X, LENS_Y, 2), M.body);
+  k.shell(ring(128, 150, -12, 0, "z", LENS_X, LENS_Y, 1), M.silver);
+  // on the front: the lens release button beside it, and the little lamp by the grip
+  k.shell(extrude(rr(186, -22, 218, 50, 13), -9, 2, "front", 3.5), M.gloss);
+  k.shell(cyl(9, -3, 2, "z", -136, -96, 1), M.lamp);
+
+  // on top, grip side: the shutter button on the slope of the grip, the main dial just behind it, and a small button
+  k.shell(cyl(24, -126, -108, "y", -282, -60, 2), M.body);
+  k.shell(cyl(16, -131, -125, "y", -282, -60, 2), M.gloss);
+  k.shell(ribbed(23, 1.8, 30, -16, 14, "z", -298, -122), M.gloss, false);
+  k.shell(cyl(22.5, -17.5, 15.5, "z", -298, -122, 1.5), M.gloss);
+  k.shell(cyl(7, -128, -116, "y", -258, -26, 1), M.gloss);
+  // the mode dial next to the hump, with its letters
+  k.shell(ribbed(40, 2.2, 44, -150, -126, "y", -140, 95), M.gloss, false);
+  k.shell(cyl(40, -153.5, -150, "y", -140, 95, 1.5), M.gloss);
+  k.mark(decal(drawnTexture(256, 256, (c, w, h) => {
+    const names = ["M", "Av", "Tv", "P", "Fv", "A+", "SCN", "C1", "C2", "B"];
+    c.fillStyle = "#e9e9e9";
+    c.font = "700 27px Arial, Helvetica, sans-serif";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    names.forEach((nm, i) => {
+      c.save();
+      c.translate(w / 2, h / 2);
+      c.rotate((i / names.length) * Math.PI * 2);
+      c.fillText(nm, 0, -86);
+      c.restore();
+    });
+  }), 74, 74, { x: -140, y: -153.9, z: 95 }, { x: -1, y: 0, z: 0 }, { x: 0, y: 0, z: -1 }));
+  // the record button with its red dot
+  k.shell(cyl(10, -131.5, -126, "y", -222, 53, 1.5), M.gloss);
+  k.shell(cyl(4.5, -132.4, -131, "y", -222, 53), M.red);
+  // the back dial with the power switch round it
+  k.shell(cyl(46, -134, -126, "y", -272, 124, 1.5), M.body);
+  k.shell(box(-234, -218, -134, -128, 140, 158), M.body);
+  k.shell(ribbed(37, 2, 40, -152, -134, "y", -272, 124), M.gloss, false);
+  k.shell(cyl(37, -155, -152, "y", -272, 124, 1.5), M.gloss);
+  // on top, the other side: the photo / video switch
+  k.shell(cyl(30, -141, -126, "y", 176, 120, 2), M.body);
+  k.shell(cyl(24, -146, -141, "y", 176, 120, 1.5), M.gloss);
+  k.shell(box(196, 214, -141, -133, 86, 100), M.body);
+
+  // on the back: the flip-out screen with its hinge...
+  k.shell(extrude(rr(-166, -60, 204, 183, 7), 183, 197, "front", 3), M.body);
+  k.shell(box(-160, 198, -55, 180, 196.4, 197.5), M.screenGlass);
+  k.shell(extrude(rr(206, -40, 232, 165, 5), 181, 196, "front", 3), M.body);
+  // ...the thumb rest, and the buttons with their labels
+  // (the rubber on the back has the same grain as the grip)
+  const grained = (g: THREE.BufferGeometry) => {
+    const uv = g.getAttribute("uv");
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.06, uv.getY(i) * 0.06);
+    return g;
+  };
+  // the big pad of grained rubber under your thumb: it starts beside the screen, steps round the top buttons,
+  // runs down the edge of the back and curves round the ring of buttons
+  k.shell(grained(extrude("M -185 -80 Q -185 -90 -195 -90 L -238 -90 Q -248 -90 -248 -80 L -246 -48 Q -244 -34 -268 -20 L -298 -4 Q -310 2 -326 2 L -326 162 Q -326 172 -316 172 L -306 172 Q -298 172 -296 160 L -291 112 Q -290 56 -252 32 L -200 6 Q -185 -4 -185 -20 Z", 183, 188, "front", 2.5)), M.rubber, false);
+  // the speaker holes beside the viewfinder
+  k.mark(decal(drawnTexture(128, 128, (c) => {
+    c.fillStyle = "#050505";
+    for (const [x, y] of [[64, 64], [64, 28], [64, 100], [28, 64], [100, 64], [40, 40], [88, 40], [40, 88], [88, 88]]) { c.beginPath(); c.arc(x, y, 8, 0, Math.PI * 2); c.fill(); }
+  }), 24, 24, { x: -116, y: -70, z: 185.3 }, { x: -1, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }));
+  const back = (tex: THREE.Texture, x: number, y: number, size: number) =>
+    k.mark(decal(tex, size, size, { x, y, z: 191.6 }, { x: -1, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }));
+  const icon = (draw: (c: CanvasRenderingContext2D) => void) => drawnTexture(128, 128, (c) => { c.fillStyle = c.strokeStyle = "#e9e9e9"; c.lineWidth = 9; draw(c); });
+  const buttons: [number, number, number, THREE.Texture][] = [
+    [178, -74, 16, label(["MENU"])],
+    [-270, -64, 17, label(["AF", "ON"])],
+    [-316, -64, 13, label(["*"], 230)],
+    [-320, -28, 12, icon((c) => { for (let i = 0; i < 9; i++) c.fillRect(22 + (i % 3) * 32, 22 + Math.floor(i / 3) * 32, 20, 20); })],
+    [-205, 24, 16, label(["INFO"])],
+    [-205, 142, 14, icon((c) => { c.fillStyle = c.strokeStyle = "#5aa8ee"; c.strokeRect(18, 26, 92, 76); c.beginPath(); c.moveTo(48, 42); c.lineTo(86, 64); c.lineTo(48, 86); c.closePath(); c.fill(); })],
+    [-266, 142, 14, icon((c) => { c.fillStyle = c.strokeStyle = "#5aa8ee"; c.strokeRect(38, 44, 52, 62); c.fillRect(28, 26, 72, 10); c.fillRect(52, 14, 24, 10); })],
+  ];
+  for (const [x, y, r, tex] of buttons) {
+    k.shell(cyl(r, 183, 191, "z", x, y, 2), M.gloss);
+    k.shell(ring(r, r + 3.5, 183, 188.6, "z", x, y, 1), M.body, false); // the raised rim round each button
+    back(tex, x, y, r * 1.55);
+  }
+  k.shell(ring(22, 40, 183, 189.5, "z", -239, 76, 2), M.gloss);
+  k.shell(ring(40, 43.5, 183, 188.6, "z", -239, 76, 1), M.body, false);
+  k.shell(cyl(17, 183, 191, "z", -239, 76, 2), M.gloss);
+  back(label(["Q", "SET"]), -239, 76, 21);
+  // the four ways the ring round it presses, and the magnifier under the top buttons
+  for (const [dx, dy] of [[0, -31], [0, 31], [-31, 0], [31, 0]]) k.shell(cyl(1.8, 189.5, 190.2, "z", -239 + dx, 76 + dy), M.conn, false);
+  k.mark(decal(icon((c) => { c.strokeStyle = "#5aa8ee"; c.lineWidth = 12; c.beginPath(); c.arc(52, 52, 26, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.moveTo(72, 72); c.lineTo(108, 108); c.stroke(); }),
+    13, 13, { x: -330, y: -9, z: 188.4 }, { x: -1, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }));
+
+  // small details: the red dot on the mount for lining a lens up, the white mark the mode dial turns to,
+  // the words by the power switch and the photo / video switch, and the textured rubber beside the mount
+  k.shell(cyl(3.5, -12.9, -12, "z", LENS_X, LENS_Y - 145), M.red, false);
+  k.shell(box(-93, -89, -129, -128, 91, 99), M.conn, false);
+  const onTop = (words: string[], x: number, z: number, size: number) =>
+    k.mark(decal(label(words), size, size, { x, y: -128.5, z }, { x: -1, y: 0, z: 0 }, { x: 0, y: 0, z: -1 }));
+  onTop(["ON"], -206, 132, 15);
+  onTop(["OFF"], -206, 166, 15);
+  onTop(["LOCK"], -206, 149, 15);
+  onTop(["PHOTO"], 222, 150, 20);
+  onTop(["VIDEO"], 222, 134, 20);
+  k.shell(box(174, 178, -146.6, -146, 100, 116), M.conn, false);
+  const panel = extrude(rr(172, -34, 240, 178, 12), -2.5, 0, "front", 1), panelUv = panel.getAttribute("uv");
+  for (let i = 0; i < panelUv.count; i++) panelUv.setXY(i, panelUv.getX(i) * 0.06, panelUv.getY(i) * 0.06); // the same size of grain as the grip
+  k.shell(panel, M.rubber, false);
+  // the name of the little button on top of the grip, lying on the slope beside it
+  k.mark(decal(label(["M-Fn"]), 22, 22, { x: -234, y: -124.4, z: -26 }, { x: -1, y: 0, z: 0 }, { x: 0, y: 5, z: -32 }));
+  // what each socket is, on the covers at the side
+  const onSide = (words: string[], y: number, z: number, size: number) =>
+    k.mark(decal(label(words), size, size, { x: 249.9, y, z }, { x: 0, y: 0, z: 1 }, { x: 0, y: -1, z: 0 }));
+  onSide(["MIC"], -27, 112, 26);
+  onSide(["HDMI"], 52, 112, 26);
+  onSide(["USB"], 100, 112, 26);
+
+  // underneath: the tripod thread and the battery door under the grip
+  k.shell(ring(11, 22, 183.5, 186.5, "y", 0, 95), M.steel);
+  k.shell(extrude(rr(-334, -76, -198, 168, 14), 184.5, 187.5, "top", 1), M.gloss);
+  k.shell(box(-290, -250, 187, 189.5, 120, 134), M.body);
+  // on the sides: the strap loops, and the covers over the sockets
+  k.shell(box(246, 254, -118, -94, 82, 106), M.silver);
+  k.shell(box(-358, -350, -118, -94, 82, 106), M.silver);
+  k.shell(extrude(rr(40, -64, 150, 10, 10), 245, 249.5, "side", 2), M.rubberPlain);
+  k.shell(extrude(rr(40, 22, 150, 128, 10), 245, 249.5, "side", 2), M.rubberPlain);
+}
+
+// ---- the cage round the body (dark metal, with rows of threaded holes, no logos). It's one frame that hugs the camera:
+// a base plate underneath, a strut up each side, and a top that steps over the viewfinder hump ----
+function buildCage(k: Kit) {
+  const C = k.M.cage;
+  // an outline with other outlines cut out of it (for slots and openings that aren't round)
+  const cut = (d: string, ...gaps: string[]) => {
+    const s = shapeOf(d);
+    for (const g of gaps) s.holes.push(shapeOf(g));
+    return s;
+  };
+
+  // the base plate, drawn from above: it reaches forward under the grip, has an opening for the battery door,
+  // and is scooped out in the middle so the lens clears it
+  k.shell(extrude(cut("M -358 -112 L -190 -112 L -150 -44 L -96 -44 Q -76 -44 -66 -20 Q -56 8 -30 8 L 30 8 Q 56 8 66 -20 Q 76 -44 96 -44 L 240 -44 Q 254 -44 254 -30 L 254 170 Q 254 182 242 182 L -358 182 Q -372 182 -372 168 L -372 -98 Q -372 -112 -358 -112 Z",
+    rr(-336, -82, -196, 170, 14)), 187, 205, "top", 3,
+    [[-150, -10, 6], [-110, -24, 6], [110, -24, 6], [150, -24, 6], [190, -24, 6], [-120, 164, 6], [-70, 164, 6], [60, 164, 6], [110, 164, 6], [160, 164, 6], [210, 164, 6]]), C);
+  // the lip that comes up in front of the bottom of the grip
+  k.shell(extrude("M -372 205 L -372 152 Q -372 142 -362 142 L -300 142 L -236 166 L -200 166 Q -190 166 -190 176 L -190 205 Z", -112, -99, "front", 3), C);
+  // the rail underneath for tripod clamps, and the quick-release plate
+  k.shell(extrude("M -31 205 L 168 205 L 180 223 L -43 223 Z", -150, 252, "side"), C);
+  k.shell(extrude(rr(-85, 10, 85, 180, 16), 223, 238, "top", 3), C);
+  k.shell(cyl(30, 238, 241, "y", 0, 95, 1), k.M.silver);
+  k.shell(box(-22, 22, 240.4, 241.6, 91, 99), k.M.gloss);
+
+  // the strut up the grip side, drawn from the side: a wall round the bottom of the grip, a thin bar up the back,
+  // then a wide block with holes that meets the top bar (it sits behind the strap loop)
+  k.shell(extrude("M 112 -202 L 176 -202 Q 184 -202 184 -194 L 184 -44 L 164 -8 L 164 128 L 184 162 L 184 205 L -112 205 L -112 152 Q -112 142 -102 142 L -64 142 L -30 170 L 112 170 L 136 128 L 136 -8 L 112 -44 Z",
+    -372, -352, "side", 3, [[148, -160, 8], [148, -120, 8], [148, -80, 8], [10, 188, 5.5], [60, 188, 5.5]]), C);
+
+  // the strut up the other side. Low down it's a block across the front corner of the body, set at an angle, with a row of holes...
+  const corner = extrude(rr(-25, 30, 27, 204, 9), 1, 17, "front", 2.5, [[1, 60, 9], [1, 96, 9], [1, 132, 9], [1, 168, 9]]);
+  const c45 = Math.SQRT1_2;
+  place(corner, new THREE.Matrix4().set(c45, 0, c45, 237.2, 0, 1, 0, 0, c45, 0, -c45, 8.8, 0, 0, 0, 1));
+  k.shell(corner, C);
+  // ...then it steps back and carries on up the side, with a slot for a strap and a round socket, to the top of the body
+  k.shell(extrude(cut("M 16 205 L 62 205 L 62 44 L 76 14 L 76 -132 Q 76 -146 62 -146 L 2 -146 L 2 -128 L 24 -108 L 30 -4 L 16 30 Z", rr(42, -130, 58, -98, 7)),
+    250, 268, "side", 3), C);
+  k.shell(ring(8, 15, 268, 271, "x", -56, 53, 1), k.M.steel);
+  k.shell(cyl(8, 268, 268.8, "x", -56, 53), k.M.black, false);
+
+  // the top, starting on that side: an arm along the front edge of the body, with a shoe on it for accessories...
+  k.shell(extrude("M 99 2 L 254 2 Q 268 2 268 16 L 268 44 L 99 44 Z", -146, -128, "top", 2.5, [[124, 23, 5.5], [150, 23, 5.5]]), C);
+  for (const [a, b, c, d] of [[182, 192, -157, -146], [230, 240, -157, -146], [182, 198, -159, -155.5], [224, 240, -159, -155.5]]) k.shell(box(a, b, c, d, 4, 42), C);
+  // ...which climbs the side of the viewfinder hump...
+  k.shell(extrude("M 102 -128 L 122 -128 L 96 -200 L 76 -200 Z", 2, 44, "front", 2), C);
+  // ...to the plate on top of the hump, in front of the flash shoe, with its holes, its screws, and the lip down its front
+  k.shell(extrude(rr(-78, -26, 96, 48, 8), -208, -194, "top", 2.5, [[-20, 0, 5], [6, 0, 5], [32, 0, 5], [-20, 26, 5], [6, 26, 5], [32, 26, 5]]), C);
+  for (const [x, z] of [[-58, -8], [76, -8], [-58, 32], [76, 32]]) k.shell(cyl(7, -210, -207, "y", x, z, 1), k.M.steel);
+  k.shell(extrude(rr(-86, -206, 104, -160, 6), -28, -14, "front", 2.5), C);
+  // from there an arm runs back over the dials to a bar above the grip side, which sits on top of the grip-side strut
+  k.shell(extrude("M -360 110 L -205 110 L -85 -4 L -68 -4 L -68 40 L -220 184 L -360 184 Q -372 184 -372 172 L -372 122 Q -372 110 -360 110 Z", -202, -182, "top", 3,
+    [[-336, 132, 6], [-336, 162, 6], [-296, 132, 6], [-296, 162, 6], [-256, 147, 6]]), C);
+}
+
+// one piece of lens glass: zf = where its front is, R = its radius, th = how thick in the middle,
+// k1 / k2 = how curved its front and back are (above 0 = the middle bulges towards the front of the lens)
+function lensElement(zf: number, R: number, k1: number, th: number, k2: number): [number, number][] {
+  const n = 10, p: [number, number][] = [];
+  for (let i = 0; i <= n; i++) { const r = (R * i) / n; p.push([zf + k1 * r * r, r]); }
+  for (let i = n; i >= 0; i--) { const r = (R * i) / n; p.push([zf + th + k2 * r * r, r]); }
+  return p;
+}
+// The glass inside the kit zoom: 8 pieces in 8 groups, front to back [front, radius, front curve, thickness, back curve].
+// The real lens's exact curves aren't published, so this is a sensible layout for a zoom like it, not a copy
+const LENS_GLASS: [number, number, number, number, number][] = [
+  [-405, 92, 0.0016, 8, 0.003],    // 1: the big front piece (thin in the middle)
+  [-352, 70, 0.0022, 34, -0.0018], // 2: fat in the middle
+  [-296, 52, -0.002, 7, 0.003],    // 3: thin in the middle
+  [-232, 46, 0.003, 24, -0.003],   // 4: just behind the aperture
+  [-186, 44, 0.001, 6, 0.004],     // 5: the piece that moves to steady the picture
+  [-150, 50, 0.0025, 22, -0.002],  // 6
+  [-100, 52, -0.0015, 6, 0.003],   // 7: the piece that moves to focus
+  [-44, 66, 0.0012, 22, -0.0006],  // 8: the back piece, nearest the sensor
+];
+const LENS_APERTURE_Z = -252;
+
+// ---- the lens (the 24-50mm kit zoom, pulled out ready to shoot, with its hood on backwards, a step-up ring and a wide filter stack; no writing but the zoom numbers) ----
+function buildLens(k: Kit) {
+  const { M } = k, X = LENS_X, Y = LENS_Y;
+  const L = (prof: [number, number][], m: THREE.Material, lines = true) => k.shell(lathe(prof, "z", X, Y), m, lines);
+  // the back of the barrel, widening from the mount, and a black wall so you can't see daylight through the lens
+  L([[-12, 128], [-12, 142], [-26, 156], [-112, 157], [-112, 128]], M.barrel);
+  k.shell(cyl(128, -15, -13, "z", X, Y), M.black, false);
+  // the zoom ring (ridged rubber), a thin metal ring, then the diamond-knurled control ring
+  L([[-112, 140], [-112, 156.8], [-196, 156.8], [-196, 140]], M.barrel, false);
+  k.shell(ribbed(160, 3, 90, -195, -113, "z", X, Y), M.ribs, false);
+  L([[-196, 140], [-196, 158.5], [-201, 158.5], [-201, 140]], M.dimSilver);
+  L([[-201, 140], [-201, 157], [-250, 157], [-250, 140]], M.barrel, false);
+  k.shell(knurled(160.2, 2.6, 96, 7, -249, -202, "z", X, Y), M.ribs, false);
+  L([[-250, 128], [-250, 157], [-256, 157], [-262, 150], [-262, 128]], M.barrel);
+  // the inner barrel that slides out a long way when the lens is ready to shoot, and its front with the ring round the glass
+  L([[-260, 118], [-260, 131], [-395, 131], [-395, 118]], M.barrel);
+  L([[-395, 118], [-395, 131], [-401, 142], [-417, 142], [-417, 130], [-411, 128], [-411, 96], [-403, 96], [-403, 118]], M.barrel);
+  // the switches on the side, near the body
+  k.shell(box(146, 158.5, Y - 60, Y + 50, -106, -42), M.barrel);
+  const lensSwitch = (y: number, words: string[]) => {
+    // the label, the slot the switch slides in, the switch itself, and the white line on it
+    k.mark(decal(label(words), 30, 30, { x: 158.9, y: y - 19, z: -74 }, { x: 0, y: 0, z: 1 }, { x: 0, y: -1, z: 0 }));
+    k.shell(box(158.5, 159.3, y - 3, y + 13, -92, -56), M.black, false);
+    k.shell(box(158.5, 162.5, y - 1, y + 11, -90, -70), M.gloss);
+    k.shell(box(162.5, 162.9, y, y + 10, -81, -79), M.conn, false);
+  };
+  lensSwitch(Y - 22, ["CONTROL", "AF | MF"]);
+  lensSwitch(Y + 32, ["STABILIZER", "ON | OFF"]);
+  // the zoom numbers along the top, read from behind the camera
+  const a0 = -0.62, a1 = 0.62, zr = -58, zf = -106, cols = 16;
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (let i = 0; i <= cols; i++) {
+    const a = a0 + ((a1 - a0) * i) / cols;
+    for (const [z, v] of [[zr, 0], [zf, 1]]) {
+      pos.push(X + 157.6 * Math.sin(a), Y - 157.6 * Math.cos(a), z);
+      uv.push(1 - i / cols, v);
+    }
+    if (i < cols) { const b = i * 2; idx.push(b, b + 1, b + 3, b, b + 3, b + 2); }
+  }
+  const band = new THREE.BufferGeometry();
+  band.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  band.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  band.setIndex(idx);
+  band.computeVertexNormals();
+  k.mark(new THREE.Mesh(band, new THREE.MeshBasicMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    map: drawnTexture(1024, 256, (c, w) => {
+      c.fillStyle = "#e9e9e9";
+      c.font = "600 84px Arial, Helvetica, sans-serif";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      ["24", "28", "35", "50"].forEach((n, i) => c.fillText(n, w * (0.2 + i * 0.2), 150));
+      c.fillRect(w / 2 - 4, 20, 8, 56);
+    }),
+  })));
+
+  // The hood, put on backwards (how it's stored): a short, nearly straight sleeve clipped to the very front of the
+  // lens and pointing back towards the body, standing clear of the inner barrel. Its two wide petals are on the
+  // sides; at the top and bottom a deep U is cut out, where you can see the inner barrel behind it.
+  L([[-417, 141], [-417, 158], [-401, 160], [-401, 141]], M.barrel);
+  k.shell(surface(144, 14, (u, v) => {
+    const a = u * Math.PI * 2, back = -272 - 66 * smooth(0.66, 0.985, Math.abs(Math.sin(a))), z = -409 + (back + 409) * v;
+    return around("z", X, Y, z, 160 + 12 * ((z + 409) / 137), a);
+  }, true, { x: X, y: Y, z: -340 }), M.barrelSoft, false);
+  // the step-up ring: screwed into the lens's own thread, it steps out to the size of the bigger filter
+  L([[-413, 126], [-417, 131], [-423, 186], [-431, 186], [-431, 178], [-425, 126]], M.cage);
+  // the stack on the front of it: a ring with square teeth, a diamond-knurled ring, then the filter itself
+  L([[-431, 178], [-431, 189], [-445, 189], [-445, 178]], M.barrel, false);
+  k.shell(ribbed(194, 5, 46, -444, -432, "z", X, Y), M.cage, false);
+  L([[-445, 178], [-445, 190.5], [-459, 190.5], [-459, 178]], M.barrel, false);
+  k.shell(knurled(193.6, 2.2, 120, 2, -458, -446, "z", X, Y), M.cage, false);
+  L([[-459, 181], [-459, 195], [-475, 195], [-477, 193], [-477, 181]], M.barrel);
+  k.shell(ribbed(196.2, 1.2, 150, -475, -467, "z", X, Y), M.ribs, false);
+  k.glass(cyl(182, -470, -468, "z", X, Y), M.filterGlass);
+
+  // the glass, and the aperture blades (you can see them down the barrel from the front)
+  for (const [z, R, k1, th, k2] of LENS_GLASS) k.glass(lathe(lensElement(z, R, k1, th, k2), "z", X, Y, 64), M.lensGlass);
+  const N = CAMERA_APERTURE_BLADES, open = 30, out = 60;
+  for (let i = 0; i < N; i++) {
+    const b0 = 0.3 + (i / N) * Math.PI * 2, b1 = 0.3 + ((i + 1) / N) * Math.PI * 2, s = new THREE.Shape();
+    s.moveTo(X + open * Math.cos(b0), Y + open * Math.sin(b0));
+    s.lineTo(X + open * Math.cos(b1), Y + open * Math.sin(b1));
+    for (let q = 0; q <= 8; q++) { const a = b1 + 0.4 - (q / 8) * 1.7; s.lineTo(X + out * Math.cos(a), Y + out * Math.sin(a)); }
+    s.closePath();
+    k.glass(extrude(s, LENS_APERTURE_Z + i * 0.9, LENS_APERTURE_Z + i * 0.9 + 0.8), M.blade);
+  }
+}
+
+// ---- inside the lens (seen in x-ray view) ----
+function buildLensInsides(k: Kit) {
+  const { M } = k, X = LENS_X, Y = LENS_Y;
+  // the ring that holds each piece of glass
+  for (const [z, R, k1, th, k2] of LENS_GLASS) {
+    const e0 = z + k1 * R * R, e1 = z + th + k2 * R * R;
+    k.inside(ring(R - 1, R + 7, Math.min(e0, e1) - 2, Math.max(e0, e1) + 2, "z", X, Y, 1.5, 64), M.cell);
+  }
+  // the aperture's housing and the little motor that turns it
+  k.inside(ring(60, 82, LENS_APERTURE_Z - 4, LENS_APERTURE_Z + 10, "z", X, Y, 2), M.frame);
+  k.inside(cyl(8, LENS_APERTURE_Z - 16, LENS_APERTURE_Z - 4, "z", X + 66, Y - 26), M.can);
+  // the image stabiliser round piece 5: a plate, two coils of copper wire and their magnets
+  const IS = LENS_GLASS[4][0];
+  k.inside(ring(52, 88, IS + 6, IS + 14, "z", X, Y, 1.5), M.frame);
+  for (const a of [-Math.PI / 4, (-3 * Math.PI) / 4]) {
+    const cx = X + 70 * Math.cos(a), cy = Y + 70 * Math.sin(a);
+    k.inside(box(cx - 14, cx + 14, cy - 14, cy + 14, IS - 3, IS + 6), M.copper);
+    k.inside(box(cx - 16, cx + 16, cy - 16, cy + 16, IS + 14, IS + 20), M.can);
+  }
+  // the focus motor: a small motor turning a screw, which slides piece 7 along two rods
+  const FOCUS = LENS_GLASS[6][0];
+  k.inside(cyl(10, -40, -16, "z", X - 68, Y + 68, 1), M.can);
+  k.inside(cyl(2.6, FOCUS - 30, -40, "z", X - 68, Y + 68), M.steel);
+  k.inside(box(X - 78, X - 58, Y + 58, Y + 78, FOCUS - 6, FOCUS + 6), M.chip);
+  k.inside(box(X - 62, X - 40, Y + 40, Y + 62, FOCUS - 3, FOCUS + 3), M.frame);
+  k.inside(cyl(2.4, FOCUS - 34, -18, "z", X + 74, Y + 48), M.steel);
+  k.inside(cyl(2.4, FOCUS - 34, -18, "z", X + 8, Y - 88), M.steel);
+  // the lens's own circuit board (a C-shaped ring near the mount), its chips, and the ribbon cable running forward
+  const arc = (r0: number, r1: number, from: number, to: number) => {
+    const s = new THREE.Shape();
+    s.absarc(X, Y, r1, from, to, false);
+    s.absarc(X, Y, r0, to, from, true);
+    s.closePath();
+    return s;
+  };
+  k.inside(extrude(arc(90, 124, (120 * Math.PI) / 180, (420 * Math.PI) / 180), -24, -21), M.pcb);
+  k.inside(box(X - 22, X + 22, Y - 120, Y - 96, -29, -24), M.chip);
+  k.inside(box(X + 70, X + 90, Y - 84, Y - 64, -27, -24), M.chip);
+  k.inside(box(X - 96, X - 78, Y - 70, Y - 52, -27, -24), M.chip);
+  k.inside(box(X - 106, X - 102, Y - 18, Y + 18, -250, -24), M.flex);
+  k.inside(box(146, 150, Y - 30, Y + 30, -100, -48), M.pcb);
+  // the gold pins that talk to the camera, at the bottom of the mount
+  k.inside(extrude(arc(106, 126, (55 * Math.PI) / 180, (125 * Math.PI) / 180), -20, -12), M.chip);
+  for (let i = 0; i < 12; i++) {
+    const a = ((62 + i * 5.1) * Math.PI) / 180;
+    k.inside(cyl(2.6, -12, -3, "z", X + 116 * Math.cos(a), Y + 116 * Math.sin(a), 0, 12), M.gold);
+  }
+}
+
+// ---- inside the body (seen in x-ray view) ----
+function buildBodyInsides(k: Kit) {
+  const { M } = k, Y = LENS_Y;
+  // behind the mount: the shutter (its frame, two of its blades part way down, and its motor)...
+  const frame = shapeOf(rr(-118, Y - 88, 118, Y + 88, 6));
+  frame.holes.push(new THREE.Path(shapeOf(rr(-83, Y - 56, 83, Y + 56, 2)).getPoints(4)));
+  k.inside(extrude(frame, 44, 56), M.chip);
+  k.inside(box(-83, 83, Y - 56, Y - 34, 47, 48.5), M.frame);
+  k.inside(box(-83, 83, Y - 38, Y - 20, 49.5, 51), M.frame);
+  k.inside(cyl(12, 44, 72, "z", 140, Y + 70, 1), M.can);
+  // ...then the full-frame sensor on its own board
+  k.inside(box(-81, 81, Y - 54, Y + 54, 71, 75), M.sensor);
+  k.inside(box(-96, 96, Y - 68, Y + 68, 75, 82), M.ceramic);
+  k.inside(extrude(rr(-125, Y - 92, 125, Y + 92, 6), 82, 86), M.pcb);
+  // the main board behind it, with the processor, memory and the rest (they face the back of the camera)
+  k.inside(extrude("M -140 -100 L 205 -100 L 215 -90 L 215 150 L 205 160 L -60 160 L -60 100 L -140 100 Z", 118, 122), M.pcb);
+  k.inside(box(30, 95, 5, 70, 122, 128), M.chip);
+  k.inside(box(38, 87, 13, 62, 128, 128.7), M.chipTop);
+  k.inside(box(115, 160, 0, 60, 122, 127), M.chip);
+  k.inside(box(40, 80, 95, 140, 122, 126.5), M.chip);
+  k.inside(box(-125, -45, -80, 10, 122, 131), M.can);
+  for (const [x, y, s] of [[-20, -70, 18], [20, -60, 14], [120, 90, 20], [165, 100, 14], [-30, 40, 16], [-110, 50, 22], [-20, 110, 16], [175, -40, 16], [100, -70, 24]]) {
+    k.inside(box(x - s / 2, x + s / 2, y - s / 2, y + s / 2, 122, 125.5), M.chip);
+  }
+  for (const y of [-88, -20, 60]) k.inside(box(176, 208, y, y + 14, 122, 129), M.conn);
+  for (let i = 0; i < 12; i++) k.inside(cyl(2.4, 122, 123, "z", 118 + (i % 4) * 11, 125 + Math.floor(i / 4) * 10, 0, 10), M.gold);
+  for (let i = 0; i < 14; i++) {
+    const x = -130 + ((i * 97) % 330), y = -90 + ((i * 61) % 240);
+    k.inside(box(x, x + 9, y, y + 5, 122, 125), i % 3 ? M.ceramic : M.brass);
+  }
+  // the battery in the grip, and the memory card beside it
+  k.inside(box(-334, -204, -30, 180, -60, -2), M.battery);
+  k.inside(box(-316, -222, 60, 130, -61.2, -60), M.paper);
+  k.inside(box(-300, -240, -34, -30, -44, -18), M.gold);
+  k.inside(box(-330, -222, 40, 176, 22, 31), M.card);
+  k.inside(box(-324, -228, 52, 120, 20.8, 22), M.paper);
+  k.inside(box(-334, -218, 30, 180, 31, 33), M.can);
+  // the electronic viewfinder in the hump: a tiny screen, and the glass you look at it through
+  k.inside(box(-18, 30, -137, -105, 96, 99), M.oled);
+  k.inside(box(-26, 38, -145, -97, 92, 96), M.pcb);
+  for (const [z, R, k1, th, k2] of [[112, 24, 0.008, 10, -0.008], [138, 26, 0.004, 8, 0.002], [160, 28, 0.006, 12, -0.004]]) {
+    k.glass(lathe(lensElement(z, R, k1, th, k2), "z", 6, -121, 40), M.lensGlass);
+    k.inside(ring(R, R + 4, z + 2, z + th - 2, "z", 6, -121, 1, 40), M.cell);
+  }
+  // under the top: the parts the dials and buttons turn or press, and the ribbon cables joining them up
+  k.inside(box(-170, -110, -122, -120, 60, 130), M.flex);
+  k.inside(cyl(14, -126, -110, "y", -140, 95), M.can);
+  k.inside(cyl(14, -126, -112, "y", -272, 124), M.can);
+  k.inside(box(-292, -272, -108, -96, -70, -50), M.can);
+  k.inside(cyl(8, -34, -18, "z", -298, -122), M.can);
+  k.inside(box(-20, 32, -191, -184, 100, 150), M.chip);
+  k.inside(box(-6, 18, -186, -100, 148, 150), M.flex);
+  k.inside(box(196, 212, 40, 90, 124, 182), M.flex);
+  // the metal thread for a tripod, and the sockets on the side (USB, HDMI, microphone, headphones) on their board
+  k.inside(cyl(17, 150, 185, "y", 0, 95, 1), M.brass);
+  k.inside(box(210, 214, -50, 125, 60, 130), M.pcb);
+  k.inside(box(214, 244, -34, -22, 80, 112), M.can);
+  k.inside(box(214, 244, 28, 42, 76, 114), M.can);
+  k.inside(cyl(8, 214, 244, "x", 78, 95), M.can);
+  k.inside(cyl(8, 214, 244, "x", 108, 95), M.can);
+}
+
+// everything that makes up the camera. To add another model later (a flash, say), write its function and add it here
+const CAMERA_PARTS: ((k: Kit) => void)[] = [buildBody, buildCage, buildLens, buildLensInsides, buildBodyInsides];
+
+// soft studio lighting for the camera to reflect: a pale room with a few bright panels, like softboxes
+function studioLight(renderer: THREE.WebGLRenderer) {
+  const s = new THREE.Scene();
+  const made: { geometry: THREE.BufferGeometry; material: THREE.Material }[] = [];
+  const add = (g: THREE.BufferGeometry, power: number, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: new THREE.Color(power, power, power), side: THREE.DoubleSide }));
+    m.position.set(x, y, z);
+    m.lookAt(0, 0, 0);
+    s.add(m);
+    made.push(m);
+  };
+  add(new THREE.BoxGeometry(24, 14, 24), 0.45);
+  add(new THREE.PlaneGeometry(9, 6), 11, -6, 5, 7);   // the main light: big, up and to the left, in front
+  add(new THREE.PlaneGeometry(3, 9), 5, 9, 1, 3);     // a tall strip to the right
+  add(new THREE.PlaneGeometry(10, 3), 4, 0, 6, -5);   // one behind, along the top
+  add(new THREE.PlaneGeometry(6, 2), 2.5, 0, -6, 4);  // a little bounce from below
+  const pm = new THREE.PMREMGenerator(renderer);
+  const tex = pm.fromScene(s, 0.04).texture;
+  pm.dispose();
+  made.forEach((m) => { m.geometry.dispose(); m.material.dispose(); });
+  return tex;
+}
+
+// Sets the camera up on a canvas. render = draw it in a pose. xray = how far into x-ray view it is (0 to 1).
+// paintDots = redraw the dots on its back screen.
+function makeCameraStage(canvas: HTMLCanvasElement) {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+  renderer.setClearColor(0x000000, 0);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  const scene = new THREE.Scene();
+  const env = studioLight(renderer);
+  scene.environment = env;
+  scene.environmentIntensity = 0.7;
+  const cam = new THREE.PerspectiveCamera(30, 1, 100, 10000);
+
+  // build the model
+  const root = new THREE.Group(), shell = new THREE.Group(), inside = new THREE.Group(), glass = new THREE.Group(), marks = new THREE.Group(), lines = new THREE.Group();
+  root.add(shell, inside, glass, marks, lines);
+  root.matrixAutoUpdate = false;
+  const M = cameraMaterials();
+  const solid = (into: THREE.Group, shadows: boolean) => (g: THREE.BufferGeometry, m: THREE.Material, edges = true) => {
+    const mesh = new THREE.Mesh(g, m);
+    mesh.castShadow = shadows;
+    mesh.receiveShadow = shadows;
+    mesh.userData.edges = edges;
+    into.add(mesh);
+    return mesh;
+  };
+  const kit: Kit = { M, shell: solid(shell, true), inside: solid(inside, true), glass: solid(glass, false), mark: (mesh) => { marks.add(mesh); } };
+  CAMERA_PARTS.forEach((part) => part(kit));
+  // aperture blades are solid metal, so they do take part in the shadows
+  glass.children.forEach((c) => { if ((c as THREE.Mesh).material === M.blade) c.castShadow = c.receiveShadow = true; });
+  inside.visible = false;
+  // the attachment points, as named (invisible) points on the model
+  for (const [name, at] of Object.entries(CAMERA_ANCHORS)) {
+    const o = new THREE.Object3D();
+    o.name = name;
+    o.position.set(at.x, at.y, at.z);
+    root.add(o);
+  }
+  scene.add(root);
+
+  // the back screen's dots: a picture that's redrawn as they light up
+  const DOT_PX = 3;
+  const dotCanvas = document.createElement("canvas");
+  dotCanvas.width = SCREEN_W * DOT_PX;
+  dotCanvas.height = SCREEN_H * DOT_PX;
+  const dotCtx = dotCanvas.getContext("2d");
+  const dotTex = new THREE.CanvasTexture(dotCanvas);
+  dotTex.colorSpace = THREE.SRGBColorSpace;
+  const dotMesh = decal(dotTex, SCREEN_W, SCREEN_H, { x: SCREEN_X, y: SCREEN_Y, z: SCREEN_Z - 0.2 }, { x: -1, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+  (dotMesh.material as THREE.MeshBasicMaterial).toneMapped = false;
+  root.add(dotMesh);
+
+  // lights: one main light that casts the shadows, and a soft one from the other side
+  const key = new THREE.DirectionalLight(0xffffff, 3.2);
+  key.position.set(-1100, 1500, 1700);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  const sc = key.shadow.camera;
+  sc.left = sc.bottom = -1000;
+  sc.right = sc.top = 1000;
+  sc.near = 400;
+  sc.far = 4800;
+  key.shadow.bias = -0.0004;
+  key.shadow.normalBias = 2.5;
+  const fill = new THREE.DirectionalLight(0xffffff, 1.1);
+  fill.position.set(1400, 300, 900);
+  const rim = new THREE.DirectionalLight(0xffffff, 1.1);
+  rim.position.set(900, 900, -1500);
+  scene.add(key, key.target, fill, rim);
+
+  // x-ray view: everything on the outside turns to a faint ghost with fine lines round its edges, and the insides show
+  const shellMats = Array.from(new Set(shell.children.map((c) => (c as THREE.Mesh).material as THREE.Material)));
+  const markMats = marks.children.map((c) => (c as THREE.Mesh).material as THREE.Material);
+  const lineMat = new THREE.LineBasicMaterial({ color: new THREE.Color(`rgb(${CAMERA_XRAY_LINES})`), transparent: true, opacity: 0, depthWrite: false });
+  const GLASS_DARK = new THREE.Color(0x0a0f14), GLASS_PALE = new THREE.Color(0xa9d6ee);
+  let xrayNow = -1, linesBuilt = false;
+  const setXray = (a: number) => {
+    if (a === xrayNow) return;
+    const ghost = a > 0.002, was = xrayNow > 0.002;
+    xrayNow = a;
+    if (ghost && !linesBuilt) {
+      linesBuilt = true;
+      shell.children.forEach((c) => {
+        const mesh = c as THREE.Mesh;
+        if (mesh.userData.edges) lines.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 28), lineMat));
+      });
+    }
+    for (const m of shellMats) {
+      m.opacity = 1 + (CAMERA_XRAY_GHOST - 1) * a;
+      m.depthWrite = a < 0.5;
+      if (ghost !== was || m.transparent !== ghost) { m.transparent = ghost; m.needsUpdate = true; }
+    }
+    shell.children.forEach((c) => { c.castShadow = a < 0.5; });
+    for (const m of markMats) m.opacity = 1 - a;
+    // lens glass: dark with coloured reflections when solid, pale blue so you can see each piece in x-ray
+    M.lensGlass.color.lerpColors(GLASS_DARK, GLASS_PALE, a);
+    M.lensGlass.opacity = 0.2 + 0.16 * a;
+    lineMat.opacity = 0.55 * a;
+    lines.visible = ghost;
+    inside.visible = ghost;
+  };
+  setXray(0);
+
+  let dotsKey = "";
+  const paintDots = (lit: Float32Array, show: number, version: number) => {
+    const k = `${version}|${show.toFixed(3)}|${xrayNow.toFixed(2)}`;
+    if (k === dotsKey || !dotCtx) return;
+    dotsKey = k;
+    const D = CAMERA_SCREEN_DOTS, a = show * (1 - Math.max(0, xrayNow));
+    dotCtx.clearRect(0, 0, dotCanvas.width, dotCanvas.height);
+    dotMesh.visible = a > 0.003;
+    if (!dotMesh.visible) return;
+    const x0 = SCREEN_X + SCREEN_W / 2, y0 = SCREEN_Y - SCREEN_H / 2, base = CAMERA_DOT_GAP * 0.3 * DOT_PX;
+    dotCtx.fillStyle = `rgba(${CAMERA_DOTS},${(CAMERA_DOT_FAINT * 2.2 * a).toFixed(3)})`;
+    for (let i = 0; i < D.length; i++) if (lit[i] <= 0) dotCtx.fillRect((x0 - D[i].x) * DOT_PX - base / 2, (D[i].y - y0) * DOT_PX - base / 2, base, base);
+    for (let i = 0; i < D.length; i++) {
+      const v = lit[i];
+      if (v <= 0) continue;
+      const g = base * (1.2 + 0.6 * v);
+      dotCtx.fillStyle = `rgba(${CAMERA_DOTS_LIT},${((0.35 + 0.65 * v) * a).toFixed(3)})`;
+      dotCtx.fillRect((x0 - D[i].x) * DOT_PX - g / 2, (D[i].y - y0) * DOT_PX - g / 2, g, g);
+    }
+    dotTex.needsUpdate = true;
+  };
+
+  let sizeKey = "";
+  const render = (o: CameraPose, w: number, h: number, dpr: number) => {
+    const sk = `${w}x${h}@${dpr}`;
+    if (sk !== sizeKey) {
+      sizeKey = sk;
+      renderer.setPixelRatio(dpr);
+      renderer.setSize(w, h, false);
+    }
+    // the same view as poseProjector, so the page's screen box lines up with the model's screen exactly
+    const cY = Math.cos(o.yaw), sY = Math.sin(o.yaw), cT = Math.cos(o.tilt), sT = Math.sin(o.tilt), cR = Math.cos(o.roll), sR = Math.sin(o.roll);
+    const r = [
+      [cY * cR - sY * sT * sR, -cT * sR, sY * cR + cY * sT * sR],
+      [-(cY * sR + sY * sT * cR), -cT * cR, -(sY * sR - cY * sT * cR)],
+      [sY * cT, -sT, -cY * cT],
+    ];
+    const t = r.map((row) => -(row[0] * o.px + row[1] * o.py + row[2] * o.pz));
+    root.matrix.set(r[0][0], r[0][1], r[0][2], t[0], r[1][0], r[1][1], r[1][2], t[1], r[2][0], r[2][1], r[2][2], t[2], 0, 0, 0, 1);
+    root.updateMatrixWorld(true);
+    const F = o.depth;
+    cam.position.set(0, 0, F);
+    cam.aspect = w / h;
+    cam.fov = (2 * Math.atan(h / (2 * o.scale * F)) * 180) / Math.PI;
+    cam.near = Math.max(50, F - 1700);
+    cam.far = F + 1700;
+    cam.setViewOffset(w, h, w / 2 - o.cx, h / 2 - o.cy, w, h);
+    cam.updateProjectionMatrix();
+    renderer.render(scene, cam);
+  };
+
+  const dispose = () => {
+    root.traverse((c) => {
+      const mesh = c as THREE.Mesh;
+      if (mesh.geometry) mesh.geometry.dispose();
+    });
+    [...Object.values(M), ...markMats, lineMat, dotMesh.material as THREE.Material].forEach((m) => {
+      const map = (m as THREE.MeshBasicMaterial).map;
+      if (map) map.dispose();
+      m.dispose();
+    });
+    M.rubber.bumpMap?.dispose();
+    env.dispose();
+    renderer.dispose();
+  };
+  return { render, setXray, paintDots, dispose };
 }
 
 /* ---------- Page ---------- */
@@ -1637,13 +1377,16 @@ export default function Home() {
   const camRef = useRef<HTMLElement>(null);
   const camCanvasRef = useRef<HTMLCanvasElement>(null);
   const camHintRef = useRef<HTMLDivElement>(null);
-  // the camera's screen: the box laid over it, the strip of pages that slides along, each page, the dots, the bar's words
+  // the camera's screen: the box laid over it, the strip of pages that slides along, each page, the dots
   const screenRef = useRef<HTMLDivElement>(null);
   const screenTrackRef = useRef<HTMLDivElement>(null);
   const screenPageEls = useRef<(HTMLDivElement | null)[]>([]);
   const screenDotEls = useRef<(HTMLButtonElement | null)[]>([]);
-  const screenLabelRef = useRef<HTMLSpanElement>(null);
   const goToPageRef = useRef<(i: number) => void>(() => {});
+  // x-ray view: the switch, whether it's on (for the page) and the same for the drawing loop
+  const xrayBtnRef = useRef<HTMLButtonElement>(null);
+  const xrayRef = useRef(false);
+  const [xray, setXray] = useState(false);
   // the visitor's real battery, for the bar along the top of the camera's screen: how full (0 to 1) and whether
   // it's charging. Only some browsers share this (Chrome, Edge, Opera, Chrome on Android); in the others
   // (Safari, every iPhone browser, Firefox) it stays null and the battery just shows full with no number.
@@ -1668,24 +1411,39 @@ export default function Home() {
     };
   }, []);
   // your photo albums, for the photos page on the screen (read from public/photos by app/api/albums/route.ts)
-  const [albums, setAlbums] = useState<{ id: string; title: string; description: string; cover: string; count: number }[]>([]);
+  const [albums, setAlbums] = useState<{ id: string; title: string; description: string; cover: string; count: number; taken: string }[]>([]);
   useEffect(() => {
     let gone = false;
     fetch("/api/albums").then((r) => (r.ok ? r.json() : [])).then((a) => { if (!gone) setAlbums(a); }).catch(() => {});
     return () => { gone = true; };
   }, []);
-  // the albums to show: the ones named in HOME_ALBUMS first, then any others, three in all
+  // the settings of the preview photo you're hovering on the photos page (shown in the bar along the top of the screen)
+  const [shotInfo, setShotInfo] = useState<string[] | null>(null);
+  const shotCache = useRef(new Map<string, string[]>());
+  const shotKey = useRef("");
+  const leaveShot = () => { shotKey.current = ""; setShotInfo(null); };
+  const hoverShot = (album: string, photo: string) => {
+    const key = `${album}/${photo}`;
+    shotKey.current = key;
+    const known = shotCache.current.get(key);
+    if (known) { setShotInfo(known); return; }
+    setShotInfo(null);
+    fetch(`/api/albums?album=${encodeURIComponent(album)}&photo=${encodeURIComponent(photo)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((x: { fstop: string; shutter: string; iso: string; focal: string } | null) => {
+        const parts = x ? [x.focal, x.fstop, x.shutter, x.iso].filter(Boolean) : [];
+        shotCache.current.set(key, parts);
+        if (shotKey.current === key) setShotInfo(parts); // only if you're still on that preview
+      })
+      .catch(() => {});
+  };
+
+  // the albums to show: any named in HOME_ALBUMS first, then the most recently shot, three in all (newest first)
+  const byNewest = [...albums].sort((a, b) => (b.taken || "").localeCompare(a.taken || ""));
   const featured = [
     ...HOME_ALBUMS.map((n) => albums.find((a) => a.id === n)).filter((a): a is (typeof albums)[number] => !!a),
-    ...albums.filter((a) => !HOME_ALBUMS.includes(a.id)),
+    ...byNewest.filter((a) => !HOME_ALBUMS.includes(a.id)),
   ].slice(0, 3);
-
-  // the concrete wall you break through when you first arrive (see WallIntro)
-  const [phase, setPhase] = useState<"wall" | "breaking" | "none">(() =>
-    typeof window === "undefined" || shouldPlayIntro() ? "wall" : "none",
-  );
-  const introOn = phase !== "none";
-
 
   // Lenis smooth scrolling (only on this page: it switches itself off when you leave)
   useEffect(() => {
@@ -1704,25 +1462,6 @@ export default function Home() {
     };
   }, []);
 
-  // once this page has been shown, clicking around the site (like the "wingwang" logo) never brings the wall back
-  useEffect(() => {
-    introSeen = true;
-  }, []);
-
-  // while the wall is up there is no scrolling
-  useEffect(() => {
-    if (!introOn) return;
-    window.scrollTo(0, 0);
-    lenisRef.current?.stop();
-    const html = document.documentElement;
-    const prev = html.style.overflow;
-    html.style.overflow = "hidden";
-    return () => {
-      html.style.overflow = prev;
-      lenisRef.current?.start();
-    };
-  }, [introOn]);
-
   // The camera. At the start you can drag it round to look at it from any side (it also leans a little towards
   // the mouse and sways gently). As you scroll, it turns round to show its back and zooms in on the screen there
   // (on phones held upright it also tips on its side, so the screen stands up tall). Then the screen's pages
@@ -1730,9 +1469,13 @@ export default function Home() {
   // swipe or drag them sideways, press the left and right arrow keys, or tap the dots.
   useEffect(() => {
     const box = camRef.current, cv = camCanvasRef.current, hint = camHintRef.current;
-    const scr = screenRef.current, track = screenTrackRef.current, label = screenLabelRef.current;
-    const c = cv?.getContext("2d");
-    if (!box || !cv || !c || !scr || !track) return;
+    const scr = screenRef.current, track = screenTrackRef.current;
+    const xrayBtn = xrayBtnRef.current;
+    if (!box || !cv || !scr || !track) return;
+    // the 3D camera (if the browser can't do 3D, the rest of the page still works without it)
+    let stage: ReturnType<typeof makeCameraStage> | null = null;
+    try { stage = makeCameraStage(cv); } catch { stage = null; }
+    let xr = 0; // how far into x-ray view it is (0 = solid, 1 = see-through)
     const T = CAMERA_TURN, n = SCREEN_PAGES.length;
     let raf = 0, last = performance.now(), ps = 0, w = 0, h = 0, dpr = 1, tv = 0, page = -1, boxKey = "";
     // the last pose drawn, and where the screen was: if nothing has moved since, the drawing is left as it is
@@ -1744,13 +1487,14 @@ export default function Home() {
     const dotJit = Float32Array.from(D, (_, i) => { const r = Math.sin(i * 127.1 + 311.7) * 43758.5453; return 0.7 + 0.5 * (r - Math.floor(r)); });
     // how much the screen on the back faces you (1 = straight at you, 0 = side on, below 0 = you're looking at the front),
     // from the last frame drawn. The dots only light up when you've turned the camera to see its side or back
-    let screenFacing = -1;
+    let screenFacing = -1, circled = false;
     let dotVer = 0, dotsAny = false, ptrX = -1e5, ptrY = -1e5, brushX = -1e5, brushY = -1e5;
     let mx = 0, my = 0, ex = 0, ey = 0;
     // turning the camera by hand: how far it's turned (ry = round, rx = up and down, in radians), how fast it's
     // still turning after you let go, and when the pointer last moved
     let spinning = false, lastX = 0, lastY = 0, ry = 0, rx = 0, vy = 0, vx = 0, movedAt = 0;
-    const START = 0.01; // you can turn it until you've scrolled this far (1 = the whole camera part)
+    let turnDir = 0; // which way round it turns to its screen (+1 / -1), fixed once the turn has started
+    const START = CAMERA_TURN * CAMERA_SPIN_UNTIL; // you can turn it until you've scrolled this far (1 = the whole camera part)
     // swiping the screen: where the swipe started, whether it's gone sideways yet, and how far the pages are pulled along
     let swipe: { id: number; x: number; y: number; on: boolean } | null = null, dragPx = 0, justSwiped = false;
     // a page you asked for (by swiping, the dots or the arrow keys) that the scrolling is on its way to (-1 = none)
@@ -1762,9 +1506,7 @@ export default function Home() {
       dpr = Math.min(CAMERA_SHARPNESS, window.devicePixelRatio || 1);
       w = r.width;
       h = r.height;
-      cv.width = Math.round(w * dpr);
-      cv.height = Math.round(h * dpr);
-      drawnKey = ""; // resizing clears the canvas, so draw again
+      drawnKey = ""; // draw again at the new size
     };
     // how far down the page to scroll to for screen page i (or part way into it)
     const scrollFor = (i: number) => {
@@ -1894,26 +1636,36 @@ export default function Home() {
       ey += (my - ey) * (1 - Math.exp(-dt * 3));
       const f = smooth(0, T, ps); // 0 = the whole camera from the front, 1 = zoomed in on its screen
 
-      // Turning it by hand: after you let go it carries on a little and slows down. As soon as you scroll,
-      // it lets go of the drag and settles back (the short way round) into the turn towards its screen.
+      // Turning it by hand: after you let go it carries on a little and slows down. Once you scroll, it stays where
+      // you left it, and the turn towards the screen starts from there (scroll back up and it's where you left it).
       if (ps >= START) {
         spinning = false;
         vy = vx = 0;
-        const back = 1 - Math.exp((-dt * 3) / Math.max(0.05, CAMERA_SPIN_BACK));
-        ry = Math.atan2(Math.sin(ry), Math.cos(ry));
-        ry -= ry * back;
-        rx -= rx * back;
       } else if (!spinning) {
         ry += vy * dt;
         rx = clamp(rx + vx * dt, -Math.PI / 2, Math.PI / 2);
         vy *= Math.exp(-dt * 3.5);
         vx *= Math.exp(-dt * 3.5);
       }
-      const held = 1 - smooth(0.02, 0.3, f); // however fast you scroll, your drag is gone early in the turn
+      ry = Math.atan2(Math.sin(ry), Math.cos(ry)); // keep it within one turn either way
+      // where the turn starts (how you left it) and ends (its back facing you), going whichever way round is shorter
+      const yaw0 = CAMERA_YAW * deg + ry, tilt0 = CAMERA_TILT * deg + rx;
+      // While you can still drag it, scrolling turns it half way round from wherever you've turned it (so you can spin it
+      // all the way round without it jumping). Past that point it stops following the pointer, and the rest of the scroll
+      // eases it round to face you with its screen, going whichever way is shorter.
+      const toBack = Math.PI - yaw0;
+      let shortest = Math.atan2(Math.sin(toBack), Math.cos(toBack));
+      if (f <= 0.001 || !turnDir) turnDir = shortest < 0 ? -1 : 1;
+      if (Math.abs(shortest - turnDir * Math.PI) > Math.PI) shortest += Math.sign(turnDir * Math.PI - shortest) * Math.PI * 2;
+      const turnBy = lerp(turnDir * Math.PI, shortest, smooth(smooth(0, T, START), 0.75, f));
 
       // Lighting up the dots: every dot near the line the pointer moved along since the last frame lights up
       // (so fast moves don't skip any). Once you scroll on towards the screen, they all fade away.
       const dotShow = 1 - smooth(0.12, 0.55, f);
+      // x-ray view fades in and out when you flip the switch
+      const xrGoal = xrayRef.current ? 1 : 0;
+      xr += (xrGoal - xr) * (1 - Math.exp(-dt * 7));
+      if (Math.abs(xrGoal - xr) < 0.004) xr = xrGoal;
       const cr = cv.getBoundingClientRect();
       const bx = ptrX - cr.left, by = ptrY - cr.top;
       if (dotShow > 0.6 && screenFacing > CAMERA_DOT_TURN && (bx !== brushX || by !== brushY)) {
@@ -1972,16 +1724,9 @@ export default function Home() {
         const z = smooth(tall ? 0.4 : 0.15, 1, f); // ...while pushing in on the screen (later on phones, so it doesn't spill off the sides while it's side on)
         const t = now / 1000;
         const wob = 1 - f; // it stops leaning and swaying as it turns, so the screen ends up perfectly still
-        const fade = smooth(0.3, 0.85, f); // the lens and blades fade back, so they don't show through the screen
         const pose: CameraPose = {
-          dots: { lit: dotLit, xy: dotXY, show: dotShow },
-          fstop: CAMERA_FSTOP,
-          lit: 0,
-          body: 1,
-          lens: 1 - 0.85 * fade,
-          iris: 0.4 * (1 - fade),
-          yaw: lerp(CAMERA_YAW * deg, Math.PI, turn) + (ex * CAMERA_MOUSE + Math.sin(t * 0.6) * 1.5) * wob * deg + ry * held,
-          tilt: lerp(CAMERA_TILT, 0, turn) * deg + (ey * CAMERA_MOUSE * 0.5 + Math.sin(t * 0.45)) * wob * deg + rx * held,
+          yaw: yaw0 + turnBy * turn + (ex * CAMERA_MOUSE + Math.sin(t * 0.6) * 1.5) * wob * deg,
+          tilt: lerp(tilt0, 0, turn) + (ey * CAMERA_MOUSE * 0.5 + Math.sin(t * 0.45)) * wob * deg,
           roll: tall ? (Math.PI / 2) * smooth(0.35, 1, f) : 0,
           cx: w / 2,
           cy: h / 2 + (tall ? 0 : 16 * z),
@@ -1995,13 +1740,23 @@ export default function Home() {
         // only draw when something has visibly moved (once zoomed in on the screen, the camera holds still)
         // (angles to a twentieth of a degree: the slow sway at the start then redraws only when it has moved enough to see)
         const key = [pose.yaw, pose.tilt, pose.roll].map((v) => v.toFixed(3)).join(",") + "|" +
-          [pose.lens, pose.iris, pose.scale, pose.px, pose.py, pose.pz, pose.depth].map((v) => v.toFixed(4)).join(",") +
-          `|${pose.cx.toFixed(1)},${pose.cy.toFixed(1)},${w},${h}|${dotShow.toFixed(3)},${dotVer}`;
+          [pose.scale, pose.px, pose.py, pose.pz, pose.depth].map((v) => v.toFixed(4)).join(",") +
+          `|${pose.cx.toFixed(1)},${pose.cy.toFixed(1)},${w},${h}|${dotShow.toFixed(3)},${dotVer},${xr.toFixed(3)}`;
         if (key !== drawnKey || !drawnBox) {
           drawnKey = key;
-          c.setTransform(dpr, 0, 0, dpr, 0, 0);
-          c.clearRect(0, 0, w, h);
-          drawnBox = drawCamera(c, pose);
+          drawnBox = screenBoxFor(pose);
+          // where each of the screen's dots is on the page, for the pointer to find them
+          const proj = poseProjector(pose);
+          for (let i = 0; i < D.length; i++) {
+            const q = proj(D[i]);
+            dotXY[i * 2] = q.x;
+            dotXY[i * 2 + 1] = q.y;
+          }
+          if (stage) {
+            stage.setXray(xr);
+            stage.paintDots(dotLit, dotShow, dotVer);
+            stage.render(pose, w, h, dpr);
+          }
         }
         sb = drawnBox;
       }
@@ -2036,12 +1791,24 @@ export default function Home() {
         screenDotEls.current.forEach((el, i) => {
           if (!el) return;
           el.setAttribute("aria-current", String(i === page));
-          el.style.background = i === page ? `rgb(${BLUE})` : "rgba(255,255,255,.25)";
+          el.style.background = i === page ? "rgb(255,255,255)" : "rgba(255,255,255,.25)";
           el.style.width = i === page ? "18px" : "6px";
         });
-        if (label) label.textContent = `${String(page + 1).padStart(2, "0")}/${String(n).padStart(2, "0")}  ${SCREEN_PAGES[page]}`;
+      }
+      // the marker circle on "who am i": drawn while that page is up on the screen, rubbed out when it isn't
+      const circleOn = on > 0.95 && page === 0 && Math.abs(tv) < 0.3;
+      if (circleOn !== circled) {
+        circled = circleOn;
+        scr.querySelectorAll(".marker").forEach((el) => el.classList.toggle("drawn", circleOn));
       }
       if (hint) hint.style.opacity = String(1 - smooth(0, 0.03, ps));
+      // the x-ray switch is there while you can see the whole camera, and goes as it zooms in on the screen
+      if (xrayBtn) {
+        const o = 1 - smooth(0.25, 0.5, f);
+        xrayBtn.style.opacity = String(o);
+        xrayBtn.style.pointerEvents = o > 0.5 ? "auto" : "none";
+        xrayBtn.style.visibility = o < 0.01 ? "hidden" : "visible";
+      }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -2059,6 +1826,7 @@ export default function Home() {
       scr.removeEventListener("pointerup", onScrUp);
       scr.removeEventListener("pointercancel", onScrUp);
       scr.removeEventListener("click", onScrClick, true);
+      stage?.dispose();
     };
   }, []);
 
@@ -2069,25 +1837,24 @@ export default function Home() {
   const scrPad: CSSProperties = { padding: "clamp(14px, 5cqmin, 48px)", paddingTop: "clamp(10px, 3cqmin, 28px)" };
 
   return (
-    <main className="relative text-white" style={{ background: `rgb(${PAGE_BLACK})` }}>
+    <main className="relative" style={{ background: `rgb(${PAGE_BG})`, color: `rgb(${PAGE_INK})` }}>
 
       {/* the page's main heading: screen readers and Google read it, it isn't shown */}
       <h1 className="sr-only">Ethan Wang: photography, and a bit about me</h1>
 
-      {/* the wall (only when you first arrive) */}
-      {introOn && <WallIntro onBreak={() => setPhase("breaking")} onDone={() => setPhase("none")} />}
-
-      {/* dot + trailing ring cursor (it shows on the wall too) */}
+      {/* dot + trailing ring cursor */}
       <Cursor />
 
-      <style>{INTRO_CSS + LENIS_CSS + CURSOR_CSS + CONTACT_CSS + BG_CSS + WALL_CSS}</style>
+      <style>{INTRO_CSS + LENIS_CSS + CURSOR_CSS + MARKER_CSS + CONTACT_CSS + BG_CSS}</style>
 
-      {/* The camera behind the wall. Scrolling through this tall block turns it round and zooms in on its back
+      {/* The camera. Scrolling through this tall block turns it round and zooms in on its back
           screen. Then the screen's pages slide past: who am i, photos, videos, projects and contact
           (edit ABOUT_TITLE, ABOUT_TEXT, ABOUT_PRO, ABOUT_PERSONAL, HOME_ALBUMS, HOME_VIDEO, HOME_PROJECTS and CONTACT_TEXT at the top). */}
       <section ref={camRef} className="relative -mt-16" style={{ height: CAMERA_HEIGHT }}>
         <div className="sticky top-0 z-10 h-dvh w-full overflow-hidden">
-          <canvas ref={camCanvasRef} role="img" aria-label="A see-through 3D camera. Drag to turn it." className="absolute inset-0 h-full w-full" style={{ touchAction: "pan-y" }} />
+          {/* your W logo in dots, behind the camera */}
+          <LogoDots />
+          <canvas key="camera-3d" ref={camCanvasRef} role="img" aria-label="A 3D model of my camera. Drag to turn it." className="absolute inset-0 h-full w-full" style={{ touchAction: "pan-y" }} />
 
           {/* the camera's back screen: laid exactly over the screen in the drawing once it's zoomed in */}
           <div
@@ -2095,21 +1862,20 @@ export default function Home() {
             role="region"
             aria-roledescription="carousel"
             aria-label="the camera's screen"
-            className="absolute flex select-none flex-col overflow-hidden rounded-[10px]"
+            className="absolute flex select-none flex-col overflow-hidden rounded-[2px] text-white"
             style={{
               left: 0, top: 0, width: 0, height: 0, opacity: 0, visibility: "hidden",
               containerType: "size", touchAction: "pan-y",
-              background: `linear-gradient(180deg, rgba(${BLUE},.07), rgba(${BLUE},.02)), rgb(${PAGE_BLACK})`,
-              boxShadow: `0 0 0 1px rgba(${BLUE},.6), 0 0 28px rgba(${BLUE},.22), inset 0 0 60px rgba(0,0,0,.6)`,
+              background: "#000",
             }}
           >
-            {/* the bar along the top, like a camera's screen: which page, and the settings */}
-            <div className="flex shrink-0 items-center justify-between font-mono text-neutral-400" style={{ ...scrSmall, padding: "clamp(8px, 2.4cqmin, 20px) clamp(14px, 5cqmin, 48px) 0" }}>
-              <span ref={screenLabelRef} className="whitespace-pre uppercase tracking-[0.2em]">01/05  who am i</span>
+            {/* the bar along the top, like a camera's screen: the battery, plus the settings of whichever album preview
+                you're hovering (focal length, f-number, shutter, ISO, read from that photo) */}
+            <div className="flex shrink-0 items-center justify-end font-mono text-neutral-400" style={{ ...scrSmall, padding: "clamp(8px, 2.4cqmin, 20px) clamp(14px, 5cqmin, 48px) 0" }}>
               <span className="flex items-center gap-[1.4em]">
-                <span className="hidden sm:inline">f/{CAMERA_FSTOP}</span>
-                <span className="hidden sm:inline">1/250</span>
-                <span>ISO 100</span>
+                <span className="flex items-center gap-[1.4em] transition-opacity duration-300" style={{ opacity: shotInfo && shotInfo.length ? 1 : 0 }} aria-hidden={!shotInfo?.length}>
+                  {(shotInfo || []).map((p, i) => <span key={i}>{p}</span>)}
+                </span>
                 {/* the visitor's battery: the percentage (if their browser shares it), and the icon filled to match.
                     It turns red at 20% or less, and shows a lightning bolt while charging */}
                 <span className="flex items-center gap-[0.5em]" aria-label={battery ? `battery ${Math.round(battery.level * 100)}%${battery.charging ? ", charging" : ""}` : undefined}>
@@ -2120,7 +1886,7 @@ export default function Home() {
                     <rect
                       x="2.5" y="2.5" height="7" rx="1"
                       width={(18 * clamp(battery ? battery.level : 1, 0.06, 1)).toFixed(2)}
-                      fill={battery && battery.level <= 0.2 && !battery.charging ? "rgb(255,95,95)" : `rgb(${BLUE})`}
+                      fill={battery && battery.level <= 0.2 && !battery.charging ? "rgb(255,95,95)" : "rgb(255,255,255)"}
                     />
                     {battery?.charging && <path d="M12.5 1.8 8.6 6.6h3l-1.2 3.6 4-4.9h-3z" fill="#fff" />}
                   </svg>
@@ -2135,25 +1901,48 @@ export default function Home() {
                 <div ref={(el) => { screenPageEls.current[0] = el; }} role="group" aria-roledescription="slide" aria-label={`1 of ${SCREEN_PAGES.length}: who am i`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
                   <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{ABOUT_TITLE}</h2>
                   <div className="mt-[0.6em] space-y-[0.3em] leading-snug text-neutral-300" style={scrText}>
-                    {ABOUT_TEXT.map((paragraph, i) => <p key={i}>{paragraph}</p>)}
+                    {ABOUT_TEXT.map((paragraph, i) => {
+                      // colour ABOUT_CIRCLE (the first time it comes up) blue and circle it in blue, like with a marker
+                      const at = ABOUT_CIRCLE ? paragraph.indexOf(ABOUT_CIRCLE) : -1;
+                      if (at < 0) return <p key={i}>{paragraph}</p>;
+                      return (
+                        <p key={i}>
+                          {paragraph.slice(0, at)}
+                          <span className="marker" style={{ color: `rgb(${MARKER_BLUE})` }}>
+                            {ABOUT_CIRCLE}
+                            {/* a loop drawn in one stroke that runs a little past where it started, like a real marker */}
+                            <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+                              <path
+                                d="M 22 7 C 48 -1, 90 1, 96 17 C 101 31, 66 39, 42 37.5 C 16 36, 1 28, 5 16 C 8 7, 28 2.5, 58 4.5"
+                                pathLength={1}
+                                fill="none"
+                                stroke={`rgb(${MARKER_BLUE})`}
+                                strokeWidth={2.4}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                vectorEffect="non-scaling-stroke"
+                              />
+                            </svg>
+                          </span>
+                          {paragraph.slice(at + ABOUT_CIRCLE.length)}
+                        </p>
+                      );
+                    })}
                   </div>
-                  {/* two columns: the professional side and the personal side */}
-                  <div className="mt-[1.4em] grid min-h-0 grid-cols-2 gap-x-[2em]" style={scrSmall}>
-                    {([[ABOUT_PRO_TITLE, ABOUT_PRO], [ABOUT_PERSONAL_TITLE, ABOUT_PERSONAL]] as const).map(([head, rows]) => (
-                      <div key={head} className="min-w-0">
-                        <h3 className="font-mono uppercase tracking-[0.2em]" style={{ color: `rgb(${BLUE})` }}>{head}</h3>
-                        <dl className="mt-[0.7em] space-y-[0.75em]">
-                          {rows.map((row, i) => (
-                            <div key={i}>
-                              <dt className="font-semibold text-white">{row.title}</dt>
-                              <dd className="mt-[0.1em] leading-snug text-neutral-400">{row.text}</dd>
-                            </div>
-                          ))}
-                        </dl>
-                      </div>
+                  {/* two columns (the professional side, then the personal side), spread out to fill the page */}
+                  <div className="grid min-h-0 flex-1 grid-cols-2 gap-x-[2em] py-[1.4em]" style={{ fontSize: "clamp(0.75rem, 2.5cqmin, 1.3rem)" }}>
+                    {[ABOUT_PRO, ABOUT_PERSONAL].map((rows, c) => (
+                      <dl key={c} className="flex min-w-0 flex-col justify-between gap-[0.8em]">
+                        {rows.map((row, i) => (
+                          <div key={i}>
+                            <dt className="font-semibold text-white">{row.title}</dt>
+                            <dd className="mt-[0.15em] leading-snug text-neutral-400">{row.text}</dd>
+                          </div>
+                        ))}
+                      </dl>
                     ))}
                   </div>
-                  <div className="mt-auto flex flex-wrap gap-3 pt-[1em]">
+                  <div className="flex flex-wrap gap-3">
                     <Link href="/resume" className="contact-btn" draggable={false}>Résumé<ArrowUpRight /></Link>
                   </div>
                 </div>
@@ -2162,13 +1951,29 @@ export default function Home() {
                 <div ref={(el) => { screenPageEls.current[1] = el; }} role="group" aria-roledescription="slide" aria-label={`2 of ${SCREEN_PAGES.length}: photos`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
                   <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>photos</h2>
                   <p className="mt-[0.5em] text-neutral-400" style={scrText}>
-                    {albums.length > 0 ? `${albums.length} albums so far. the latest three:` : "albums from my camera roll."}
+                    {albums.length > 0 ? `${albums.length} albums so far! the latest three:` : "albums from my camera roll."}
                   </p>
                   <div className="mt-[1em] grid min-h-0 flex-1 grid-cols-3 gap-[clamp(8px,2cqmin,20px)]">
                     {featured.map((a) => (
-                      <Link key={a.id} href={`/photos/${encodeURIComponent(a.id)}`} draggable={false} className="group relative block min-h-0 overflow-hidden rounded-lg bg-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-                        {a.cover && (
-                          <Image src={a.cover} alt={`${a.title}: album cover`} fill sizes="(min-width: 768px) 28vw, 30vw" draggable={false} className="object-cover transition duration-700 group-hover:scale-[1.04]" />
+                      <Link
+                        key={a.id}
+                        href={`/photos/${encodeURIComponent(a.id)}`}
+                        draggable={false}
+                        onMouseEnter={() => hoverShot(a.id, HOME_COVERS[a.id]?.photo ?? decodeURIComponent(a.cover.split("/").pop() || ""))}
+                        onMouseLeave={leaveShot}
+                        onFocus={() => hoverShot(a.id, HOME_COVERS[a.id]?.photo ?? decodeURIComponent(a.cover.split("/").pop() || ""))}
+                        onBlur={leaveShot}
+                        className="group relative block min-h-0 overflow-hidden rounded-[3px] bg-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+                        {(HOME_COVERS[a.id] || a.cover) && (
+                          <Image
+                            src={HOME_COVERS[a.id] ? `/photos/${encodeURIComponent(a.id)}/${encodeURIComponent(HOME_COVERS[a.id].photo)}` : a.cover}
+                            alt={`${a.title}: album cover`}
+                            fill
+                            sizes="(min-width: 768px) 28vw, 30vw"
+                            draggable={false}
+                            className="object-cover transition duration-700 group-hover:scale-[1.04]"
+                            style={{ objectPosition: HOME_COVERS[a.id]?.focus || "50% 50%" }}
+                          />
                         )}
                         <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-[0.7em] pb-[0.5em] pt-[2em] font-semibold" style={scrSmall}>{a.id}</span>
                       </Link>
@@ -2183,7 +1988,7 @@ export default function Home() {
                 <div ref={(el) => { screenPageEls.current[2] = el; }} role="group" aria-roledescription="slide" aria-label={`3 of ${SCREEN_PAGES.length}: videos`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
                   <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>videos</h2>
                   <p className="mt-[0.5em] text-neutral-400" style={scrText}>{HOME_VIDEO.caption}</p>
-                  <div className="relative mt-[1em] min-h-0 flex-1 overflow-hidden rounded-lg bg-neutral-900">
+                  <div className="relative mt-[1em] min-h-0 flex-1 overflow-hidden rounded-[3px] bg-neutral-900">
                     {HOME_VIDEO.src ? (
                       <video className="h-full w-full object-cover" src={HOME_VIDEO.src} poster={HOME_VIDEO.poster || undefined} controls playsInline preload="metadata" />
                     ) : (
@@ -2231,10 +2036,33 @@ export default function Home() {
 
                 {/* 5: contact */}
                 <div ref={(el) => { screenPageEls.current[4] = el; }} role="group" aria-roledescription="slide" aria-label={`5 of ${SCREEN_PAGES.length}: contact`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
-                  <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{CONTACT_TITLE}</h2>
-                  <p className="mt-[0.5em] text-neutral-400" style={scrText}>{CONTACT_TEXT}</p>
-                  <div className="mt-auto flex flex-wrap gap-3 pt-[1em]">
-                    <Link href="/contact" className="contact-btn" draggable={false}>Contact me<ArrowUpRight /></Link>
+                  {/* on computers: the title, words and button on the left, the details down the right.
+                      On phones it's all one column, with the button at the bottom */}
+                  <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_1fr_auto] md:grid-cols-[2fr_3fr] md:grid-rows-[1fr_auto] md:gap-x-[3em]">
+                    <div className="md:col-start-1 md:row-start-1">
+                      <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{CONTACT_TITLE}</h2>
+                      <p className="mt-[0.6em] leading-snug text-neutral-300" style={{ fontSize: "clamp(0.9rem, 3.2cqmin, 1.75rem)" }}>{CONTACT_TEXT}</p>
+                    </div>
+                    <dl className="my-[1.2em] flex min-h-0 flex-col justify-between divide-y divide-white/10 border-y border-white/10 md:col-start-2 md:row-span-2 md:row-start-1 md:my-0" style={{ fontSize: "clamp(0.75rem, 2.5cqmin, 1.3rem)" }}>
+                      {CONTACT_MORE.map((row, i) => (
+                        <div key={i} className="grid flex-1 grid-cols-[7.5em_1fr] items-center gap-x-[1em] py-[0.5em]">
+                          <dt className="font-semibold text-white">{row.title}</dt>
+                          <dd className="leading-snug text-neutral-400">
+                            {row.links
+                              ? row.links.map((l, j) => (
+                                  <span key={l.href}>
+                                    {j > 0 && ", "}
+                                    <a href={l.href} target="_blank" rel="noopener noreferrer" draggable={false} className="underline decoration-white/30 underline-offset-4 transition-colors hover:text-white hover:decoration-white">{l.label}</a>
+                                  </span>
+                                ))
+                              : row.text}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <div className="flex flex-wrap items-end gap-3 md:col-start-1 md:row-start-2">
+                      <Link href="/contact" className="contact-btn" draggable={false}>Contact me<ArrowUpRight /></Link>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2256,24 +2084,40 @@ export default function Home() {
             </div>
           </div>
 
-          <div ref={camHintRef} className="pointer-events-none absolute bottom-8 left-1/2 flex -translate-x-1/2 whitespace-nowrap flex-col items-center gap-3 text-xs uppercase tracking-[0.3em] text-neutral-400">
-            drag to turn / scroll
-            <span className="sc-hint block h-10 w-px bg-white/60" />
+          {/* the x-ray switch: see inside the body and the lens */}
+          <button
+            ref={xrayBtnRef}
+            type="button"
+            role="switch"
+            aria-checked={xray}
+            onClick={() => { xrayRef.current = !xrayRef.current; setXray(xrayRef.current); }}
+            className="absolute bottom-7 right-5 flex items-center gap-3 rounded-full px-3 py-2 text-sm font-light lowercase text-neutral-500 sm:right-[5%]"
+          >
+            x-ray
+            <span className="relative block h-5 w-9 rounded-full transition-colors duration-300" style={{ background: xray ? `rgb(${BLUE})` : "rgba(0,0,0,.18)" }}>
+              <span className="absolute left-0.5 top-0.5 block h-4 w-4 rounded-full bg-white shadow transition-transform duration-300" style={{ transform: xray ? "translateX(16px)" : "none" }} />
+            </span>
+          </button>
+
+          <div ref={camHintRef} className="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-sm font-light lowercase text-neutral-500">
+            drag to turn/scroll
           </div>
         </div>
       </section>
 
-      <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 px-6 pb-6 pt-2 text-xs text-neutral-500">
+      {/* plain one-line footer: grey monospace, lowercase, links with a faint underline */}
+      <footer className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 py-6 font-mono text-sm lowercase text-neutral-500">
+        <span>© 2026 ethan wang</span>
         {/* your resume page (app/resume/page.tsx) */}
-        <Link href="/resume" className="contact-btn">
-          Résumé
-          <ArrowUpRight />
-        </Link>
-        <Link href="/contact" className="contact-btn">
-          Contact me
-          <ArrowUpRight />
-        </Link>
-        <span>© 2026 Ethan Wang. All rights reserved.</span>
+        <Link href="/resume" className="border-b border-neutral-300 transition-colors hover:border-neutral-500 hover:text-neutral-800">résumé</Link>
+        <Link href="/contact" className="border-b border-neutral-300 transition-colors hover:border-neutral-500 hover:text-neutral-800">contact me</Link>
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="border-b border-neutral-300 lowercase transition-colors hover:border-neutral-500 hover:text-neutral-800"
+        >
+          back to top
+        </button>
       </footer>
     </main>
   );

@@ -23,6 +23,20 @@ const AUTO_SPEED = 0.1;
 // Shown in an empty slot (for example when one shelf has fewer folders than the other)
 const PLACEHOLDER = "more soon :)";
 
+// ---- choose each album's cover on this page ----
+// "photo" is the file name inside the album's folder, written exactly. "focus" is optional and picks which part
+// stays in view when the tile crops it: "50% 50%" is the middle, "50% 20%" keeps nearer the top, "30% 50%" more of the left.
+// Albums not listed use a photo named cover.jpg in their folder, or else the first photo.
+// (the small previews on the home page are set separately, with HOME_COVERS in app/page.tsx)
+const CAROUSEL_COVERS: Record<string, { photo: string; focus?: string }> = {
+  // "senior volleyball team '26-27": { photo: "1.JPG", focus: "50% 30%" },
+};
+const coverOf = (f: Folder) => {
+  const key = Object.keys(CAROUSEL_COVERS).find((k) => k.toLowerCase() === f.id.toLowerCase());
+  const c = key ? CAROUSEL_COVERS[key] : undefined;
+  return { src: c ? `/photos/${encodeURIComponent(f.id)}/${encodeURIComponent(c.photo)}` : f.cover, focus: c?.focus || "50% 50%" };
+};
+
 // ---- choose what goes on each shelf ----
 // Write each folder's name exactly like the folder in public/photos/ (capital letters don't matter when matching).
 // The order you list them in is the order they appear, left to right.
@@ -82,13 +96,13 @@ function Words({ text }: { text: string }) {
 const CSS = `
 .pc-tile {
   position: absolute; inset: 0; isolation: isolate; overflow: hidden; display: block; color: #fff;
-  border-radius: 22px; background: rgb(11,13,15);
+  border-radius: 22px; background: rgb(229,229,229);
   transition: transform .6s cubic-bezier(.22,1,.36,1), box-shadow .6s ease;
   animation: pc-in .9s cubic-bezier(.34,1.56,.64,1) backwards; animation-delay: var(--d, 0ms);
 }
 .pc-tile:hover, .pc-tile:focus-visible {
   transform: scale(1.015); outline: none;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.28), 0 26px 60px -24px rgba(0,0,0,.9);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.16), 0 26px 60px -24px rgba(0,0,0,.45);
 }
 .pc-tile:active { transform: scale(.99); transition-duration: .2s; }
 .pc-tile img { transition: transform 1.2s cubic-bezier(.22,1,.36,1); }
@@ -109,8 +123,8 @@ const CSS = `
 
 .pc-ph {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  border-radius: 22px; border: 1px dashed rgba(255,255,255,.16); background: rgba(255,255,255,.03);
-  color: rgba(255,255,255,.4); font-size: var(--bt, 1.1rem);
+  border-radius: 22px; border: 1px dashed rgba(0,0,0,.22); background: rgba(0,0,0,.03);
+  color: rgba(0,0,0,.5); font-size: var(--bt, 1.1rem);
 }
 
 @media (max-width: 639px) {
@@ -490,13 +504,14 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
           >
             <span ref={(el) => { imgs.current[sl.v] = el; }} className="absolute inset-0 block will-change-transform">
               <Image
-                src={f.cover}
+                src={coverOf(f).src}
                 alt=""
                 fill
                 draggable={false}
                 preload={sl.v === 0}
                 sizes={isTop ? "90vw" : "(min-width: 640px) 40vw, 62vw"}
                 className="object-cover"
+                style={{ objectPosition: coverOf(f).focus }}
               />
             </span>
             <span className={`pc-cap ${isTop ? "pc-cap-top" : ""}`}>
@@ -517,7 +532,7 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
       tabIndex={0}
       role="region"
       aria-label="Photo folders. Swipe, or use the left and right arrow keys."
-      className="pc-root relative mx-auto flex min-h-[calc(100dvh-4rem)] w-full select-none flex-col justify-center gap-6 overflow-x-clip bg-[#0b0d0f] py-6 outline-none"
+      className="pc-root relative mx-auto flex min-h-[calc(100dvh-4rem)] w-full select-none flex-col justify-center gap-6 overflow-x-clip bg-white py-6 outline-none"
     >
       <style>{CSS}</style>
 
@@ -526,7 +541,7 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
           <Words text={TITLE} />
         </h1>
-        <p className="pc-fade mt-1.5 text-sm text-neutral-400 sm:text-base">{INTRO}</p>
+        <p className="pc-fade mt-1.5 text-sm text-neutral-600 sm:text-base">{INTRO}</p>
       </header>
 
       {/* Two tracks on one stage: wide cards on top, smaller tiles below. Each page moves both. */}
@@ -546,7 +561,7 @@ export default function FolderCarousel({ folders }: { folders: Folder[] }) {
               aria-label={`Page ${g + 1}`}
               onClick={() => snapRef.current(g)}
               className={`h-2 rounded-full transition-all duration-500 ease-[cubic-bezier(.34,1.56,.64,1)] ${
-                g === active ? "w-7 bg-white" : "w-2 bg-white/30 hover:bg-white/60"
+                g === active ? "w-7 bg-black" : "w-2 bg-black/25 hover:bg-black/50"
               }`}
             />
           ))}
