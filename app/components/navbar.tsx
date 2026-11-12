@@ -82,11 +82,11 @@ export default function Navbar() {
   return (
     // h-16 is fixed so pages can size themselves with calc(100dvh - 4rem)
     <header className="sticky top-0 z-50 h-16 bg-transparent text-white mix-blend-difference">
-      {/* on phones it's two rows (the logo centred on top, the pages and icons underneath), since one row doesn't fit;
-          on bigger screens it's one row with the logo in the middle */}
-      <nav aria-label="Main" className="grid h-full grid-cols-2 content-center items-center gap-x-3 px-4 sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-8">
-        {/* left: the pages */}
-        <ul className="row-start-2 flex items-center gap-4 text-sm sm:col-start-1 sm:row-start-1 sm:gap-6 sm:text-base">
+      {/* one row. On phones: the logo on the left, then the pages and icons on the right.
+          On bigger screens: the pages on the left, the logo in the middle, the icons on the right */}
+      <nav aria-label="Main" className="grid h-full grid-cols-[auto_1fr_auto] items-center gap-x-3 px-4 sm:grid-cols-[1fr_auto_1fr] sm:px-8">
+        {/* the pages */}
+        <ul className="col-start-2 row-start-1 flex items-center justify-self-end gap-4 text-sm sm:col-start-1 sm:justify-self-start sm:gap-6 sm:text-base">
           {pageLinks.map((link) => {
             const active = pathname.startsWith(link.href);
             return (
@@ -99,17 +99,17 @@ export default function Navbar() {
           })}
         </ul>
 
-        {/* middle: the logo, which takes you home (Comic Sans, with fallbacks for devices that don't have it) */}
+        {/* the logo, which takes you home (Comic Sans, with fallbacks for devices that don't have it) */}
         <Link
           href="/"
-          className="col-span-2 row-start-1 justify-self-center text-lg font-bold leading-7 tracking-tight sm:col-span-1 sm:col-start-2 sm:text-xl"
+          className="col-start-1 row-start-1 justify-self-start text-lg font-bold tracking-tight sm:col-start-2 sm:justify-self-center sm:text-xl"
           style={{ fontFamily: '"Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive' }}
         >
           wingwang
         </Link>
 
-        {/* right: your profiles */}
-        <div className="row-start-2 flex items-center justify-end gap-1 sm:col-start-3 sm:row-start-1 sm:gap-3">
+        {/* your profiles */}
+        <div className="col-start-3 row-start-1 flex items-center justify-end gap-0.5 sm:gap-3">
           <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className={iconButton}>
             <InstagramIcon />
           </a>

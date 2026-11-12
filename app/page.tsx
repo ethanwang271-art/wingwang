@@ -25,14 +25,14 @@ const ABOUT_CIRCLE = "ethan";
 const ABOUT_PRO: { title: string; text: string }[] = [
   { title: "what i do", text: "currently a student, trying to make and do cool things" },
   { title: "what i shoot", text: "events, street and sports" },
-  { title: "tools", text: "canon r8, photos editied on lightroom classic" },
+  { title: "tools", text: "canon r8, photos edited on lightroom classic" },
   { title: "open to", text: "freelance shoots, collaborations, and job opportunities" },
 ];
 const ABOUT_PERSONAL: { title: string; text: string }[] = [
   { title: "where i'm from", text: "based in Toronto" },
   { title: "why photos", text: "photography has always been cool to me" },
   { title: "outside of photos", text: "i like to play games & hang out w my friends" },
-  { title: "currently into", text: "building my portfilio " },
+  { title: "currently into", text: "building my portfolio" },
   { title: "what's next", text: "trying to develop new projects" },
 ];
 
@@ -50,7 +50,7 @@ const HOME_COVERS: Record<string, { photo: string; focus?: string }> = {
 };
 // videos: the one video to feature. Put the file in public/videos/ and write its path, for example "/videos/reel.mp4".
 // Leave src "" to show a "coming soon" box. poster = an optional picture shown before it plays.
-const HOME_VIDEO = { title: "coming soon", caption: "to be annnounced", src: "", poster: "" };
+const HOME_VIDEO = { title: "coming soon", caption: "to be announced", src: "", poster: "" };
 // projects: a short list. Copy the example block (without the //) to add one, newest first.
 const HOME_PROJECTS: { date: string; title: string; text: string; href: string }[] = [
   { date: "nov '26", title: "mini robot desk assistant", text: "a unfinished small desk robot with a face & emotions, built around a pico 2 w, its my personal starting project in robotics. it currently is a work in progress and its in its development phase", href: "/projects/robot" },
@@ -442,13 +442,31 @@ function poseProjector(o: CameraPose) {
 }
 
 // where the camera's back screen ends up on the page (its picture area)
-type ScreenBox = { x: number; y: number; w: number; h: number };
+// where the camera's screen is on the page: the box round it, and its four corners as they appear
+// (top-left, top-right, bottom-right, bottom-left), so the pages can be laid exactly over it even while it's still turning
+type ScreenBox = { x: number; y: number; w: number; h: number; q: { x: number; y: number }[] };
 function screenBoxFor(o: CameraPose): ScreenBox {
   const proj = poseProjector(o);
   const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => proj({ x: SCREEN_X + (a * SCREEN_W) / 2, y: SCREEN_Y + (b * SCREEN_H) / 2, z: SCREEN_Z }));
   const xs = q.map((p) => p.x), ys = q.map((p) => p.y);
   const x = Math.min(...xs), y = Math.min(...ys);
-  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+  // name the corners by where they sit on the page (the camera may be on its side, as it is on phones)
+  const pick = (f: (p: { x: number; y: number }) => number) => q.reduce((m, p) => (f(p) < f(m) ? p : m));
+  const tl = pick((p) => p.x + p.y), br = pick((p) => -(p.x + p.y)), tr = pick((p) => p.y - p.x), bl = pick((p) => p.x - p.y);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y, q: [tl, tr, br, bl] };
+}
+
+// a css transform that stretches a w x h box onto four corners (top-left, top-right, bottom-right, bottom-left)
+function quadTransform(w: number, h: number, q: { x: number; y: number }[], ox: number, oy: number) {
+  const [p0, p1, p2, p3] = q.map((p) => ({ x: p.x - ox, y: p.y - oy }));
+  const dx1 = p1.x - p2.x, dx2 = p3.x - p2.x, dx3 = p0.x - p1.x + p2.x - p3.x;
+  const dy1 = p1.y - p2.y, dy2 = p3.y - p2.y, dy3 = p0.y - p1.y + p2.y - p3.y;
+  const den = dx1 * dy2 - dx2 * dy1;
+  if (Math.abs(den) < 1e-9) return "none";
+  const g = (dx3 * dy2 - dx2 * dy3) / den, k = (dx1 * dy3 - dx3 * dy1) / den;
+  const a = p1.x - p0.x + g * p1.x, b = p3.x - p0.x + k * p3.x, d = p1.y - p0.y + g * p1.y, e = p3.y - p0.y + k * p3.y;
+  const m = [a / w, d / w, 0, g / w, b / h, e / h, 0, k / h, 0, 0, 1, 0, p0.x, p0.y, 0, 1];
+  return `matrix3d(${m.map((v) => +v.toFixed(6)).join(",")})`;
 }
 
 // the dots on the camera's back screen: a grid over its picture (rows offset like brick), worked out once
@@ -1772,13 +1790,20 @@ export default function Home() {
         sb = drawnBox;
       }
       if (sb && on > 0.001) {
-        const key = `${Math.round(sb.x)},${Math.round(sb.y)},${Math.round(sb.w)},${Math.round(sb.h)}`;
+        // lay the pages over the screen's four corners. Once the screen sits square on (within half a pixel),
+        // drop the stretch so the writing stays perfectly sharp
+        const x = Math.round(sb.x), y = Math.round(sb.y), bw = Math.round(sb.w), bh = Math.round(sb.h);
+        const square = [[x, y], [x + bw, y], [x + bw, y + bh], [x, y + bh]].every(([cx, cy], i) => Math.abs(sb!.q[i].x - cx) < 0.5 && Math.abs(sb!.q[i].y - cy) < 0.5);
+        const tf = square ? "none" : quadTransform(bw, bh, sb.q, x, y);
+        const key = `${x},${y},${bw},${bh}|${tf}`;
         if (key !== boxKey) {
           boxKey = key;
-          scr.style.left = `${Math.round(sb.x)}px`;
-          scr.style.top = `${Math.round(sb.y)}px`;
-          scr.style.width = `${Math.round(sb.w)}px`;
-          scr.style.height = `${Math.round(sb.h)}px`;
+          scr.style.left = `${x}px`;
+          scr.style.top = `${y}px`;
+          scr.style.width = `${bw}px`;
+          scr.style.height = `${bh}px`;
+          scr.style.transformOrigin = "0 0";
+          scr.style.transform = tf;
         }
         scr.style.opacity = String(on);
         scr.style.visibility = "visible";
