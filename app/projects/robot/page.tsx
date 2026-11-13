@@ -92,7 +92,7 @@ export default function RobotPage() {
             <p>
               the model on the left is laid out in real millimetres. turn on x-ray and hover over a part to see what it is.
               press shake to see it get dizzy, or clock to see the time on its face. it&apos;s a little character with a big
-              head, a small body and two feet: about 100 mm wide (ears included), 66 mm deep and 120 mm tall, or 135 mm to the
+              head, a small body and two feet: about 100 mm wide (ears included), 66 mm deep and 116 mm tall, or 135 mm to the
               tip of its antenna.
             </p>
           </Section>
@@ -235,9 +235,9 @@ export default function RobotPage() {
             </p>
           </Section>
 
-          <Section title="future plans (v2) ">
+          <Section title="future plans (v2)">
             <p>
-              the next upgrade, turns version 1 into the head, and a new wheel system going under it. everything from version 1 carries
+              the next upgrade turns version 1 into the head, with a new wheeled base under it. everything from version 1 carries
               over. here are the new parts:
             </p>
             <ul className="list-disc space-y-2 pl-6">
@@ -256,7 +256,7 @@ export default function RobotPage() {
 
           <Section title="why a robot">
             <p>
-              i honestly want a cool thing to build and add to my projects, ive always enjoyed the concept of robot friends when i was younger, owning bb8 and cozmo really inspired me to start developing my very own robot!
+              i honestly want a cool thing to build and add to my projects, i&apos;ve always enjoyed the concept of robot friends when i was younger, owning bb-8 and cozmo really inspired me to start developing my very own robot!
             </p>
           </Section>
         </article>

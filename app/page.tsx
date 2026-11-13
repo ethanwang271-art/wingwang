@@ -108,22 +108,7 @@ const PAGE_INK = "17,17,17";      // r,g,b of the writing on it (near black)
 const MARKER_BLUE = "100,159,255"; // r,g,b of your name on "who am i" and the marker circle round it (the site blue)
 const BLUE = "100,159,255";       // r,g,b of the blue (taken from your new swatch, #649FFF). Used by the line, the glow, the button and the cursor
 
-/* ---------- Custom cursor ---------- */
-
-// ---- tweak these ----
-const CURSOR_DOT = 8;             // size of the dot in px
-const CURSOR_RING = 38;           // size of the ring in px
-const CURSOR_FOLLOW = 9;          // how quickly the ring catches up with the dot (lower = lazier, more delay)
-const CURSOR_HOVER_SCALE = 1.7;   // the ring grows this much over links and buttons (1 = never grows)
-
-
-// hide the normal arrow (only on devices with a real mouse); it comes back when you leave this page
-const CURSOR_CSS = `
-@media (hover: hover) and (pointer: fine) {
-  html, html * { cursor: none !important; }
-}
-.cursor-dot, .cursor-ring { transition: background-color .25s ease, border-color .25s ease, box-shadow .25s ease; }
-`;
+/* the custom cursor now lives in app/components/cursor.tsx, so every page has it */
 
 // the "Contact me" button: dark blue-tinted box, blue border, monospace text
 // the marker circle: drawn round its word over about a second, each time the "who am i" page comes up
@@ -266,93 +251,6 @@ function LogoDots() {
     };
   }, []);
   return <canvas ref={ref} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />;
-}
-
-function Cursor() {
-  const dotRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-    const dot = dotRef.current, ring = ringRef.current;
-    if (!dot || !ring) return;
-
-    let mx = -100, my = -100;   // the mouse (the dot sits exactly here)
-    let rx = -100, ry = -100;   // the ring, which drifts after it
-    let sc = 1, hover = false, down = false, seen = false;
-    let raf = 0, last = performance.now(), lastDot = "", lastRing = "";
-
-    const show = (on: boolean) => {
-      dot.style.opacity = on ? "1" : "0";
-      ring.style.opacity = on ? "1" : "0";
-    };
-
-    const onMove = (e: PointerEvent) => {
-      if (e.pointerType === "touch") return;
-      mx = e.clientX;
-      my = e.clientY;
-      if (!seen) {
-        seen = true;
-        rx = mx; ry = my; // appear in place instead of flying in from the corner
-        show(true);
-      }
-      const t = e.target as Element | null;
-      hover = !!t?.closest?.("a, button, [role='button'], input, textarea, select, label, summary");
-    };
-    const onLeave = () => { seen = false; show(false); };
-    const onDown = () => { down = true; };
-    const onUp = () => { down = false; };
-
-    const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-
-      // the ring eases towards the dot, so it lags while you move and settles when you stop
-      const k = 1 - Math.exp(-dt * CURSOR_FOLLOW);
-      rx += (mx - rx) * k;
-      ry += (my - ry) * k;
-      const want = (hover ? CURSOR_HOVER_SCALE : 1) * (down ? 0.8 : 1);
-      sc += (want - sc) * (1 - Math.exp(-dt * 14));
-
-      // only touch the page when the cursor has actually moved
-      const d = `translate3d(${mx}px,${my}px,0) translate(-50%,-50%)`;
-      const r = `translate3d(${rx.toFixed(1)}px,${ry.toFixed(1)}px,0) translate(-50%,-50%) scale(${sc.toFixed(3)})`;
-      if (d !== lastDot) { dot.style.transform = d; lastDot = d; }
-      if (r !== lastRing) { ring.style.transform = r; lastRing = r; }
-      raf = requestAnimationFrame(frame);
-    };
-    raf = requestAnimationFrame(frame);
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("pointerup", onUp);
-    document.documentElement.addEventListener("mouseleave", onLeave);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("pointerup", onUp);
-      document.documentElement.removeEventListener("mouseleave", onLeave);
-    };
-  }, []);
-
-  const base: CSSProperties = {
-    position: "fixed",
-    left: 0,
-    top: 0,
-    zIndex: 10001,
-    pointerEvents: "none",
-    borderRadius: "9999px",
-    opacity: 0,
-    willChange: "transform",
-    transition: "opacity .25s ease",
-  };
-  return (
-    <>
-      <div ref={ringRef} aria-hidden="true" className="cursor-ring" style={{ ...base, width: CURSOR_RING, height: CURSOR_RING, border: "1px solid rgba(255,255,255,.75)", mixBlendMode: "difference" }} />
-      <div ref={dotRef} aria-hidden="true" className="cursor-dot" style={{ ...base, width: CURSOR_DOT, height: CURSOR_DOT, background: `rgb(${BLUE})`, boxShadow: `0 0 10px rgba(${BLUE},.9)` }} />
-    </>
-  );
 }
 
 /* ---------- The camera ---------- */
@@ -1878,10 +1776,8 @@ export default function Home() {
       {/* the page's main heading: screen readers and Google read it, it isn't shown */}
       <h1 className="sr-only">Ethan Wang: photography, and a bit about me</h1>
 
-      {/* dot + trailing ring cursor */}
-      <Cursor />
 
-      <style>{INTRO_CSS + LENIS_CSS + CURSOR_CSS + MARKER_CSS + CONTACT_CSS + BG_CSS}</style>
+      <style>{INTRO_CSS + LENIS_CSS + MARKER_CSS + CONTACT_CSS + BG_CSS}</style>
 
       {/* The camera. Scrolling through this tall block turns it round and zooms in on its back
           screen. Then the screen's pages slide past: who am i, photos, videos, projects and contact

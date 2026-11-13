@@ -22,7 +22,7 @@ const IDLE_TITLE = "come back!! \u{1F622}";
 const pageLinks = [
   { href: "/photos", label: "photos" },
   // { href: "/videos", label: "videos" },
-  // { href: "/projects", label: "projects" },
+  { href: "/projects", label: "projects" },
   { href: "/contact", label: "contact" },
 ];
 
@@ -86,7 +86,7 @@ export default function Navbar() {
           On bigger screens: the pages on the left, the logo in the middle, the icons on the right */}
       <nav aria-label="Main" className="grid h-full grid-cols-[auto_1fr_auto] items-center gap-x-3 px-4 sm:grid-cols-[1fr_auto_1fr] sm:px-8">
         {/* the pages */}
-        <ul className="col-start-2 row-start-1 flex items-center justify-self-end gap-4 text-sm sm:col-start-1 sm:justify-self-start sm:gap-6 sm:text-base">
+        <ul className="col-start-2 row-start-1 flex items-center justify-self-end gap-3 text-sm sm:col-start-1 sm:justify-self-start sm:gap-6 sm:text-base">
           {pageLinks.map((link) => {
             const active = pathname.startsWith(link.href);
             return (

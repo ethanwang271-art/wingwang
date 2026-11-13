@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/navbar";
 import IrisTransition from "./components/iris";
+import Cursor from "./components/cursor";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -85,6 +86,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
         {/* the aperture that closes and opens when you go between photos, videos and projects */}
         <IrisTransition />
+        {/* the blue dot and ring cursor, on every page */}
+        <Cursor />
       </body>
     </html>
   );
