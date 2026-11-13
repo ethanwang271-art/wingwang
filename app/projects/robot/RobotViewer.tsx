@@ -64,6 +64,10 @@ const ARM = { r: 6.5, len: 16, x: BODY.hw + 4, y: 29, z: 2, tilt: 0.32 }; // cap
 const FOOT = { x: 18, y: 8, z: 18, sx: 13, sy: 8, sz: 19 };           // middle and half-sizes
 const CHEEK = { r: 4.2, x: 35, dy: -14 };                              // radius, distance from the middle, height from the face's middle
 const VISOR = { hw: 27, hh: 17, r: 13 };                               // the dark face panel: half width, half height, corner radius
+// the on/off rocker switch, in the back cover of the head: its hole (upright), its front, how far its body reaches in,
+// and the pocket round the hole on the inside where the cover is thinned to 2 mm so its snap clips can grip.
+// sizes are estimates until the real switch is measured
+const ROCKER = { x: 21, y: 107, holeW: 13, holeH: 19, frontW: 15, frontH: 21, proud: 2, z1: -9, thin: 2, pocket: 4 };
 // the collar: a short hollow ring on top of the body that pushes up into a hole in the head's floor. It's hidden inside the
 // floor's thickness, so from outside the head sits straight on the body. The wires run up through it
 const COLLAR = { r: 14, y0: BODY.y1, y1: HEAD.y0 + WALL };
@@ -194,6 +198,10 @@ function buildDims() {
   dim(v(-30, HEAD.y1 + 8, HEAD.z0), v(-30, HEAD.y1 + 8, HEAD.z0 + WALL), v(-30, HEAD.y1 - 3, HEAD.z0), v(-30, HEAD.y1 - 3, HEAD.z0 + WALL), WALL, BACK, true); // the wall: the back cover's thickness
   const ex = -W - 0.5, ez = EAR.z - EAR.r - 8;
   dim(v(ex, EAR.y - EAR.r, ez), v(ex, EAR.y + EAR.r, ez), v(ex, EAR.y - EAR.r, EAR.z), v(ex, EAR.y + EAR.r, EAR.z), EAR.r * 2, LEFT, true);          // the left ear, across
+  // the rocker switch's front, on the back of the head
+  const rz = HEAD.z0 - ROCKER.proud, rx0 = ROCKER.x - ROCKER.frontW / 2, rx1 = ROCKER.x + ROCKER.frontW / 2, ry0 = ROCKER.y - ROCKER.frontH / 2, ry1 = ROCKER.y + ROCKER.frontH / 2;
+  dim(v(rx0, ry0 - 6, rz), v(rx1, ry0 - 6, rz), v(rx0, ry0, rz), v(rx1, ry0, rz), ROCKER.frontW, BACK, true);
+  dim(v(rx1 + 6, ry0, rz), v(rx1 + 6, ry1, rz), v(rx1, ry0, rz), v(rx1, ry1, rz), ROCKER.frontH, BACK, true);
   // where the ears are, the face's height, and the antenna above the head
   const lx = -W - 0.5, ly = EAR.y + EAR.r + 8, fz = EAR.z + EAR.r + 9; // above the ear, and in front of it
   dim(v(lx, ly, EAR.z), v(lx, ly, HEAD.z1), v(lx, EAR.y + EAR.r, EAR.z), v(-HEAD.hw, HEAD.y1 - 4, HEAD.z1 - 6), HEAD.z1 - EAR.z, LEFT, true); // ear centre, back from the face
@@ -392,6 +400,20 @@ function buildRobot() {
   // 2 posts on the back cover reach forward to just behind the breadboard, so it can't slide back once the cover is on
   part("posts (printed with the back cover): 2 of them reach forward to just behind the breadboard, so it can't slide backwards", body,
     ...STANDOFF.ys.map((y) => bx(bl + STANDOFF.x - STANDOFF.hw, bl + STANDOFF.x + STANDOFF.hw, y - STANDOFF.hw, y + STANDOFF.hw, HEAD.z0 + WALL, BOARD.z0 - STANDOFF.gap, M.hub)));
+  // the on/off rocker switch, snapped into a hole in the back cover. its front is outside, its body reaches forward into the head
+  const rk = ROCKER, back = HEAD.z0, inner = HEAD.z0 + WALL;
+  const rockerO = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.8, 24), M.white);
+  rockerO.rotation.y = Math.PI;
+  rockerO.position.set(rk.x, rk.y - 4.5, back - rk.proud - 0.62);
+  part("on/off rocker switch: snaps into the back cover. it's in the battery's red wire, so i is on and o is off", body,
+    bx(rk.x - rk.frontW / 2, rk.x + rk.frontW / 2, rk.y - rk.frontH / 2, rk.y + rk.frontH / 2, back - rk.proud, back, M.chip),        // its front frame
+    bx(rk.x - rk.holeW / 2 + 1, rk.x + rk.holeW / 2 - 1, rk.y - rk.holeH / 2 + 1, rk.y + rk.holeH / 2 - 1, back - rk.proud - 0.6, back - rk.proud, M.boardBlack), // the rocker
+    bx(rk.x - 0.35, rk.x + 0.35, rk.y + 2.5, rk.y + 6.5, back - rk.proud - 0.62, back - rk.proud - 0.6, M.white), rockerO,            // "i" and "o"
+    bx(rk.x - rk.holeW / 2, rk.x + rk.holeW / 2, rk.y - rk.holeH / 2, rk.y + rk.holeH / 2, back, inner, M.chip), // through the hole
+    bx(rk.x - rk.holeW / 2 + 0.5, rk.x + rk.holeW / 2 - 0.5, rk.y - rk.holeH / 2 + 0.5, rk.y + rk.holeH / 2 - 0.5, inner, rk.z1 - 6, M.chip), // its body, then the clips
+    bx(rk.x - 4, rk.x - 1, rk.y - 3, rk.y + 3, rk.z1 - 6, rk.z1, M.redLine), bx(rk.x + 1, rk.x + 4, rk.y - 3, rk.y + 3, rk.z1 - 6, rk.z1, M.redLine)); // the clip connectors on its tabs
+  // the pocket where the cover is thinned to 2 mm round the hole (shown as lines in x-ray)
+  outline(bx(rk.x - rk.holeW / 2 - rk.pocket, rk.x + rk.holeW / 2 + rk.pocket, rk.y - rk.holeH / 2 - rk.pocket, rk.y + rk.holeH / 2 + rk.pocket, back + rk.thin, inner, M.chip));
   const pz = zHoles - 2.5; // the pico's board, standing off the breadboard on its header strips
   part("raspberry pi pico 2 w with header (51 x 21 mm): the brain, with wi-fi. its usb connector is flush with the left wall", body,
     bx(bl, bl + 51, yMid - 10, yMid - 7.5, pz, zHoles, M.chip),
@@ -419,13 +441,8 @@ function buildRobot() {
   const cells: THREE.Object3D[] = [];
   for (const z of [-12.2, 0, 12.2]) cells.push(cylX(5.25, -22.2, 22.2, 16, z, M.battery, 24), cylX(2, 22.2, 23.4, 16, z, M.gold, 12));
   part("3 aaa batteries (about 3.6 to 4.5 v)", body, ...cells);
-  part("battery holder (63.5 x 36.8 x 15.7 mm): sits loose in a pocket in the battery base, its switch facing down", body,
-    outline(asGhost(bx(-31.75, 31.75, 8.2, 23.9, -18.4, 18.4, M.holder))),
-    bx(-4, 4, 7.4, 8.2, -10, -2, M.chip));
-  // the on/off switch: the floor is thinned to 1.5 mm in a pocket under it, so its knob shows on the outside, between the feet
-  part("on/off switch: the battery holder's own switch. it pokes through a slot in a pocket under the body, so you flip it from outside", body,
-    bx(-1.5, 1.5, 3.6, 7.4, -8, -4, M.accent),
-    bx(-7, 7, BODY.y0 - 0.12, BODY.y0 - 0.02, -13, 1, M.chip));
+  part("battery holder (63.5 x 36.8 x 15.7 mm): sits loose in a pocket in the battery base. its own switch is just left on", body,
+    outline(asGhost(bx(-31.75, 31.75, 8.2, 23.9, -18.4, 18.4, M.holder))));
   part("shelf (printed with the upper body): the motion sensor screws onto it", body, bx(-BODY.hw + WALL, BODY.hw - WALL, 30, 31.5, -15, 4, M.hub));
   part("mpu6050 motion sensor (about 21 x 16 mm): feels being picked up and shaken. its wires go straight up through the collar into the head", body,
     bx(-10.5, 10.5, 31.5, 33, -14, 2, M.boardBlue), bx(-2, 2, 33, 33.9, -8, -4, M.chip),
@@ -707,7 +724,6 @@ const SPECS: { title: string; rows: [string, string][] }[] = [
     ["corners (seen from the side), radius", mm(BODY.round)], ["left and right edges, rounded", mm(Math.min(8, BODY.round * 0.45))],
     ["battery base height, upper body height", `${BODY.split - BODY.y0} mm, ${BODY.y1 - BODY.split} mm`],
     ["collar on top (hidden in the head's floor): diameter, height", `${COLLAR.r * 2} mm, ${COLLAR.y1 - COLLAR.y0} mm`],
-    ["switch pocket underneath: size, floor left", "14 x 14 mm, 1.5 mm"],
   ] },
   { title: "arms and feet", rows: [
     ["arms: diameter, total length, tilt outwards", `${ARM.r * 2} mm, ${ARM.len + ARM.r * 2} mm, ${Math.round((ARM.tilt * 180) / Math.PI)} degrees`],
@@ -720,6 +736,8 @@ const SPECS: { title: string; rows: [string, string][] }[] = [
     ["head tabs (on the back cover): width x height x depth", `${HEAD.hw - WALL - HEAD_TAB.x0} x ${HEAD_TAB.h} x ${Math.round((HEAD_TAB.z1 - HEAD_TAB.z0) * 10) / 10} mm`],
     ["body: 2 screws in the back of the battery base", `${Math.abs(BASE_TAB.xs[0]) * 2} mm apart, ${mm(BASE_TAB.y - BODY.y0)} up from the body's bottom`],
     ["body tabs (on the upper body): width x height x depth", `${BASE_TAB.hw * 2} x ${BASE_TAB.y1 - BASE_TAB.y0} x ${BASE_TAB.z1 - BASE_TAB.z0} mm`],
+    ["on/off rocker switch: hole in the back cover (width x height)", `${ROCKER.holeW} x ${ROCKER.holeH} mm, upright, centre ${mm(ROCKER.x)} right of the middle and ${mm(ROCKER.y - HEAD.y0)} up from the head's bottom`],
+    ["rocker switch: pocket round the hole on the inside", `${ROCKER.holeW + ROCKER.pocket * 2} x ${ROCKER.holeH + ROCKER.pocket * 2} mm, cover thinned to ${ROCKER.thin} mm`],
     ["countersink, for the screw heads", `${SCREW.head * 2} mm across, flush`],
     ["nut pockets", "7.3 mm across the flats, 3.5 mm deep, open on one side"],
   ] },

@@ -19,8 +19,9 @@ const PARTS: { name: string; does: string; size: string; price: number | null; q
   // (this link's address says 30cm, but the page it opens is pishop's "Male to Female Jumper Cable x 40 (20cm)". checked nov 2026)
   { name: "male to female jumper wires, 40 x 20 cm", does: "breadboard to each module", size: "", price: 2.95, qty: 1, shop: "pishop", url: "https://www.pishop.ca/product/diy-jumper-wires-for-raspberry-pi-30cm/" },
   { name: "male to male jumper wires, 40 x 20 cm", does: "battery plug to breadboard. also needed for the servos in version 2", size: "", price: 2.95, qty: 1, shop: "pishop", url: "https://www.pishop.ca/product/multicolored-40-pin-dupont-breadboard-jumper-wires-male-to-male-20cm/" },
-  { name: "3 x aaa battery holder with on/off switch", does: "power and the on/off switch in one", size: "63.5 x 36.8 x 15.7 mm", price: 2.95, qty: 1, shop: "pishop", url: "https://www.pishop.ca/product/3-x-aaa-battery-holder-with-on-off-switch-and-2-pin-jst/" },
+  { name: "3 x aaa battery holder with on/off switch", does: "holds the three aaa cells. its own switch is just left on", size: "63.5 x 36.8 x 15.7 mm", price: 2.95, qty: 1, shop: "pishop", url: "https://www.pishop.ca/product/3-x-aaa-battery-holder-with-on-off-switch-and-2-pin-jst/" },
   { name: "1n4001 diode, 10 pack", does: "stops usb power flowing back into the batteries", size: "", price: 2.45, qty: 1, shop: "pishop", url: "https://www.pishop.ca/product/1n4001-diode-10-pack/" },
+  { name: "mini rocker switch, kcd1, 2 pin on/off, pre-wired, 10 pack (daiertek)", does: "the on/off switch, in the back of the head. it goes in the battery's red wire. it uses 1, so 9 are spares", size: "about 21 x 15 mm", price: 11.99, qty: 1, shop: "amazon", url: "https://www.amazon.ca/dp/B07S2QJKTX" },
   { name: "mpu6050 motion sensor (gy-521), pre-soldered", does: "accelerometer and gyro: feels being picked up and shaken", size: "about 21 x 16 mm", price: 12, qty: 1, shop: "amazon", url: "https://www.amazon.ca/dp/B0BMY15TC4" },
   { name: "m4 x 16 mm flat head machine screws, 12 pack (paulin)", does: "hold the head's back cover and the battery base on. it uses 6, so half are spares", size: "m4-0.70 x 16 mm", price: 4.48, qty: 1, shop: "home depot", url: "https://www.homedepot.ca/product/paulin-flat-square-machine-screw-m4-70x16-12pcs/1001588003" },
   { name: "m4 hex nuts (paulin, din 934)", does: "one behind each screw, pushed into a hex pocket so it can't turn", size: "m4-0.70, 7 mm across", price: 0.19, qty: 6, shop: "home depot", url: "https://www.homedepot.ca/product/paulin-m4-0-70-class-8-metric-hex-nut-din-934-zinc-plated/1000128515" },
@@ -34,7 +35,7 @@ const WIRING: { pins: string; to: string }[] = [
   { pins: "gp15 (pin 20)", to: "buzzer s (signal)" },
   { pins: "3v3 out (pin 36)", to: "the breadboard's power rail, which feeds vcc on the oled and the mpu6050, and v on the buzzer" },
   { pins: "gnd (pin 38)", to: "the breadboard's ground rail, and the battery's black wire" },
-  { pins: "vsys (pin 39)", to: "the battery's red wire, through the 1n4001 diode (silver stripe towards the pico)" },
+  { pins: "vsys (pin 39)", to: "the battery's red wire, through the rocker switch and then the 1n4001 diode (silver stripe towards the pico)" },
 ];
 
 const PAGE_BG = "255,255,255"; // the page's background (white)
@@ -141,13 +142,18 @@ export default function RobotPage() {
 
           <Section title="power">
             <p>
-              three aaa batteries in a holder with its own on/off switch, or usb. the pico takes anything from 1.8 to 5.5 v
+              three aaa batteries in a holder, or usb. the pico takes anything from 1.8 to 5.5 v
               on its vsys pin and makes its own 3.3 v, so three aaa cells (about 3.6 to 4.5 v) power it directly. never use
               four cells: that is too much voltage.
             </p>
             <p>
               the battery goes in through a 1n4001 diode. it loses about 0.7 to 1 v, which is fine, and it means usb and the
               batteries can both be plugged in at once safely.
+            </p>
+            <p>
+              a rocker switch in the back of the head turns it on and off. it sits in the battery&apos;s red wire, so it
+              connects or disconnects the batteries: i is on, o is off. usb still works with it off, so the pico can be
+              programmed. the battery holder&apos;s own switch is badly made and hard to reach, so it&apos;s just left on.
             </p>
             <p>
               rechargeable nimh aaa cells (eneloop or similar) should last roughly 8 to 15 hours, depending on how much the
@@ -157,8 +163,8 @@ export default function RobotPage() {
 
           <Section title="parts">
             <p>
-              most parts come from <A href="https://www.pishop.ca/">pishop.ca</A>. the motion sensor and the oled come from
-              amazon.ca, pre-soldered, and the screws and nuts from home depot. prices are in canadian dollars, as of november 2026.
+              most parts come from <A href="https://www.pishop.ca/">pishop.ca</A>. the motion sensor and the oled (both pre-soldered)
+              and the rocker switch come from amazon.ca, and the screws and nuts from home depot. prices are in canadian dollars, as of november 2026.
             </p>
             <ul className="!mt-6 divide-y divide-neutral-200 border-y border-neutral-200 text-base">
               {PARTS.map((p) => (
@@ -230,9 +236,8 @@ export default function RobotPage() {
               to the breadboard in the head.
             </p>
             <p>
-              <strong className="font-semibold text-neutral-900">on/off.</strong> the battery holder&apos;s own switch faces down. the floor under it is thinned to 1.5 mm
-              in a small pocket between the feet, with a slot for the switch&apos;s knob, so you can flip it from outside
-              without opening anything.
+              <strong className="font-semibold text-neutral-900">on/off.</strong> the rocker switch snaps into a hole in the back cover of the head. the wall is
+              thinned to 2 mm round the hole so its clips can grip.
             </p>
             <p>the antenna, the arms and the blue cheeks are just for looks.</p>
           </Section>
@@ -254,7 +259,7 @@ export default function RobotPage() {
             </p>
             <ul className="list-disc space-y-2 pl-6">
               <li><strong className="font-semibold text-neutral-900">head, front shell:</strong> the face, top, sides and both ears in one piece, open at the back. it prints face down.</li>
-              <li><strong className="font-semibold text-neutral-900">head, back cover:</strong> a 5 mm plate with four tabs that reach forward into the head, two against each side wall. four screws go in from the sides of the head (two per side), through the wall and into a nut in each tab. the nuts drop into slots in the tops of the tabs before the cover goes on.</li>
+              <li><strong className="font-semibold text-neutral-900">head, back cover:</strong> a 5 mm plate with the on/off switch&apos;s hole in it, and four tabs that reach forward into the head, two against each side wall. four screws go in from the sides of the head (two per side), through the wall and into a nut in each tab. the nuts drop into slots in the tops of the tabs before the cover goes on.</li>
               <li><strong className="font-semibold text-neutral-900">upper body:</strong> with the motion sensor&apos;s shelf. a short hollow collar on its top pushes up into a hole in the head&apos;s floor and twists in with a quarter-turn lock. it&apos;s hidden inside the floor, so the head sits straight on the body.</li>
               <li><strong className="font-semibold text-neutral-900">battery base:</strong> the bottom of the body, with the feet. two screws go through its back wall into nuts in two tabs that hang down from the upper body, and a lip on the front of the upper body hooks inside it.</li>
               <li><strong className="font-semibold text-neutral-900">arms and antenna:</strong> printed separately and glued into holes.</li>
@@ -267,10 +272,10 @@ export default function RobotPage() {
 
           <Section title="getting inside">
             <ul className="list-disc space-y-2 pl-6">
-              <li><strong className="font-semibold text-neutral-900">to turn it on or off:</strong> flip the switch under the body, between the feet. nothing to open.</li>
+              <li><strong className="font-semibold text-neutral-900">to turn it on or off:</strong> press the rocker switch on the back of the head. nothing to open.</li>
               <li><strong className="font-semibold text-neutral-900">to plug in usb:</strong> the cable goes into the hole in the left ear. the hole is 13 x 9 mm, so the plug&apos;s plastic body fits in too.</li>
               <li><strong className="font-semibold text-neutral-900">to change the batteries:</strong> undo the two screws on the back of the battery base, tip the upper body and head back to unhook the front lip, and lift them off. lift the holder out of its pocket, slide its cover open and swap the three aaa cells. the wires need a little slack for this.</li>
-              <li><strong className="font-semibold text-neutral-900">to reach the breadboard, pico, buzzer or oled:</strong> undo the two screws on each side of the head and pull the back cover off. everything in the head is right there, and the breadboard slides out of the back.</li>
+              <li><strong className="font-semibold text-neutral-900">to reach the breadboard, pico, buzzer or oled:</strong> undo the two screws on each side of the head and pull the back cover off. everything in the head is right there, and the breadboard slides out of the back. the switch&apos;s wires need a little slack so the cover can come off.</li>
               <li><strong className="font-semibold text-neutral-900">to reach the motion sensor or diode:</strong> take the battery base off, and they&apos;re on the shelf just inside the upper body.</li>
               <li><strong className="font-semibold text-neutral-900">to take the head off:</strong> twist it a quarter turn on the body and lift.</li>
             </ul>
