@@ -264,6 +264,11 @@ function buildRobot() {
   // everything that wobbles when it's shaken goes in "body" (the shadow on the desk stays put)
   const body = new THREE.Group();
   root.add(body);
+  // for "unscrew", the pieces that come apart: base = the battery base and what's in it, upper = everything above it.
+  // inside upper: cover = the head's back cover and what's fixed to it, board = the breadboard with the pico on it
+  const base = new THREE.Group(), upper = new THREE.Group(), cover = new THREE.Group(), board = new THREE.Group();
+  body.add(base, upper);
+  upper.add(cover, board);
 
   // a rounded block, drawn from the side (z, y) and pushed out sideways, used for the head and the body.
   // r = how round each corner is from the side: [back bottom, front bottom, front top, back top]. edge = how soft its left and right edges are
@@ -281,18 +286,45 @@ function buildRobot() {
   const headSeam = asGhost(roundBlock(HEAD.hw, HEAD.y0, HEAD.y1, -10, 10, [S, S, S, S], hEdge, seamMat));
   headSeam.scale.set(1.003, 1.003, 0.03);
   headSeam.position.set(0, -(HEAD.y0 + HEAD.y1) / 2 * 0.003, HEAD.z0 + WALL);
-  part("the join between the head's front shell and its back cover", body, headSeam);
+  part("the join between the head's front shell and its back cover", cover, headSeam);
   // the body: the upper body (which reaches right up to the head) on top of the battery base (with the feet)
   const torso = asGhost(roundBlock(BODY.hw, BODY.y0, BODY.y1, BODY.z0, BODY.z1, [BODY.round, BODY.round, BODY.round, BODY.round], bEdge, M.shell));
   part("body (printed, 5 mm walls): the upper body with the motion sensor's shelf, on top of the battery base. 2 screws at the back hold them together", body, outline(torso, 24));
   const bodySeam = asGhost(roundBlock(BODY.hw, -10, 10, BODY.z0, BODY.z1, [S, S, S, S], bEdge, seamMat));
   bodySeam.scale.set(1.003, 0.03, 1.003);
   bodySeam.position.set(0, BODY.split, 0);
-  part("the join between the upper body and the battery base", body, bodySeam);
+  part("the join between the upper body and the battery base", base, bodySeam);
   // in x-ray, fine lines show the inside of the walls, so you can see they're 5 mm thick
   outline(roundBlock(HEAD.hw - WALL, HEAD.y0 + WALL, HEAD.y1 - WALL, HEAD.z0 + WALL, HEAD.z1 - WALL, [S, HEAD.round - WALL, HEAD.round - WALL, S], hEdge - 3, M.shell), 24);
   outline(roundBlock(BODY.hw - WALL, BODY.y0 + WALL, BODY.y1 - WALL, BODY.z0 + WALL, BODY.z1 - WALL, [BODY.round - WALL, BODY.round - WALL, BODY.round - WALL, BODY.round - WALL], bEdge - 2, M.shell), 24);
-  part("collar (printed with the upper body): a hollow ring hidden inside the head's floor. the wires run up through it, and it twists into the head with a quarter-turn lock", body, asGhost(cylY(COLLAR.r, COLLAR.y0, COLLAR.y1, 0, 0, M.base, 40)));
+  part("collar (printed with the upper body): a hollow ring hidden inside the head's floor. the wires run up through it, and it twists into the head with a quarter-turn lock", upper, asGhost(cylY(COLLAR.r, COLLAR.y0, COLLAR.y1, 0, 0, M.base, 40)));
+
+  // for "unscrew": each shell cut in two where its printed pieces meet, so each piece can come away on its own.
+  // they're the same smooth blocks as above with the other piece clipped off, and swap in for them while it's apart.
+  // the inside of the walls is drawn too, so you can see into the open head and body
+  const cuts: { mat: THREE.Material; mesh: THREE.Mesh; plane: THREE.Plane }[] = [];
+  const apartOnly: THREE.Object3D[] = [];
+  const cut = (geo: THREE.BufferGeometry, color: number, side: THREE.Side, plane: THREE.Plane, parent: THREE.Object3D, label: string) => {
+    const mat = ghost(std(color, 0.48, 0, { side, clippingPlanes: [plane.clone()] }));
+    const mesh = asGhost(new THREE.Mesh(geo, mat));
+    mesh.visible = false;
+    cuts.push({ mat, mesh, plane });
+    apartOnly.push(mesh);
+    part(label, parent, mesh);
+  };
+  const coverZ = HEAD.z0 + WALL; // where the back cover meets the front shell
+  const keepFront = new THREE.Plane(new THREE.Vector3(0, 0, 1), -coverZ), keepBack = new THREE.Plane(new THREE.Vector3(0, 0, -1), coverZ);
+  const keepAbove = new THREE.Plane(new THREE.Vector3(0, 1, 0), -BODY.split), keepBelow = new THREE.Plane(new THREE.Vector3(0, -1, 0), BODY.split);
+  const headIn = roundBlock(HEAD.hw - WALL, HEAD.y0 + WALL, HEAD.y1 - WALL, HEAD.z0 + WALL, HEAD.z1 - WALL, [S, HEAD.round - WALL, HEAD.round - WALL, S], hEdge - 3, M.shell).geometry;
+  const bodyIn = roundBlock(BODY.hw - WALL, BODY.y0 + WALL, BODY.y1 - WALL, BODY.z0 + WALL, BODY.z1 - WALL, [BODY.round - WALL, BODY.round - WALL, BODY.round - WALL, BODY.round - WALL], bEdge - 2, M.shell).geometry;
+  const INSIDE = 0xdcdcd7;
+  cut(head.geometry, SHELL_COLOUR, THREE.DoubleSide, keepFront, upper, "head front shell (printed): the face, top, bottom, sides and ears in one piece, open at the back");
+  cut(headIn, INSIDE, THREE.BackSide, keepFront, upper, "head front shell (printed): the face, top, bottom, sides and ears in one piece, open at the back");
+  cut(head.geometry, SHELL_COLOUR, THREE.DoubleSide, keepBack, cover, "back cover (printed, 5 mm): its tabs, the 2 posts and the on/off switch come off with it");
+  cut(torso.geometry, SHELL_COLOUR, THREE.DoubleSide, keepAbove, upper, "upper body (printed): with the motion sensor's shelf, the collar and the tabs that hang down into the base");
+  cut(bodyIn, INSIDE, THREE.BackSide, keepAbove, upper, "upper body (printed): with the motion sensor's shelf, the collar and the tabs that hang down into the base");
+  cut(torso.geometry, SHELL_COLOUR, THREE.DoubleSide, keepBelow, base, "battery base (printed): the batteries sit in here, with the feet underneath");
+  cut(bodyIn, INSIDE, THREE.BackSide, keepBelow, base, "battery base (printed): the batteries sit in here, with the feet underneath");
 
   // ---------- the screws: six m4 x 16 mm flat head, countersunk so their heads sit flush ----------
   // tabs are see-through, so in x-ray you can see the screw threaded into each one
@@ -301,55 +333,62 @@ function buildRobot() {
   const headScrews: THREE.Object3D[] = [], headTabs: THREE.Object3D[] = [];
   for (const sx of [1, -1]) for (const y of HEAD_TAB.ys) {
     const z = HEAD_TAB.screwZ, out = sx * HEAD.hw;
-    headScrews.push(cylX(SCREW.head, out - sx * 0.05, out + sx * 0.15, y, z, M.steel, 24), bx(out + sx * 0.1, out + sx * 0.2, y - 1, y + 1, z - 1, z + 1, M.chip),
-      cylX(SCREW.r, out, out - sx * SCREW.len, y, z, M.steel, 12));
+    const s = new THREE.Group(); // centred on the screw's axis, so it can spin as it comes out
+    s.position.set(0, y, z);
+    s.userData.dir = sx;
+    s.add(cylX(SCREW.head, out - sx * 0.05, out + sx * 0.15, 0, 0, M.steel, 24), bx(out + sx * 0.1, out + sx * 0.2, -1, 1, -1, 1, M.chip),
+      cylX(SCREW.r, out, out - sx * SCREW.len, 0, 0, M.steel, 12));
+    headScrews.push(s);
     headTabs.push(bx(sx * HEAD_TAB.x0, sx * (HEAD.hw - WALL), y - HEAD_TAB.h / 2, y + HEAD_TAB.h / 2, HEAD_TAB.z0, HEAD_TAB.z1, tabMat));
   }
-  part("4 m4 x 16 mm flat head screws: 2 in each side of the head, flush with it. they go through the side wall into the tabs on the back cover", body, ...headScrews);
-  part("tabs (printed with the back cover): reach forward into the head, against the side walls. each has a 3.4 mm pilot hole the screw threads into", body, ...headTabs);
+  part("4 m4 x 16 mm flat head screws: 2 in each side of the head, flush with it. they go through the side wall into the tabs on the back cover", upper, ...headScrews);
+  part("tabs (printed with the back cover): reach forward into the head, against the side walls. each has a 3.4 mm pilot hole the screw threads into", cover, ...headTabs);
   // 2 through the back wall of the battery base, each threading into a tab that hangs down from the upper body.
   // a lip on the front of the upper body hooks inside the base, so these two are all it needs
   const baseScrews: THREE.Object3D[] = [], tabs: THREE.Object3D[] = [];
   for (const x of BASE_TAB.xs) {
     const y = BASE_TAB.y;
-    baseScrews.push(cylZ(SCREW.head, BODY.z0 - 0.15, BODY.z0 + 0.05, x, y, M.steel, 24), bx(x - 1, x + 1, y - 1, y + 1, BODY.z0 - 0.2, BODY.z0 - 0.1, M.chip),
-      cylZ(SCREW.r, BODY.z0, BODY.z0 + SCREW.len, x, y, M.steel, 12));
+    const s = new THREE.Group(); // centred on the screw's axis, so it can spin as it comes out
+    s.position.set(x, y, 0);
+    s.add(cylZ(SCREW.head, BODY.z0 - 0.15, BODY.z0 + 0.05, 0, 0, M.steel, 24), bx(-1, 1, -1, 1, BODY.z0 - 0.2, BODY.z0 - 0.1, M.chip),
+      cylZ(SCREW.r, BODY.z0, BODY.z0 + SCREW.len, 0, 0, M.steel, 12));
+    baseScrews.push(s);
     tabs.push(bx(x - BASE_TAB.hw, x + BASE_TAB.hw, BASE_TAB.y0, BASE_TAB.y1, BASE_TAB.z0, BASE_TAB.z1, tabMat));
   }
   tabs.push(bx(-20, 20, 22, BASE_TAB.y1, BODY.z1 - WALL - 2.5, BODY.z1 - WALL, M.hub)); // the lip at the front, fused into the front wall the same way
-  part("2 m4 x 16 mm flat head screws: in the back of the battery base, flush with it. undo these to change the batteries", body, ...baseScrews);
-  part("tabs (printed with the upper body): hang down inside the battery base. the back two each have a 3.4 mm pilot hole the screw threads into. the front one is a lip that hooks in", body, ...tabs);
+  part("2 m4 x 16 mm flat head screws: in the back of the battery base, flush with it. undo these to change the batteries", base, ...baseScrews);
+  part("tabs (printed with the upper body): hang down inside the battery base. the back two each have a 3.4 mm pilot hole the screw threads into. the front one is a lip that hooks in", upper, ...tabs);
   // two little feet, and two stubby arms
   for (const sx of [1, -1]) {
     const foot = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), M.base);
     foot.scale.set(FOOT.sx, FOOT.sy, FOOT.sz);
     foot.position.set(sx * FOOT.x, FOOT.y, FOOT.z);
-    part("foot (printed with the battery base)", body, asGhost(foot));
+    part("foot (printed with the battery base)", base, asGhost(foot));
     const arm = new THREE.Mesh(new THREE.CapsuleGeometry(ARM.r, ARM.len, 8, 20), M.shell);
     arm.position.set(sx * ARM.x, ARM.y, ARM.z);
     arm.rotation.z = sx * ARM.tilt;
-    part("arm (printed separately, glued into a hole)", body, asGhost(arm));
+    part("arm (printed separately, glued into a hole)", upper, asGhost(arm));
   }
   // a little antenna on top
-  part("antenna (printed separately and glued in, just for looks)", body, cylY(ANTENNA.r, HEAD.y1 - 2, HEAD.y1 + ANTENNA.top, 0, ANTENNA.z, M.base, 16),
+  part("antenna (printed separately and glued in, just for looks)", upper, cylY(ANTENNA.r, HEAD.y1 - 2, HEAD.y1 + ANTENNA.top, 0, ANTENNA.z, M.base, 16),
     (() => { const b = new THREE.Mesh(new THREE.SphereGeometry(ANTENNA.ball, 24, 16), M.accent); b.position.set(0, HEAD.y1 + ANTENNA.ballY, ANTENNA.z); return b; })());
   // round ears. The left one has the pico's usb port in it; the right one is a grille for the buzzer
   for (const sx of [1, -1]) {
     const ear = cylX(EAR.r, sx * HEAD.hw - sx * 0.5, sx * (HEAD.hw + EAR_OUT), EAR.y, EAR.z, M.base, 48);
     const ring = cylX(EAR.r - 3, sx * (HEAD.hw + 3.4), sx * (HEAD.hw + 3.7), EAR.y, EAR.z, M.accent, 48);
-    part(sx < 0 ? "left ear: a 13 x 9 mm hole through it and the wall lets the usb cable's whole plug reach the pico" : "right ear: a grille for the buzzer", body, ear, ring);
+    part(sx < 0 ? "left ear: a 13 x 9 mm hole through it and the wall lets the usb cable's whole plug reach the pico" : "right ear: a grille for the buzzer", upper, ear, ring);
   }
   // the usb hole: 13 x 9 mm, lined up with the pico's connector, big enough for the plastic body of the cable's plug
-  part("usb hole (13 x 9 mm): code and power go in here", body, bx(-HEAD.hw - EAR_OUT - 0.3, -HEAD.hw - EAR_OUT + 0.1, EAR.y - USB_HOLE.h / 2, EAR.y + USB_HOLE.h / 2, USB_Z - USB_HOLE.w / 2, USB_Z + USB_HOLE.w / 2, M.chip));
+  part("usb hole (13 x 9 mm): code and power go in here", upper, bx(-HEAD.hw - EAR_OUT - 0.3, -HEAD.hw - EAR_OUT + 0.1, EAR.y - USB_HOLE.h / 2, EAR.y + USB_HOLE.h / 2, USB_Z - USB_HOLE.w / 2, USB_Z + USB_HOLE.w / 2, M.chip));
   const holes: THREE.Object3D[] = [];
   const gp = GRILLE.pitch, gq = gp * 0.866;
   for (const [dy, dz] of [[0, 0], [gp, 0], [-gp, 0], [gp / 2, gq], [-gp / 2, gq], [gp / 2, -gq], [-gp / 2, -gq]]) holes.push(cylX(GRILLE.r, HEAD.hw + 3.6, HEAD.hw + 3.8, EAR.y + dy, BUZZ_Z + dz, M.chip, 16));
-  part("grille for the buzzer", body, ...holes);
+  part("grille for the buzzer", upper, ...holes);
 
   // ---------- the face: a dark panel on the front of the head, with the oled behind a window in it ----------
   const face = new THREE.Group();
   face.position.set(0, FACE_Y, HEAD.z1);
-  body.add(face);
+  upper.add(face);
   const eyeCanvas = document.createElement("canvas");
   eyeCanvas.width = 128; eyeCanvas.height = 64;
   const eyeTex = new THREE.CanvasTexture(eyeCanvas);
@@ -370,25 +409,25 @@ function buildRobot() {
   const zHoles = BOARD.z0, yMid = (BOARD.y0 + BOARD.y1) / 2;
   const bl = BOARD.x0, br = BOARD.x0 + 85; // the breadboard's left and right edges
   const inX = HEAD.hw - WALL, inY0 = HEAD.y0 + WALL, inY1 = HEAD.y1 - WALL; // the inside of the head's walls
-  part("half-size breadboard (85 x 55 mm), standing upright: slides in through the back of the head before the cover goes on", body,
+  part("half-size breadboard (85 x 55 mm), standing upright: slides in through the back of the head before the cover goes on", board,
     bx(bl, br, BOARD.y0, BOARD.y1, BOARD.z0, BOARD.z1, M.white),
     bx(bl, br, yMid - 1.2, yMid + 1.2, zHoles - 0.05, zHoles + 0.01, M.chip),
     bx(bl + 2.5, br - 2.5, BOARD.y0 + 2, BOARD.y0 + 2.6, zHoles - 0.05, zHoles + 0.01, M.redLine),
     bx(bl + 2.5, br - 2.5, BOARD.y1 - 2.6, BOARD.y1 - 2, zHoles - 0.05, zHoles + 0.01, M.accent));
   // what holds it: a rib on the left wall in front of it, and a rail on the right (it doesn't reach the right wall)
-  part("rib and rail (printed with the head): hold the breadboard. a rib on the left wall, and a rail on the right that its edge slides into", body,
+  part("rib and rail (printed with the head): hold the breadboard. a rib on the left wall, and a rail on the right that its edge slides into", upper,
     bx(-inX, bl + 2, inY0, inY1, BOARD.z1, BOARD.z1 + 2, M.hub),
     bx(br + 0.2, br + 2.2, inY0, inY1, BOARD.z0, BOARD.z1 + 2, M.hub),
     bx(br - 2, br + 0.2, inY0, inY1, BOARD.z1, BOARD.z1 + 2, M.hub));
   // 2 posts on the back cover reach forward to just behind the breadboard, so it can't slide back once the cover is on
-  part("posts (printed with the back cover): 2 of them reach forward to just behind the breadboard, so it can't slide backwards", body,
+  part("posts (printed with the back cover): 2 of them reach forward to just behind the breadboard, so it can't slide backwards", cover,
     ...STANDOFF.ys.map((y) => bx(bl + STANDOFF.x - STANDOFF.hw, bl + STANDOFF.x + STANDOFF.hw, y - STANDOFF.hw, y + STANDOFF.hw, HEAD.z0 + WALL, BOARD.z0 - STANDOFF.gap, M.hub)));
   // the on/off rocker switch, snapped into a hole in the back cover. its front is outside, its body reaches forward into the head
   const rk = ROCKER, back = HEAD.z0, inner = HEAD.z0 + WALL;
   const rockerO = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.8, 24), M.white);
   rockerO.rotation.y = Math.PI;
   rockerO.position.set(rk.x, rk.y - 4.5, back - rk.proud - 0.62);
-  part("on/off rocker switch: snaps into the back cover. it's in the battery's red wire, so i is on and o is off", body,
+  part("on/off rocker switch: snaps into the back cover. it's in the battery's red wire, so i is on and o is off", cover,
     bx(rk.x - rk.frontW / 2, rk.x + rk.frontW / 2, rk.y - rk.frontH / 2, rk.y + rk.frontH / 2, back - rk.proud, back, M.chip),        // its front frame
     bx(rk.x - rk.holeW / 2 + 1, rk.x + rk.holeW / 2 - 1, rk.y - rk.holeH / 2 + 1, rk.y + rk.holeH / 2 - 1, back - rk.proud - 0.6, back - rk.proud, M.boardBlack), // the rocker
     bx(rk.x - 0.35, rk.x + 0.35, rk.y + 2.5, rk.y + 6.5, back - rk.proud - 0.62, back - rk.proud - 0.6, M.white), rockerO,            // "i" and "o"
@@ -398,7 +437,7 @@ function buildRobot() {
   // the pocket where the cover is thinned to 2 mm round the hole (shown as lines in x-ray)
   outline(bx(rk.x - rk.holeW / 2 - rk.pocket, rk.x + rk.holeW / 2 + rk.pocket, rk.y - rk.holeH / 2 - rk.pocket, rk.y + rk.holeH / 2 + rk.pocket, back + rk.thin, inner, M.chip));
   const pz = zHoles - 2.5; // the pico's board, standing off the breadboard on its header strips
-  part("raspberry pi pico 2 w with header (51 x 21 mm): the brain, with wi-fi. its usb connector is flush with the left wall", body,
+  part("raspberry pi pico 2 w with header (51 x 21 mm): the brain, with wi-fi. its usb connector is flush with the left wall", board,
     bx(bl, bl + 51, yMid - 10, yMid - 7.5, pz, zHoles, M.chip),
     bx(bl, bl + 51, yMid + 7.5, yMid + 10, pz, zHoles, M.chip),
     bx(bl, bl + 51, yMid - 10.5, yMid + 10.5, pz - 1, pz, M.pico),
@@ -414,8 +453,8 @@ function buildRobot() {
   plugAt(1.4, sigY, M.redLine); plugAt(3.94, sigY, M.dark); plugAt(9.02, sigY, M.accent); plugAt(11.56, sigY, M.tape);
   plugAt(54.5, yMid - 6, M.redLine); plugAt(57, yMid - 6, M.dark); plugAt(59.5, yMid + 6, M.accent); plugAt(62, yMid + 6, M.tape);
   plugAt(81.5, BOARD.y0 + 2.3, M.redLine); plugAt(81.5, BOARD.y1 - 2.3, M.dark);
-  part("jumper wires: plug every part into the breadboard, no soldering", body, ...plugs);
-  part("passive buzzer brick (19 x 27 mm): chirps, chimes and alarms. it sits against the right wall, behind the right ear's grille", body,
+  part("jumper wires: plug every part into the breadboard, no soldering", board, ...plugs);
+  part("passive buzzer brick (19 x 27 mm): chirps, chimes and alarms. it sits against the right wall, behind the right ear's grille", upper,
     bx(inX - 10.6, inX - 9, EAR.y - 13.5, EAR.y + 13.5, BUZZ_Z - 9.5, BUZZ_Z + 9.5, M.boardBlack),
     cylX(6, inX - 9, inX, EAR.y, BUZZ_Z, M.chip),
     bx(inX - 16.5, inX - 10.6, EAR.y - 12.5, EAR.y - 9.5, BUZZ_Z - 4, BUZZ_Z + 4, M.white));
@@ -423,15 +462,15 @@ function buildRobot() {
   // ---------- inside the body: the batteries, the motion sensor and the diode ----------
   const cells: THREE.Object3D[] = [];
   for (const z of [-12.2, 0, 12.2]) cells.push(cylX(5.25, -22.2, 22.2, 16, z, M.battery, 24), cylX(2, 22.2, 23.4, 16, z, M.gold, 12));
-  part("3 aaa batteries (about 3.6 to 4.5 v)", body, ...cells);
-  part("battery holder (63.5 x 36.8 x 15.7 mm): sits loose in a pocket in the battery base. its own switch is just left on", body,
+  part("3 aaa batteries (about 3.6 to 4.5 v)", base, ...cells);
+  part("battery holder (63.5 x 36.8 x 15.7 mm): sits loose in a pocket in the battery base. its own switch is just left on", base,
     outline(asGhost(bx(-31.75, 31.75, 8.2, 23.9, -18.4, 18.4, M.holder))));
-  part("shelf (printed with the upper body): the motion sensor screws onto it", body, bx(-BODY.hw + WALL, BODY.hw - WALL, 30, 31.5, -15, 4, M.hub));
-  part("mpu6050 motion sensor (about 21 x 16 mm): feels being picked up and shaken. its wires go straight up through the collar into the head", body,
+  part("shelf (printed with the upper body): the motion sensor screws onto it", upper, bx(-BODY.hw + WALL, BODY.hw - WALL, 30, 31.5, -15, 4, M.hub));
+  part("mpu6050 motion sensor (about 21 x 16 mm): feels being picked up and shaken. its wires go straight up through the collar into the head", upper,
     bx(-10.5, 10.5, 31.5, 33, -14, 2, M.boardBlue), bx(-2, 2, 33, 33.9, -8, -4, M.chip),
     bx(-10.5, 10.5, 33, 35.5, -0.5, 2, M.chip),
     bx(-5, -2.5, 35.5, 49.5, -0.5, 2, M.redLine), bx(-2.5, 0, 35.5, 49.5, -0.5, 2, M.dark), bx(0, 2.5, 35.5, 49.5, -0.5, 2, M.accent), bx(2.5, 5, 35.5, 49.5, -0.5, 2, M.tape));
-  part("1n4001 diode: stops usb power flowing back into the batteries", body,
+  part("1n4001 diode: stops usb power flowing back into the batteries", upper,
     cylX(1.3, 14, 19.5, 34.5, -12, M.chip, 16), bx(18.4, 19.2, 33.2, 35.8, -13.3, -10.7, M.steel));
 
   // the soft shadow on the desk
@@ -449,7 +488,7 @@ function buildRobot() {
   shadow.position.set(0, 0.05, 1);
   root.add(shadow);
 
-  return { root, body, ghostMats, lineMat, eyeCanvas, eyeTex, shadow };
+  return { root, body, ghostMats, lineMat, eyeCanvas, eyeTex, shadow, base, upper, cover, board, headScrews, baseScrews, cuts, apartOnly, wholes: [head, torso, headSeam, bodySeam] };
 }
 
 // draws the oled. open = 1 wide open, 0 shut. look = -1 left to 1 right. dizzy = spirals for eyes.
@@ -479,13 +518,34 @@ function drawEyes(c: HTMLCanvasElement, open: number, look: number, dizzy: numbe
   }
 }
 
+// ---- tweak these ("unscrew") ----
+// the steps it comes apart in, the way you'd do it yourself. at/end = when each one starts and finishes, in seconds
+const UNSCREW_STEPS = [
+  { at: 0.3, end: 1.8, text: "1. undo the 4 screws in the sides of the head" },
+  { at: 1.9, end: 3.0, text: "2. pull the back cover off. the on/off switch comes with it" },
+  { at: 3.1, end: 4.0, text: "3. slide the breadboard out the back, with the pico on it" },
+  { at: 4.1, end: 5.4, text: "4. undo the 2 screws in the back of the battery base" },
+  { at: 5.5, end: 6.6, text: "5. lift the top off the battery base to get to the batteries" },
+];
+const UNSCREW_DONE = 6.8;          // when it's all apart, in seconds
+const UNSCREW_BACK_SPEED = 1.8;    // putting it back together plays this many times faster
+const UNSCREW_OUT = 26;            // how far each screw comes out, in mm (they're 16 long)
+const UNSCREW_TURNS = 5;           // how many times each screw turns as it comes out
+const COVER_OFF = 50, BOARD_OUT = 32, TOP_LIFT = 45; // how far the back cover, the breadboard and the top move, in mm
+// where the camera swings round to as it starts, so you can see the back: theta = round from the front (pi = straight
+// behind), phi = down from straight above
+const UNSCREW_VIEW = { theta: Math.PI * 0.72, phi: 1.12, seconds: 1.5 };
+
 export default function RobotViewer() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [xray, setXray] = useState(false);
   const [spin, setSpin] = useState(false); // off when the page opens; press "spin" to turn it on
   const [dims, setDims] = useState(false);
+  const [apart, setApart] = useState(false);
+  const [step, setStep] = useState("");
   const [label, setLabel] = useState<{ text: string; x: number; y: number } | null>(null);
+  const apartRef = useRef(false);
   const xrayRef = useRef(false), spinRef = useRef(false), dimsRef = useRef(false), shakeRef = useRef(-1);
 
   useEffect(() => {
@@ -494,6 +554,7 @@ export default function RobotViewer() {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setClearColor(0x000000, 0);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.localClippingEnabled = true; // "unscrew" cuts the shells in two
     const scene = new THREE.Scene();
     const pm = new THREE.PMREMGenerator(renderer);
     const room = new RoomEnvironment();
@@ -545,8 +606,12 @@ export default function RobotViewer() {
       const r = canvas.getBoundingClientRect();
       ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ndc, camera);
-      const list = xrayRef.current ? meshes.filter((m) => !m.userData.ghost) : meshes;
-      const hit = ray.intersectObjects(list, false)[0];
+      const list = meshes.filter((m) => m.visible && !(xrayRef.current && m.userData.ghost));
+      // skip the bits of a cut shell that are clipped away (they're still there, just not drawn)
+      const hit = ray.intersectObjects(list, false).find((h) => {
+        const planes = ((h.object as THREE.Mesh).material as THREE.Material).clippingPlanes;
+        return !planes || planes.every((pl) => pl.distanceToPoint(h.point) > -0.01);
+      });
       let o: THREE.Object3D | null = hit ? hit.object : null;
       while (o && !o.userData.label) o = o.parent;
       const text = o ? (o.userData.label as string) : "";
@@ -562,11 +627,15 @@ export default function RobotViewer() {
 
     const camDir = new THREE.Vector3();
     let raf = 0, last = performance.now(), xr = 0, dm = 0, eyeKey = "", seen = true;
+    let ut = 0, stepKey = "", camTurn = false; // ut = how far through taking it apart, in seconds
+    const camFrom = new THREE.Spherical(), camTo = new THREE.Spherical(), camOff = new THREE.Vector3();
+    const ease = (a: number, b: number) => { const x = Math.min(1, Math.max(0, (ut - a) / (b - a))); return x * x * (3 - 2 * x); };
+    const stepK = (i: number) => ease(UNSCREW_STEPS[i].at, UNSCREW_STEPS[i].end);
     const io = new IntersectionObserver((en) => { seen = en[0].isIntersecting; });
     io.observe(wrap);
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); // the first frame's time can be a touch before "last"
       last = now;
       if (!seen) return;
       // x-ray fades the body out so the parts show through
@@ -579,7 +648,56 @@ export default function RobotViewer() {
         m.opacity = 1 - (1 - XRAY_GHOST) * xr;
         m.depthWrite = xr < 0.5;
       }
-      robot.lineMat.opacity = 0.5 * xr;
+      // "unscrew": plays the steps forwards to take it apart, and backwards to put it together again
+      const ag = apartRef.current ? 1 : -1, was = ut;
+      ut = Math.min(UNSCREW_DONE, Math.max(0, ut + dt * (ag > 0 ? 1 : UNSCREW_BACK_SPEED) * ag));
+      const isApart = ut > 0;
+      const hide = Math.min(1, ut / 0.3); // the x-ray lines and the dimensions fade out while it's apart
+      for (const o of robot.wholes) o.visible = !isApart;
+      for (const o of robot.apartOnly) o.visible = isApart;
+      const k1 = stepK(0), k4 = stepK(3), lift = stepK(4);
+      for (const s of robot.headScrews) {
+        s.position.x = s.userData.dir * UNSCREW_OUT * k1;
+        s.rotation.x = -s.userData.dir * k1 * UNSCREW_TURNS * Math.PI * 2;
+      }
+      for (const s of robot.baseScrews) {
+        s.position.z = -UNSCREW_OUT * k4;
+        s.rotation.z = k4 * UNSCREW_TURNS * Math.PI * 2;
+      }
+      robot.cover.position.z = -COVER_OFF * stepK(1);
+      robot.board.position.z = -BOARD_OUT * stepK(2);
+      robot.upper.position.y = TOP_LIFT * lift;
+      // follow the top up as it lifts, so it stays in the middle
+      const ty = 62 + TOP_LIFT * 0.45 * lift;
+      camera.position.y += ty - controls.target.y;
+      controls.target.y = ty;
+      // as it starts coming apart, swing the camera round to the back (unless you're turning it yourself)
+      if (ag > 0 && was === 0 && ut > 0) {
+        camFrom.setFromVector3(camOff.copy(camera.position).sub(controls.target));
+        camTurn = true;
+      }
+      if (dragging || ag < 0) camTurn = false;
+      if (camTurn) {
+        const x = Math.min(1, ut / UNSCREW_VIEW.seconds), k = x * x * (3 - 2 * x);
+        const dth = Math.atan2(Math.sin(UNSCREW_VIEW.theta - camFrom.theta), Math.cos(UNSCREW_VIEW.theta - camFrom.theta));
+        camTo.set(camFrom.radius + (Math.max(camFrom.radius, VIEW_DISTANCE * 1.1) - camFrom.radius) * k,
+          camFrom.phi + (UNSCREW_VIEW.phi - camFrom.phi) * k, camFrom.theta + dth * k);
+        camera.position.setFromSpherical(camTo).add(controls.target);
+        if (x >= 1) camTurn = false;
+      }
+      if (isApart) {
+        // move each cut to wherever its piece is now (clipping planes are in world space)
+        robot.root.updateMatrixWorld();
+        for (const c of robot.cuts) c.mat.clippingPlanes![0].copy(c.plane).applyMatrix4(c.mesh.matrixWorld);
+      }
+      // the caption for the step it's on
+      let cap = "";
+      if (ag > 0 && ut >= UNSCREW_DONE) cap = "all apart. press unscrew again to put it back together";
+      else if (ag > 0) for (const st of UNSCREW_STEPS) if (ut >= st.at - 0.3) cap = st.text;
+      if (ag < 0 && isApart) cap = "putting it back together";
+      if (cap !== stepKey) { stepKey = cap; setStep(cap); }
+
+      robot.lineMat.opacity = 0.5 * xr * (1 - hide);
       robot.shadow.material.opacity = 1 - 0.5 * xr;
       // "dimensions" fades the measuring lines in and out
       const dg = dimsRef.current ? 1 : 0;
@@ -591,7 +709,7 @@ export default function RobotViewer() {
         camDir.copy(camera.position).sub(controls.target).setY(0).normalize();
         for (const m of measure.dims) {
           const f = Math.min(1, Math.max(0, (m.side.dot(camDir) + 0.05) / 0.35));
-          m.line.opacity = m.label.opacity = dm * f;
+          m.line.opacity = m.label.opacity = dm * f * (1 - hide);
         }
       }
       // "shake": it wobbles about like it's being shaken, then its eyes go dizzy
@@ -648,6 +766,12 @@ export default function RobotViewer() {
     <div ref={wrapRef} className="relative h-full w-full">
       <canvas ref={canvasRef} role="img" aria-label="A 3D model of the desk robot. Drag to turn it round." className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing" />
       {/* the name of the part under the pointer */}
+      {/* what it's doing while it comes apart */}
+      {step && (
+        <div aria-live="polite" className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center px-2">
+          <span className="rounded-full bg-neutral-900/85 px-3 py-1.5 text-center text-xs lowercase text-white sm:text-sm">{step}</span>
+        </div>
+      )}
       {label && (
         <div className="pointer-events-none absolute z-10 max-w-[16rem] rounded-md bg-neutral-900 px-3 py-1.5 text-sm lowercase leading-snug text-white shadow-lg" style={{ left: Math.max(8, label.x + 14), top: Math.max(8, label.y + 14) }}>
           {label.text}
@@ -658,6 +782,7 @@ export default function RobotViewer() {
         <span className="flex flex-wrap gap-1 sm:gap-2">
           <button type="button" onClick={() => { shakeRef.current = 0; }} className={pill(false)}>shake</button>
           <button type="button" aria-pressed={dims} onClick={() => { dimsRef.current = !dimsRef.current; setDims(dimsRef.current); }} className={pill(dims)}>dimensions</button>
+          <button type="button" aria-pressed={apart} onClick={() => { apartRef.current = !apartRef.current; setApart(apartRef.current); }} className={pill(apart)}>unscrew</button>
           <button type="button" aria-pressed={xray} onClick={() => { xrayRef.current = !xrayRef.current; setXray(xrayRef.current); }} className={pill(xray)}>x-ray</button>
           <button type="button" aria-pressed={spin} onClick={() => { spinRef.current = !spinRef.current; setSpin(spinRef.current); }} className={pill(spin)}>spin</button>
         </span>
