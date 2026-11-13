@@ -1,9 +1,9 @@
 "use client";
 // app/projects/robot/RobotViewer.tsx
-// The 3D model of the robot on the robot project page (app/projects/robot/page.tsx).
+// The 3D model of version 1 of the robot (the stationary desk buddy) on its project page (app/projects/robot/page.tsx).
 // Everything is laid out in real millimetres: x = left/right, y = up, z = front/back (the face looks along +z).
 // Drag to turn it all the way round, click then scroll to zoom, and flip x-ray to see the parts inside.
-// Hover (or tap) a part to see what it is.
+// Hover (or tap) a part to see what it is. The wheeled version 2 model is saved in backups/2026-11-12-robot-v2-wheels/.
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
@@ -13,32 +13,27 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 // ---- tweak these ----
 const SHELL_COLOUR = 0xf3f3ef;   // the printed body (warm white)
 const ACCENT_COLOUR = 0x1f5fd9;  // the blue bits (same blue as the logo)
-const DARK_COLOUR = 0x1c1d21;    // the lift arm, tyres and face panel
-const BASE_COLOUR = 0x2b2d33;    // the lower half of the body (the base piece)
+const BASE_COLOUR = 0x2b2d33;    // the lower part of the body (the base piece)
+const DARK_COLOUR = 0x1c1d21;    // the feet
 const EYE_COLOUR = "#eaf4ff";    // the eyes on the oled
 const SPIN_SPEED = 1.1;          // how fast it turns by itself when "spin" is on
 const XRAY_GHOST = 0.17;         // in x-ray view, how visible the body stays (0 = gone, 1 = solid)
 const XRAY_LINES = 0x30507f;     // in x-ray view, the fine lines round the body's edges
-const LIFT_DEGREES = 70;         // how far the lift arm swings up
-const VIEW_DISTANCE = 380;       // how far away the camera starts, in mm
+const SHAKE_SECONDS = 1.4;       // how long it wobbles when you press "shake"
+const DIZZY_SECONDS = 2.2;       // how long the dizzy eyes last after that
+const VIEW_DISTANCE = 470;       // how far away the camera starts, in mm
 
 // ---- where things are (mm). Change a number here and the part moves in the model ----
-const HALF_W = 33;               // half the body's width (the body is 66 wide)
-const FLOOR_TOP = 11.4;          // top of the floor plate (its underside is 9 above the desk)
-const WHEEL_D = 52;              // wheel size. The seller doesn't publish it, so this is my estimate: measure yours and change it
-const WHEEL_W = 8;               // wheel width (also an estimate)
-const AXLE = { y: WHEEL_D / 2, z: -22 }; // the drive wheels' axle
-const PIVOT = { y: 40, z: 10 };  // where the lift arm swings from (the lift servo's shaft)
-const ARM_LEN = 48;              // pivot to the tip of the arm
-const ARM_DOWN = 35.7;           // how far below level the arm points when it's down, in degrees
-const SEAM = 30;                 // where the base and the top shell meet (the two main printed pieces)
-const DECK = 36;                 // the flat back the battery pack sits on
-// the body's side profile, as (z, y) points going round. A third number sets how round that corner is
-const PROFILE_BASE: [number, number, number?][] = [[-42, 9], [42, 9], [42, SEAM, 0.5], [-42, SEAM, 0.5]];
-const PROFILE_TOP: [number, number, number?][] = [[-42, SEAM + 0.5, 0.5], [42, SEAM + 0.5, 0.5], [42, 34, 1], [30, 64], [0, 64], [-3, DECK, 2], [-42, DECK, 2]];
-const FACE = { bottom: [42, 34], top: [30, 64] }; // the sloped front the oled sits in
+// It's a little character: a big round head with the face, and a small body with the batteries, on two feet.
+// the shells have 2 mm walls; every part below sits at least that far inside them
+// the head: big enough for the breadboard to stand upright inside it, behind the face
+const HEAD = { hw: 46.5, y0: 50, y1: 116, z0: -33, z1: 33, round: 20 }; // half width, bottom, top, back, front, corner roundness
+const BOARD = { y0: 56, y1: 111, z0: -3.7, z1: 6 };   // the breadboard, standing upright (85 wide x 55 tall x 9.7 thick). Its holes face the back
+const EAR = { y: 83.5, z: -10, r: 15 };               // the round ears on the sides of the head
+// the body: holds the batteries, lying flat, with the motion sensor on top
+const BODY = { hw: 38, y0: 2, y1: 48, z0: -27, z1: 27, round: 12 };
+const NECK = { r: 14, y0: 46, y1: 52 };               // the hollow neck the wires run through
 
-const deg = Math.PI / 180;
 const std = (color: number, roughness = 0.6, metalness = 0, extra: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
 
@@ -48,7 +43,7 @@ const bx = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: numb
   m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
   return m;
 };
-// cylinders lying along x, standing along y, or pointing along z
+// cylinders lying along x, or standing along y
 const cylX = (r: number, x0: number, x1: number, y: number, z: number, mat: THREE.Material, seg = 40) => {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, Math.abs(x1 - x0), seg), mat);
   m.rotation.z = Math.PI / 2;
@@ -60,13 +55,6 @@ const cylY = (r: number, y0: number, y1: number, x: number, z: number, mat: THRE
   m.position.set(x, (y0 + y1) / 2, z);
   return m;
 };
-const cylZ = (r: number, z0: number, z1: number, x: number, y: number, mat: THREE.Material, seg = 40) => {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, Math.abs(z1 - z0), seg), mat);
-  m.rotation.x = Math.PI / 2;
-  m.position.set(x, y, (z0 + z1) / 2);
-  return m;
-};
-
 // an outline with its corners rounded off
 function roundedShape(pts: [number, number, number?][], r: number) {
   const s = new THREE.Shape();
@@ -129,7 +117,6 @@ function buildRobot() {
     visor: ghost(std(0x08090b, 0.8, 0, { envMapIntensity: 0.15 })),
     accent: std(ACCENT_COLOUR, 0.4),
     dark: std(DARK_COLOUR, 0.55),
-    tyre: std(0x141416, 0.9),
     hub: std(0xe9e9e6, 0.5),
     steel: std(0xc9cbd0, 0.32, 1),
     brass: std(0xb8963f, 0.38, 1),
@@ -143,119 +130,116 @@ function buildRobot() {
     battery: std(0xb4b7be, 0.35, 0.7),
     tape: std(0xd9a514, 0.6),
     servo: std(0x2e6fe2, 0.35),
+    redLine: std(0xd23a32, 0.5),
     cone: std(0x45474d, 0.7),
     glass: std(0x06070a, 0.08, 0, { envMapIntensity: 1.5 }),
   };
 
-  // ---------- the printed body: a dark base, and a white top with the head at the front ----------
-  const shell = asGhost(new THREE.Mesh(extrudeAcross(PROFILE_TOP, -HALF_W, HALF_W, 6, 3), M.shell));
-  const base = asGhost(new THREE.Mesh(extrudeAcross(PROFILE_BASE, -HALF_W, HALF_W, 5, 3), M.base));
-  part("3d printed body: top shell, 2 mm walls", root, outline(shell, 24));
-  part("3d printed body: base, 2 mm walls", root, outline(base, 24));
+  // everything that wobbles when it's shaken goes in "body" (the shadow on the desk stays put)
+  const body = new THREE.Group();
+  root.add(body);
 
-  // ---------- the face: a dark panel on the sloped front, with the oled behind a window in it ----------
+  // a rounded block, drawn from the side (z, y) and pushed out sideways, used for the head and the body
+  const roundBlock = (hw: number, y0: number, y1: number, z0: number, z1: number, round: number, mat: THREE.Material) =>
+    new THREE.Mesh(extrudeAcross([[z0, y0], [z1, y0], [z1, y1], [z0, y1]], -hw, hw, round, Math.min(8, round * 0.45)), mat);
+
+  // ---------- the printed shells: head, body and neck ----------
+  const head = asGhost(roundBlock(HEAD.hw, HEAD.y0, HEAD.y1, HEAD.z0, HEAD.z1, HEAD.round, M.shell));
+  part("head (printed): holds the face, the breadboard, the pico and the buzzer", body, outline(head, 24));
+  const torso = asGhost(roundBlock(BODY.hw, BODY.y0, BODY.y1, BODY.z0, BODY.z1, BODY.round, M.shell));
+  part("body (printed): holds the batteries and the motion sensor. its bottom unscrews to change batteries", body, outline(torso, 24));
+  part("neck (printed): hollow, so the wires can run from the body up to the head", body, asGhost(cylY(NECK.r, NECK.y0, NECK.y1, 0, 0, M.base, 40)));
+  // two little feet, and two stubby arms
+  for (const sx of [1, -1]) {
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), M.base);
+    foot.scale.set(13, 8, 19);
+    foot.position.set(sx * 18, 8, 9);
+    part("foot (printed)", body, asGhost(foot));
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(6.5, 16, 8, 20), M.shell);
+    arm.position.set(sx * (BODY.hw + 4), 29, 2);
+    arm.rotation.z = sx * 0.32;
+    part("arm (printed)", body, asGhost(arm));
+  }
+  // a little antenna on top
+  part("antenna (printed, just for looks)", body, cylY(1.6, HEAD.y1 - 2, HEAD.y1 + 11, 0, -4, M.base, 16),
+    (() => { const b = new THREE.Mesh(new THREE.SphereGeometry(4.5, 24, 16), M.accent); b.position.set(0, HEAD.y1 + 14, -4); return b; })());
+  // round ears. The left one has the pico's usb port in it; the right one is a grille for the buzzer
+  for (const sx of [1, -1]) {
+    const ear = cylX(EAR.r, sx * HEAD.hw - sx * 0.5, sx * (HEAD.hw + 3.5), EAR.y, EAR.z, M.base, 48);
+    const ring = cylX(EAR.r - 3, sx * (HEAD.hw + 3.4), sx * (HEAD.hw + 3.7), EAR.y, EAR.z, M.accent, 48);
+    part(sx < 0 ? "left ear: the usb port is inside it" : "right ear: a grille for the buzzer", body, ear, ring);
+  }
+  part("usb port: code and power go in here", body, bx(-HEAD.hw - 3.8, -HEAD.hw - 3.4, EAR.y - 2.5, EAR.y + 2.5, -12.5, -4.5, M.chip));
+  const holes: THREE.Object3D[] = [];
+  for (const [dy, dz] of [[0, 0], [5, 0], [-5, 0], [2.5, 4.3], [-2.5, 4.3], [2.5, -4.3], [-2.5, -4.3]]) holes.push(cylX(1.1, HEAD.hw + 3.6, HEAD.hw + 3.8, EAR.y + dy, -14.5 + dz, M.chip, 16));
+  part("grille for the buzzer", body, ...holes);
+  // blue cheeks
+  for (const sx of [1, -1]) {
+    const cheek = new THREE.Mesh(new THREE.CircleGeometry(4.2, 32), M.accent);
+    cheek.position.set(sx * 31, 69, HEAD.z1 + 0.06);
+    body.add(cheek);
+  }
+
+  // ---------- the face: a dark panel on the front of the head, with the oled behind a window in it ----------
   const face = new THREE.Group();
-  const fz = FACE.bottom[0] - FACE.top[0], fy = FACE.top[1] - FACE.bottom[1];
-  face.position.set(0, (FACE.bottom[1] + FACE.top[1]) / 2, (FACE.bottom[0] + FACE.top[0]) / 2);
-  face.rotation.x = -Math.atan2(fz, fy);
-  root.add(face);
+  face.position.set(0, 86, HEAD.z1);
+  body.add(face);
   const eyeCanvas = document.createElement("canvas");
   eyeCanvas.width = 128; eyeCanvas.height = 64;
   const eyeTex = new THREE.CanvasTexture(eyeCanvas);
   eyeTex.magFilter = THREE.NearestFilter;
   eyeTex.colorSpace = THREE.SRGBColorSpace;
-  const visorShape = roundedShape([[-20, -13.5], [20, -13.5], [20, 13.5], [-20, 13.5]], 5);
-  const visor = asGhost(new THREE.Mesh(new THREE.ExtrudeGeometry(visorShape, { depth: 1.2, bevelEnabled: false, curveSegments: 10 }), M.visor));
-  visor.position.z = -0.4;
+  const visorShape = roundedShape([[-27, -17], [27, -17], [27, 17], [-27, 17]], 13);
+  const visor = asGhost(new THREE.Mesh(new THREE.ExtrudeGeometry(visorShape, { depth: 1, bevelEnabled: false, curveSegments: 14 }), M.visor));
+  visor.position.z = -0.6;
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(21.7, 10.9), new THREE.MeshBasicMaterial({ map: eyeTex, toneMapped: false }));
-  screen.position.set(0, 2, 0.86);
+  screen.position.set(0, 1.5, 0.45);
   part("the face: 0.96 inch oled, 128 x 64 pixels", face, visor, screen,
-    bx(-13, 13, -7.5, 11.5, -3.9, -2.4, M.glass),             // the display's glass
-    bx(-13.5, 13.5, -14, 14, -5.5, -3.9, M.boardBlue),        // its board (27 x 28 mm)
-    bx(-5, 5, 10.5, 13, -8, -5.5, M.chip));                   // the 4 pins on the back
+    bx(-13, 13, -8, 11, -4, -2.5, M.glass),                   // the display's glass
+    bx(-13.5, 13.5, -14.5, 13.5, -5.6, -4, M.boardBlue),      // its board
+    bx(-15.5, 15.5, -16.5, 15.5, -10, -5.6, M.holder),        // its case (size estimated: measure yours)
+    bx(-5, 5, 10, 12.5, -24, -10, M.chip));                   // the 4 jumper plugs on its pins
 
-  // ---------- drive: two wheel servos across the back. They plug straight into the pico, no driver board ----------
-  const R = WHEEL_D / 2;
-  for (const s of [1, -1]) {
-    part("wheel servo (9 g size): spins all the way round, speed set by the pico", root,
-      bx(s * 6, s * 32.4, AXLE.y - 6.1, AXLE.y + 6.1, AXLE.z - 6, AXLE.z + 17, M.servo),
-      bx(s * 26, s * 28.5, AXLE.y - 6.1, AXLE.y + 6.1, AXLE.z - 10.7, AXLE.z + 21.7, M.servo),
-      cylX(2.4, s * 32.4, s * 37.5, AXLE.y, AXLE.z, M.white, 20));
-    const tyre = new THREE.Mesh(new THREE.TorusGeometry(R - 2.6, 2.6, 14, 64), M.tyre);
-    tyre.rotation.y = Math.PI / 2;
-    tyre.scale.z = WHEEL_W / 5.2;
-    tyre.position.set(s * (34.5 + WHEEL_W / 2), AXLE.y, AXLE.z);
-    part("wheel and tyre: comes with the wheel servo and pushes onto its shaft", root, tyre,
-      cylX(R - 4, s * 35.6, s * (33.4 + WHEEL_W), AXLE.y, AXLE.z, M.hub, 64),
-      cylX(4.6, s * 34.2, s * (35 + WHEEL_W), AXLE.y, AXLE.z, M.accent, 28));
-  }
-  // a rounded bump under the middle is the third point it rests on. Printed as part of the base
-  const skid = new THREE.Mesh(new THREE.SphereGeometry(4.5, 28, 20), M.base);
-  skid.position.set(0, 4.5, 6);
-  part("skid (printed): the third point it rests on", root, asGhost(skid), asGhost(cylY(4.5, 4.5, 9, 0, 6, M.base)));
+  // ---------- inside the head: the breadboard standing upright, with the pico on its back ----------
+  const zHoles = BOARD.z0, yMid = (BOARD.y0 + BOARD.y1) / 2;
+  part("half-size breadboard (85 x 55 mm), standing upright: shares power between the parts", body,
+    bx(-42.5, 42.5, BOARD.y0, BOARD.y1, BOARD.z0, BOARD.z1, M.white),
+    bx(-42.5, 42.5, yMid - 1.2, yMid + 1.2, zHoles - 0.05, zHoles + 0.01, M.chip),
+    bx(-40, 40, BOARD.y0 + 2, BOARD.y0 + 2.6, zHoles - 0.05, zHoles + 0.01, M.redLine),
+    bx(-40, 40, BOARD.y1 - 2.6, BOARD.y1 - 2, zHoles - 0.05, zHoles + 0.01, M.accent));
+  const pz = zHoles - 2.5; // the pico's board, standing off the breadboard on its header strips
+  part("raspberry pi pico 2 w with header (51 x 21 mm): the brain, with wi-fi", body,
+    bx(-42.5, 8.5, yMid - 10, yMid - 7.5, pz, zHoles, M.chip),
+    bx(-42.5, 8.5, yMid + 7.5, yMid + 10, pz, zHoles, M.chip),
+    bx(-42.5, 8.5, yMid - 10.5, yMid + 10.5, pz - 1, pz, M.pico),
+    bx(-44, -38.3, yMid - 4, yMid + 4, pz - 3.7, pz - 1, M.steel),   // usb, facing the left ear
+    bx(-24, -17, yMid - 3.5, yMid + 3.5, pz - 1.9, pz - 1, M.chip),  // the rp2350 chip
+    bx(-6, 6, yMid - 5.5, yMid + 5.5, pz - 2.8, pz - 1, M.steel),    // the wireless module's shield
+    bx(-36, -33, yMid + 5.5, yMid + 8, pz - 2.1, pz - 1, M.white));  // the bootsel button
+  const plugs: THREE.Object3D[] = [];
+  const plugAt = (x: number, y: number, mat: THREE.Material) => plugs.push(bx(x - 1.25, x + 1.25, y - 1.25, y + 1.25, zHoles - 14, zHoles, mat));
+  plugAt(-39, BOARD.y0 + 5, M.redLine); plugAt(-36.5, BOARD.y0 + 5, M.dark); plugAt(-34, BOARD.y0 + 5, M.accent); plugAt(-31.5, BOARD.y0 + 5, M.tape);
+  plugAt(12, yMid - 6, M.redLine); plugAt(14.5, yMid - 6, M.dark); plugAt(17, yMid + 6, M.accent); plugAt(19.5, yMid + 6, M.tape);
+  plugAt(39, BOARD.y0 + 2.3, M.redLine); plugAt(39, BOARD.y1 - 2.3, M.dark);
+  part("jumper wires: plug every part into the breadboard, no soldering", body, ...plugs);
+  part("passive buzzer brick (19 x 27 mm): chirps, chimes and alarms, behind the right ear", body,
+    bx(33.9, 35.5, EAR.y - 13.5, EAR.y + 13.5, -24, -5, M.boardBlack),
+    cylX(6, 35.5, 44.5, EAR.y, -14.5, M.chip),
+    bx(28, 33.9, EAR.y - 12.5, EAR.y - 9.5, -21, -13, M.white));
 
-  // ---------- the lift arm: one servo swings two arms with a blade and two tines on the front ----------
-  const arm = new THREE.Group();
-  arm.position.set(0, PIVOT.y, PIVOT.z);
-  root.add(arm);
-  const dn = ARM_DOWN * deg, tipY = -Math.sin(dn) * ARM_LEN, tipZ = Math.cos(dn) * ARM_LEN;
-  const ax0 = HALF_W + 1.5, ax1 = HALF_W + 4.5; // the arms run just outside the body
-  const armBits: THREE.Object3D[] = [];
-  for (const s of [1, -1]) {
-    const bar = new THREE.Group();
-    bar.rotation.x = dn;
-    bar.add(bx(s * ax0, s * ax1, -3, 3, 0, ARM_LEN, M.dark));
-    armBits.push(bar, cylX(5.5, s * (ax0 - 0.4), s * (ax1 + 0.4), 0, 0, M.dark), cylX(2.6, s * (ax0 - 1), s * (ax1 + 1), 0, 0, M.accent, 24));
-  }
-  // the blade across the front (pushes), and two tines with a lip on the end (slide under things and pull them back)
-  armBits.push(bx(-ax1, ax1, tipY - 9, tipY - 1, tipZ - 1, tipZ + 1.6, M.dark));
-  for (const s of [1, -1]) {
-    armBits.push(bx(s * 12, s * 17, tipY - 9, tipY - 6.6, tipZ, tipZ + 11, M.dark), bx(s * 12, s * 17, tipY - 9, tipY - 4, tipZ + 9, tipZ + 11, M.accent));
-  }
-  part("lift arm (printed): pushes, lifts and pulls", arm, ...armBits);
-  part("micro servo (22 x 11.5 x 27 mm): swings the lift arm", root,
-    bx(-32.4, -6, PIVOT.y - 6.1, PIVOT.y + 6.1, PIVOT.z - 6, PIVOT.z + 17, M.servo),
-    bx(-28.5, -26, PIVOT.y - 6.1, PIVOT.y + 6.1, PIVOT.z - 10.7, PIVOT.z + 21.7, M.servo),
-    cylX(2.4, -34.6, -32.4, PIVOT.y, PIVOT.z, M.white, 20));
-  part("pivot pin for the right arm", root, cylX(2, 31, ax0, PIVOT.y, PIVOT.z, M.steel, 16));
-
-  // ---------- floor level: the brain, and the small parts ----------
-  part("raspberry pi pico 2 w (51 x 21 mm): the brain. everything plugs into it", root,
-    bx(-10.5, 10.5, 12.6, 13.6, -41.5, 9.5, M.pico),
-    bx(-4, 4, 13.6, 16.3, -43.2, -37.5, M.steel),            // usb
-    bx(-3.5, 3.5, 13.6, 14.5, -25, -18, M.chip),             // the rp2350 chip
-    bx(-5.5, 5.5, 13.6, 15.4, -7, 5, M.steel),               // the wireless module's shield
-    bx(-8, -5.5, 13.6, 14.7, -34, -31, M.white));            // the bootsel button
-  part("buzzer (12 x 10 mm): beeps and chirps", root, cylY(6, FLOOR_TOP, FLOOR_TOP + 10, 22, 6, M.chip), cylY(1.2, FLOOR_TOP + 10, FLOOR_TOP + 10.1, 22, 6, M.cone, 12));
-  part("vibration motor: stuck to the floor so the whole body buzzes", root, cylY(5, FLOOR_TOP, FLOOR_TOP + 3, -22, 5, M.steel));
-  part("two transistors on a scrap of board: switch the buzzer and the vibration motor", root,
-    bx(-29, -13, 12, 13.2, -20, -6, M.boardGreen), bx(-26, -22, 13.2, 17, -17, -13, M.chip), bx(-20, -16, 13.2, 17, -17, -13, M.chip));
-  // the edge sensor sits in the floor of the nose, its two infrared probes looking down
-  part("edge sensor (34 x 27 mm, two infrared probes): looks down so it never drives off the desk", root,
-    bx(-17.1, 17.1, 9.6, 11.2, 12.5, 39.7, M.boardBlack),
-    bx(-9.5, -4.5, 6.5, 9.6, 33.5, 38, M.chip), bx(4.5, 9.5, 6.5, 9.6, 33.5, 38, M.chip),
-    bx(-4, 4, 11.2, 13.8, 14, 17, M.white));
-  // the distance sensor stands behind the chin, its two round "eyes" poking through
-  const canMat = M.steel;
-  const cans: THREE.Object3D[] = [];
-  for (const s of [1, -1]) {
-    cans.push(cylZ(8, 30, 42.4, s * 13, 21.5, canMat), cylZ(6.6, 42.4, 42.5, s * 13, 21.5, M.cone, 32));
-  }
-  part("ultrasonic distance sensor (45 x 20 mm): measures how far away things are, 2 cm to 4.5 m", root,
-    bx(-22.5, 22.5, 11.5, 31.5, 28.4, 30, M.boardBlue), ...cans);
-
-  // ---------- on the back: the battery pack, where you can reach it to swap batteries and switch it off ----------
+  // ---------- inside the body: the batteries, the motion sensor and the diode ----------
   const cells: THREE.Object3D[] = [];
-  for (const z of [-34.2, -22, -9.8]) cells.push(cylX(5.25, -22.2, 22.2, DECK + 7.6, z, M.battery, 24), cylX(2, 22.2, 23.4, DECK + 7.6, z, M.gold, 12));
-  part("3 aaa batteries (4.5 v)", root, ...cells);
-  part("battery holder with on/off switch (63.5 x 36.8 x 15.7 mm)", root,
-    outline(asGhost(bx(-31.75, 31.75, DECK, DECK + 15.7, -40.4, -3.6, M.holder))),
-    bx(-27, -19, DECK + 15.7, DECK + 16.5, -26, -18, M.chip), bx(-25, -22, DECK + 16.5, DECK + 17.7, -24, -20, M.white));
-
-  // ---------- little details on the outside ----------
-  part("usb port: code goes in here", root, bx(-5, 5, 13, 17, -42.15, -41.4, M.chip));
-  // an accent line down each side
-  for (const s of [1, -1]) root.add(bx(s * (HALF_W + 0.02), s * (HALF_W - 0.4), 32.4, 33.6, -36, 34, M.accent));
+  for (const z of [-12.2, 0, 12.2]) cells.push(cylX(5.25, -22.2, 22.2, 16, z, M.battery, 24), cylX(2, 22.2, 23.4, 16, z, M.gold, 12));
+  part("3 aaa batteries (about 3.6 to 4.5 v)", body, ...cells);
+  part("battery holder with on/off switch (63.5 x 36.8 x 15.7 mm). its switch faces down, through a hole between the feet", body,
+    outline(asGhost(bx(-31.75, 31.75, 8.2, 23.9, -18.4, 18.4, M.holder))),
+    bx(-4, 4, 7.4, 8.2, -10, -2, M.chip), bx(-1.5, 1.5, 5.8, 7.4, -8, -4, M.white));
+  part("mpu6050 motion sensor (about 21 x 16 mm): feels being picked up and shaken", body,
+    bx(-10.5, 10.5, 26, 27.5, -8, 8, M.boardBlue), bx(-2, 2, 27.5, 28.4, -2, 2, M.chip),
+    bx(-10.5, 10.5, 27.5, 30, 5.5, 8, M.chip),
+    bx(-8.5, -6, 30, 44, 6, 8.5, M.redLine), bx(-6, -3.5, 30, 44, 6, 8.5, M.dark), bx(-3.5, -1, 30, 44, 6, 8.5, M.accent), bx(-1, 1.5, 30, 44, 6, 8.5, M.tape));
+  part("1n4001 diode: stops usb power flowing back into the batteries", body,
+    cylX(1.3, 14, 19.5, 28, -14, M.chip, 16), bx(18.4, 19.2, 26.7, 29.3, -15.3, -12.7, M.steel));
 
   // the soft shadow on the desk
   const sc = document.createElement("canvas");
@@ -267,34 +251,46 @@ function buildRobot() {
     sctx.fillStyle = g; sctx.fillRect(0, 0, 256, 256);
   }
   const shadowTex = new THREE.CanvasTexture(sc);
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(210, 240), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, toneMapped: false }));
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, toneMapped: false }));
   shadow.rotation.x = -Math.PI / 2;
-  shadow.position.set(0, 0.05, 6);
+  shadow.position.set(0, 0.05, 1);
   root.add(shadow);
 
-  return { root, ghostMats, lineMat, arm, eyeCanvas, eyeTex, shadow };
+  return { root, body, ghostMats, lineMat, eyeCanvas, eyeTex, shadow };
 }
 
-// draws the eyes on the oled. open = 1 wide open, 0 shut. look = -1 left to 1 right
-function drawEyes(c: HTMLCanvasElement, open: number, look: number, happy: number) {
+// draws the oled. open = 1 wide open, 0 shut. look = -1 left to 1 right. dizzy = spirals for eyes.
+// clock = show the time instead of eyes (like the real one will, set over wi-fi)
+function drawEyes(c: HTMLCanvasElement, open: number, look: number, dizzy: number, clock: string) {
   const ctx = c.getContext("2d");
   if (!ctx) return;
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, 128, 64);
-  ctx.fillStyle = EYE_COLOUR;
+  ctx.fillStyle = ctx.strokeStyle = EYE_COLOUR;
+  if (clock) {
+    ctx.font = "bold 34px ui-monospace, Menlo, monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(clock, 64, 34);
+    return;
+  }
+  if (dizzy >= 0) { // two spirals, turning
+    ctx.lineWidth = 3;
+    for (const cx of [38, 90]) {
+      ctx.beginPath();
+      for (let a = 0; a < Math.PI * 6; a += 0.2) {
+        const r = 1 + a * 1.15, x = cx + Math.cos(a + dizzy) * r, y = 32 + Math.sin(a + dizzy) * r;
+        if (a === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    return;
+  }
   const h = Math.max(4, 34 * open), w = 24, y = 32 - h / 2, dx = Math.round(look * 9);
   for (const cx of [38, 90]) {
     ctx.beginPath();
     ctx.roundRect(cx - w / 2 + dx, y, w, h, Math.min(8, h / 2));
     ctx.fill();
-  }
-  if (happy > 0) { // a smile pushes the bottoms of the eyes up into arches
-    ctx.fillStyle = "#000";
-    for (const cx of [38, 90]) {
-      ctx.beginPath();
-      ctx.ellipse(cx + dx, y + h + 6 - happy * 14, 17, 14, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
   }
 }
 
@@ -303,9 +299,9 @@ export default function RobotViewer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [xray, setXray] = useState(false);
   const [spin, setSpin] = useState(true);
-  const [lift, setLift] = useState(false);
+  const [clock, setClock] = useState(false);
   const [label, setLabel] = useState<{ text: string; x: number; y: number } | null>(null);
-  const xrayRef = useRef(false), spinRef = useRef(true), liftRef = useRef(false);
+  const xrayRef = useRef(false), spinRef = useRef(true), clockRef = useRef(false), shakeRef = useRef(-1);
 
   useEffect(() => {
     const wrap = wrapRef.current, canvas = canvasRef.current;
@@ -327,7 +323,7 @@ export default function RobotViewer() {
     scene.add(robot.root);
 
     const camera = new THREE.PerspectiveCamera(28, 1, 10, 4000);
-    const target = new THREE.Vector3(0, 32, 4);
+    const target = new THREE.Vector3(0, 62, 0);
     camera.position.set(target.x + VIEW_DISTANCE * 0.56, target.y + VIEW_DISTANCE * 0.3, target.z + VIEW_DISTANCE * 0.77);
     const controls = new OrbitControls(camera, canvas);
     controls.target.copy(target);
@@ -377,7 +373,7 @@ export default function RobotViewer() {
     canvas.addEventListener("pointerdown", onDown);
     canvas.addEventListener("pointerleave", onLeave);
 
-    let raf = 0, last = performance.now(), xr = 0, lf = 0, eyeKey = "", seen = true;
+    let raf = 0, last = performance.now(), xr = 0, eyeKey = "", seen = true;
     const io = new IntersectionObserver((en) => { seen = en[0].isIntersecting; });
     io.observe(wrap);
     const tick = (now: number) => {
@@ -397,16 +393,24 @@ export default function RobotViewer() {
       }
       robot.lineMat.opacity = 0.5 * xr;
       robot.shadow.material.opacity = 1 - 0.5 * xr;
-      // the lift arm
-      const lg = liftRef.current ? 1 : 0;
-      lf += (lg - lf) * (1 - Math.exp(-dt * 5));
-      robot.arm.rotation.x = -lf * LIFT_DEGREES * deg;
-      // the face: blinks every few seconds, glances about, and smiles while the arm is up
-      const t = now / 1000, b = t % 3.6;
+      // "shake": it wobbles about like it's being shaken, then its eyes go dizzy
+      const t = now / 1000;
+      if (shakeRef.current === 0) shakeRef.current = t; // just pressed
+      const st = shakeRef.current > 0 ? t - shakeRef.current : -1;
+      if (st > SHAKE_SECONDS + DIZZY_SECONDS) shakeRef.current = -1;
+      const wob = st >= 0 && st < SHAKE_SECONDS ? Math.sin(st * 34) * (1 - st / SHAKE_SECONDS) : 0;
+      robot.body.rotation.z = wob * 0.14;
+      robot.body.rotation.x = wob * 0.05;
+      robot.body.position.y = Math.abs(wob) * 9;
+      // the face: blinks every few seconds and glances about; dizzy after a shake; or the time, if "clock" is on
+      const b = t % 3.6;
       const open = b < 0.16 ? Math.abs(b - 0.08) / 0.08 : 1;
       const look = Math.round(Math.sin(t * 0.55) * Math.max(0, Math.sin(t * 0.21)) * 4) / 4;
-      const k = `${open.toFixed(1)}|${look}|${lf.toFixed(1)}`;
-      if (k !== eyeKey) { eyeKey = k; drawEyes(robot.eyeCanvas, open, look, lf); robot.eyeTex.needsUpdate = true; }
+      const dizzy = st >= 0 ? Math.round(t * 8) / 2 : -1;
+      const d = new Date();
+      const time = clockRef.current && st < 0 ? `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")}` : "";
+      const k = `${open.toFixed(1)}|${look}|${dizzy}|${time}`;
+      if (k !== eyeKey) { eyeKey = k; drawEyes(robot.eyeCanvas, open, look, dizzy, time); robot.eyeTex.needsUpdate = true; }
       controls.autoRotate = spinRef.current && !dragging;
       controls.update();
       renderer.render(scene, camera);
@@ -443,7 +447,7 @@ export default function RobotViewer() {
 
   return (
     <div ref={wrapRef} className="relative h-full w-full">
-      <canvas ref={canvasRef} role="img" aria-label="A 3D model of the robot. Drag to turn it round." className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing" />
+      <canvas ref={canvasRef} role="img" aria-label="A 3D model of the desk robot. Drag to turn it round." className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing" />
       {/* the name of the part under the pointer */}
       {label && (
         <div className="pointer-events-none absolute z-10 max-w-[16rem] rounded-md bg-neutral-900 px-3 py-1.5 text-sm lowercase leading-snug text-white shadow-lg" style={{ left: Math.max(8, label.x + 14), top: Math.max(8, label.y + 14) }}>
@@ -453,7 +457,8 @@ export default function RobotViewer() {
       <div className="absolute inset-x-0 bottom-4 flex flex-wrap items-center justify-between gap-3 px-1">
         <span className="text-sm font-light lowercase text-neutral-500">drag to rotate, click then scroll to zoom</span>
         <span className="flex gap-2">
-          <button type="button" aria-pressed={lift} onClick={() => { liftRef.current = !liftRef.current; setLift(liftRef.current); }} className={pill(lift)}>lift</button>
+          <button type="button" onClick={() => { shakeRef.current = 0; }} className={pill(false)}>shake</button>
+          <button type="button" aria-pressed={clock} onClick={() => { clockRef.current = !clockRef.current; setClock(clockRef.current); }} className={pill(clock)}>clock</button>
           <button type="button" aria-pressed={xray} onClick={() => { xrayRef.current = !xrayRef.current; setXray(xrayRef.current); }} className={pill(xray)}>x-ray</button>
           <button type="button" aria-pressed={spin} onClick={() => { spinRef.current = !spinRef.current; setSpin(spinRef.current); }} className={pill(spin)}>spin</button>
         </span>

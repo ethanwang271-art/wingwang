@@ -1987,10 +1987,11 @@ export default function Home() {
                 <div ref={(el) => { screenPageEls.current[1] = el; }} role="group" aria-roledescription="slide" aria-label={`2 of ${SCREEN_PAGES.length}: photos`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
                   <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>photos</h2>
                   <p className="mt-[0.5em] text-neutral-400" style={scrText}>
-                    {albums.length > 0 ? `${albums.length} albums so far! the latest three:` : "albums from my camera roll."}
+                    {albums.length > 0 ? `${albums.length} albums so far! the latest few:` : "albums from my camera roll."}
                   </p>
-                  <div className="mt-[1em] grid min-h-0 flex-1 grid-cols-3 gap-[clamp(8px,2cqmin,20px)]">
-                    {featured.map((a) => (
+                  {/* three albums side by side on computers; on phones only the first two, so they aren't too thin */}
+                  <div className="mt-[1em] grid min-h-0 flex-1 grid-cols-2 gap-[clamp(8px,2cqmin,20px)] sm:grid-cols-3">
+                    {featured.map((a, i) => (
                       <Link
                         key={a.id}
                         href={`/photos/${encodeURIComponent(a.id)}`}
@@ -1999,7 +2000,7 @@ export default function Home() {
                         onMouseLeave={leaveShot}
                         onFocus={() => hoverShot(a.id, HOME_COVERS[a.id]?.photo ?? decodeURIComponent(a.cover.split("/").pop() || ""))}
                         onBlur={leaveShot}
-                        className="group relative block min-h-0 overflow-hidden rounded-[3px] bg-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+                        className={`group relative min-h-0 ${i === 2 ? "hidden sm:block" : "block"} overflow-hidden rounded-[3px] bg-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}>
                         {(HOME_COVERS[a.id] || a.cover) && (
                           <Image
                             src={HOME_COVERS[a.id] ? `/photos/${encodeURIComponent(a.id)}/${encodeURIComponent(HOME_COVERS[a.id].photo)}` : a.cover}

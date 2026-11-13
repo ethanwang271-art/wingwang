@@ -18,8 +18,8 @@ const PROJECTS: { title: string; date: string; description: string; media: strin
   {
     title: "mini robot desk assistant",
     date: "nov '26",
-    description: "a small desk robot with a face, built around a raspberry pi pico 2 w. nine parts, the goal is under $70. a prototype design: a 3d model you can turn and x-ray, how it works, and every part it needs.",
-    media: "/projects/robot-simple.png",
+    description: "a small desk buddy with a face, built around a raspberry pi pico 2 w: a wi-fi clock, alarm and timer that gets dizzy when you shake it. version 1, parts ordered, not built yet.",
+    media: "/projects/robot-v1.png",
     link: "/projects/robot",
   },
   // Copy this block (without the // at the start of each line) to add a project:
