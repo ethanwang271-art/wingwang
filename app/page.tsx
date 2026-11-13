@@ -1418,7 +1418,7 @@ export default function Home() {
     // turning the camera by hand: how far it's turned (ry = round, rx = up and down, in radians), how fast it's
     // still turning after you let go, and when the pointer last moved
     let spinning = false, lastX = 0, lastY = 0, ry = 0, rx = 0, vy = 0, vx = 0, movedAt = 0;
-    let turnDir = 0; // which way round it turns to its screen (+1 / -1), fixed once the turn has started
+    let turnPrev = NaN; // how far it still has to turn to show its screen, from the last frame (so it never jumps a whole turn)
     const START = CAMERA_TURN * CAMERA_SPIN_UNTIL; // you can turn it until you've scrolled this far (1 = the whole camera part)
     // swiping the screen: where the swipe started, whether it's gone sideways yet, and how far the pages are pulled along
     let swipe: { id: number; x: number; y: number; on: boolean } | null = null, dragPx = 0, justSwiped = false;
@@ -1575,14 +1575,13 @@ export default function Home() {
       ry = Math.atan2(Math.sin(ry), Math.cos(ry)); // keep it within one turn either way
       // where the turn starts (how you left it) and ends (its back facing you), going whichever way round is shorter
       const yaw0 = CAMERA_YAW * deg + ry, tilt0 = CAMERA_TILT * deg + rx;
-      // While you can still drag it, scrolling turns it half way round from wherever you've turned it (so you can spin it
-      // all the way round without it jumping). Past that point it stops following the pointer, and the rest of the scroll
-      // eases it round to face you with its screen, going whichever way is shorter.
+      // Scrolling turns it round to face you with its screen, the shorter way round from wherever you've turned it.
+      // If its screen is already facing you, it doesn't turn at all and just zooms in. If you drag it while it's
+      // part way through the turn, the amount left follows on smoothly from the last frame, so it never jumps.
       const toBack = Math.PI - yaw0;
-      let shortest = Math.atan2(Math.sin(toBack), Math.cos(toBack));
-      if (f <= 0.001 || !turnDir) turnDir = shortest < 0 ? -1 : 1;
-      if (Math.abs(shortest - turnDir * Math.PI) > Math.PI) shortest += Math.sign(turnDir * Math.PI - shortest) * Math.PI * 2;
-      const turnBy = lerp(turnDir * Math.PI, shortest, smooth(smooth(0, T, START), 0.75, f));
+      let turnBy = Math.atan2(Math.sin(toBack), Math.cos(toBack));
+      if (f > 0.001 && Number.isFinite(turnPrev)) turnBy += Math.round((turnPrev - turnBy) / (Math.PI * 2)) * Math.PI * 2;
+      turnPrev = turnBy;
 
       // Lighting up the dots: every dot near the line the pointer moved along since the last frame lights up
       // (so fast moves don't skip any). Once you scroll on towards the screen, they all fade away.
