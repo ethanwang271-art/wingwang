@@ -53,7 +53,7 @@ const HOME_COVERS: Record<string, { photo: string; focus?: string }> = {
 const HOME_VIDEO = { title: "coming soon", caption: "to be announced", src: "", poster: "" };
 // projects: a short list. Copy the example block (without the //) to add one, newest first.
 const HOME_PROJECTS: { date: string; title: string; text: string; href: string }[] = [
-  { date: "nov '26", title: "mini robot desk assistant", text: "a unfinished small desk robot with a face & emotions, built around a pico 2 w, its my personal starting project in robotics. it currently is a work in progress and its in its development phase", href: "/projects/robot" },
+  { date: "nov '26", title: "salmon", text: "a unfinished small desk robot with a face & emotions, built around a pico 2 w, its my personal starting project in robotics. it currently is a work in progress and its in its development phase", href: "/projects/robot" },
   // { date: "mar '26", title: "my project", text: "one line about it", href: "/projects" },
 ];
 

@@ -22,6 +22,10 @@ const XRAY_LINES = 0x30507f;     // in x-ray view, the fine lines round the body
 const SHAKE_SECONDS = 1.4;       // how long it wobbles when you press "shake"
 const DIZZY_SECONDS = 2.2;       // how long the dizzy eyes last after that
 const VIEW_DISTANCE = 470;       // how far away the camera starts, in mm
+const DIM_COLOUR = 0x1f5fd9;     // the measuring lines when "dimensions" is on (the site blue)
+const DIM_LABEL = "#1f5fd9";     // the writing on their labels
+const DIM_DETAIL_COLOUR = 0x86a9ea; // the smaller measurements of each part (a lighter blue)
+const DIM_DETAIL_LABEL = "#4f7fd6"; // the writing on their labels
 
 // ---- where things are (mm). Change a number here and the part moves in the model ----
 // It's a little character: a big round head with the face, and a small body with the batteries, on two feet.
@@ -82,6 +86,75 @@ function extrudeAcross(pts: [number, number, number?][], x0: number, x1: number,
   g.rotateY(Math.PI / 2);
   g.translate(x0 + bevel, 0, 0);
   return g;
+}
+
+// the measuring lines for "dimensions": overall width, depth, height and height to the antenna tip,
+// plus smaller, lighter ones for each part: the head, the body, the face and the ears.
+// The numbers come from the settings above, so they stay right if the robot changes size.
+// Each one fades out when it's round the far side of the robot, so labels never show through it.
+function buildDims() {
+  const group = new THREE.Group();
+  const dims: { side: THREE.Vector3; line: THREE.LineBasicMaterial; label: THREE.SpriteMaterial }[] = [];
+  const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  // one measurement: a line from p0 to p1 with arrows at both ends, lines out from the model (e0, e1) to each end,
+  // and a label in the middle. side = which way it faces (it shows when you look from that side).
+  // small = one of the lighter measurements of a single part
+  const dim = (p0: THREE.Vector3, p1: THREE.Vector3, e0: THREE.Vector3, e1: THREE.Vector3, mm: number, side: THREE.Vector3, small = false) => {
+    const pts: THREE.Vector3[] = [], k = small ? 0.7 : 1;
+    const u = p1.clone().sub(p0).normalize();
+    for (const [p, e, d] of [[p0, e0, 1], [p1, e1, -1]] as const) {
+      const out = p.clone().sub(e).normalize();
+      pts.push(e.clone().addScaledVector(out, 2), p.clone().addScaledVector(out, 4 * k)); // the line out from the model
+      for (const sd of [1, -1]) pts.push(p.clone(), p.clone().addScaledVector(u, 6 * k * d).addScaledVector(out, 2.2 * k * sd)); // arrow
+    }
+    pts.push(p0.clone(), p1.clone());
+    const line = new THREE.LineBasicMaterial({ color: small ? DIM_DETAIL_COLOUR : DIM_COLOUR, transparent: true, opacity: 0 });
+    group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), line));
+    // the label: the size in mm on a white tag, always facing you
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 96;
+    const ctx = c.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.roundRect(8, 14, 240, 68, 34); ctx.fill();
+      ctx.fillStyle = small ? DIM_DETAIL_LABEL : DIM_LABEL;
+      ctx.font = "600 44px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(`${Math.round(mm)} mm`, 128, 50);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const label = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, depthTest: false, toneMapped: false });
+    const tag = new THREE.Sprite(label);
+    tag.scale.set(30 * k, 11.25 * k, 1);
+    tag.position.copy(p0).add(p1).multiplyScalar(0.5);
+    tag.renderOrder = 10;
+    group.add(tag);
+    dims.push({ side, line, label });
+  };
+  const FRONT = v(0, 0, 1), RIGHT = v(1, 0, 0), LEFT = v(-1, 0, 0);
+  const W = HEAD.hw + 3.7;            // the outside of the ears
+  const TIP = HEAD.y1 + 18.5;         // the top of the antenna's ball
+  const y = 0.3;                      // just above the desk
+  // overall
+  dim(v(-W, y, 60), v(W, y, 60), v(-W, y, 8), v(W, y, 8), W * 2, FRONT);                                                       // width, in front
+  dim(v(W + 20, y, HEAD.z0), v(W + 20, y, HEAD.z1), v(HEAD.hw, y, HEAD.z0), v(HEAD.hw, y, HEAD.z1), HEAD.z1 - HEAD.z0, RIGHT); // depth, at the side
+  dim(v(-W - 26, 0, 0), v(-W - 26, HEAD.y1, 0), v(-BODY.hw - 4, 0, 0), v(-HEAD.hw * 0.5, HEAD.y1, 0), HEAD.y1, LEFT);         // height, on the left
+  dim(v(W + 26, 0, -4), v(W + 26, TIP, -4), v(BODY.hw + 8, 0, -4), v(6, TIP, -4), TIP, RIGHT);                                 // to the antenna tip, on the right
+  // each part. F = the front of the head, B = the front of the body
+  const F = HEAD.z1, B = BODY.z1, R = HEAD.hw + 9; // R: the line down the right of the front, for the head and body heights
+  dim(v(-HEAD.hw, HEAD.y1 + 9, F), v(HEAD.hw, HEAD.y1 + 9, F), v(-HEAD.hw + 3, HEAD.y1 - 6, F), v(HEAD.hw - 3, HEAD.y1 - 6, F), HEAD.hw * 2, FRONT, true); // head width, above it
+  dim(v(R, HEAD.y0, F), v(R, HEAD.y1, F), v(HEAD.hw - 4, HEAD.y0 + 3, F), v(HEAD.hw - 4, HEAD.y1 - 3, F), HEAD.y1 - HEAD.y0, FRONT, true);              // head height
+  dim(v(R, BODY.y0, B), v(R, BODY.y1, B), v(BODY.hw - 4, BODY.y0 + 3, B), v(BODY.hw - 4, BODY.y1 - 3, B), BODY.y1 - BODY.y0, FRONT, true);              // body height
+  dim(v(-BODY.hw, 36, B + 9), v(BODY.hw, 36, B + 9), v(-BODY.hw + 2, 36, B - 2), v(BODY.hw - 2, 36, B - 2), BODY.hw * 2, FRONT, true);                // body width, in front of it
+  const by = BODY.y1 - 2, bx = BODY.hw + 14; // body depth: along its right side, just under the head and above the arm
+  dim(v(bx, by, BODY.z0), v(bx, by, BODY.z1), v(BODY.hw - 4, by, BODY.z0), v(BODY.hw - 4, by, BODY.z1), BODY.z1 - BODY.z0, RIGHT, true);
+  dim(v(-27, 86 + 23, F + 1), v(27, 86 + 23, F + 1), v(-24, 86 + 15, F + 1), v(24, 86 + 15, F + 1), 54, FRONT, true);                                 // the face panel's width
+  dim(v(-35, 86 - 17, F + 1), v(-35, 86 + 17, F + 1), v(-26, 86 - 15, F + 1), v(-26, 86 + 15, F + 1), 34, FRONT, true);                               // and its height
+  const ex = -W - 0.5, ez = EAR.z - EAR.r - 8;
+  dim(v(ex, EAR.y - EAR.r, ez), v(ex, EAR.y + EAR.r, ez), v(ex, EAR.y - EAR.r, EAR.z), v(ex, EAR.y + EAR.r, EAR.z), EAR.r * 2, LEFT, true);          // the left ear, across
+  group.visible = false;
+  return { group, dims };
 }
 
 // builds the whole robot. Returns the model plus the bits the page animates
@@ -260,20 +333,12 @@ function buildRobot() {
 }
 
 // draws the oled. open = 1 wide open, 0 shut. look = -1 left to 1 right. dizzy = spirals for eyes.
-// clock = show the time instead of eyes (like the real one will, set over wi-fi)
-function drawEyes(c: HTMLCanvasElement, open: number, look: number, dizzy: number, clock: string) {
+function drawEyes(c: HTMLCanvasElement, open: number, look: number, dizzy: number) {
   const ctx = c.getContext("2d");
   if (!ctx) return;
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, 128, 64);
   ctx.fillStyle = ctx.strokeStyle = EYE_COLOUR;
-  if (clock) {
-    ctx.font = "bold 34px ui-monospace, Menlo, monospace";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(clock, 64, 34);
-    return;
-  }
   if (dizzy >= 0) { // two spirals, turning
     ctx.lineWidth = 3;
     for (const cx of [38, 90]) {
@@ -299,9 +364,9 @@ export default function RobotViewer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [xray, setXray] = useState(false);
   const [spin, setSpin] = useState(true);
-  const [clock, setClock] = useState(false);
+  const [dims, setDims] = useState(false);
   const [label, setLabel] = useState<{ text: string; x: number; y: number } | null>(null);
-  const xrayRef = useRef(false), spinRef = useRef(true), clockRef = useRef(false), shakeRef = useRef(-1);
+  const xrayRef = useRef(false), spinRef = useRef(true), dimsRef = useRef(false), shakeRef = useRef(-1);
 
   useEffect(() => {
     const wrap = wrapRef.current, canvas = canvasRef.current;
@@ -321,6 +386,8 @@ export default function RobotViewer() {
 
     const robot = buildRobot();
     scene.add(robot.root);
+    const measure = buildDims();
+    scene.add(measure.group);
 
     const camera = new THREE.PerspectiveCamera(28, 1, 10, 4000);
     const target = new THREE.Vector3(0, 62, 0);
@@ -373,7 +440,8 @@ export default function RobotViewer() {
     canvas.addEventListener("pointerdown", onDown);
     canvas.addEventListener("pointerleave", onLeave);
 
-    let raf = 0, last = performance.now(), xr = 0, eyeKey = "", seen = true;
+    const camDir = new THREE.Vector3();
+    let raf = 0, last = performance.now(), xr = 0, dm = 0, eyeKey = "", seen = true;
     const io = new IntersectionObserver((en) => { seen = en[0].isIntersecting; });
     io.observe(wrap);
     const tick = (now: number) => {
@@ -393,6 +461,19 @@ export default function RobotViewer() {
       }
       robot.lineMat.opacity = 0.5 * xr;
       robot.shadow.material.opacity = 1 - 0.5 * xr;
+      // "dimensions" fades the measuring lines in and out
+      const dg = dimsRef.current ? 1 : 0;
+      dm += (dg - dm) * (1 - Math.exp(-dt * 7));
+      if (Math.abs(dg - dm) < 0.003) dm = dg;
+      measure.group.visible = dm > 0;
+      if (dm > 0) {
+        // each one shows only from its own side: fully from straight on, gone once you're round the back
+        camDir.copy(camera.position).sub(controls.target).setY(0).normalize();
+        for (const m of measure.dims) {
+          const f = Math.min(1, Math.max(0, (m.side.dot(camDir) + 0.05) / 0.35));
+          m.line.opacity = m.label.opacity = dm * f;
+        }
+      }
       // "shake": it wobbles about like it's being shaken, then its eyes go dizzy
       const t = now / 1000;
       if (shakeRef.current === 0) shakeRef.current = t; // just pressed
@@ -402,15 +483,13 @@ export default function RobotViewer() {
       robot.body.rotation.z = wob * 0.14;
       robot.body.rotation.x = wob * 0.05;
       robot.body.position.y = Math.abs(wob) * 9;
-      // the face: blinks every few seconds and glances about; dizzy after a shake; or the time, if "clock" is on
+      // the face: blinks every few seconds and glances about; dizzy after a shake
       const b = t % 3.6;
       const open = b < 0.16 ? Math.abs(b - 0.08) / 0.08 : 1;
       const look = Math.round(Math.sin(t * 0.55) * Math.max(0, Math.sin(t * 0.21)) * 4) / 4;
       const dizzy = st >= 0 ? Math.round(t * 8) / 2 : -1;
-      const d = new Date();
-      const time = clockRef.current && st < 0 ? `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")}` : "";
-      const k = `${open.toFixed(1)}|${look}|${dizzy}|${time}`;
-      if (k !== eyeKey) { eyeKey = k; drawEyes(robot.eyeCanvas, open, look, dizzy, time); robot.eyeTex.needsUpdate = true; }
+      const k = `${open.toFixed(1)}|${look}|${dizzy}`;
+      if (k !== eyeKey) { eyeKey = k; drawEyes(robot.eyeCanvas, open, look, dizzy); robot.eyeTex.needsUpdate = true; }
       controls.autoRotate = spinRef.current && !dragging;
       controls.update();
       renderer.render(scene, camera);
@@ -425,7 +504,7 @@ export default function RobotViewer() {
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointerleave", onLeave);
       controls.dispose();
-      robot.root.traverse((o) => {
+      [robot.root, measure.group].forEach((g) => g.traverse((o) => {
         const m = o as THREE.Mesh;
         if (m.geometry) m.geometry.dispose();
         const mat = m.material as THREE.Material | THREE.Material[] | undefined;
@@ -434,7 +513,7 @@ export default function RobotViewer() {
           if (map) map.dispose();
           x.dispose();
         });
-      });
+      }));
       room.dispose();
       env.dispose();
       pm.dispose();
@@ -443,7 +522,7 @@ export default function RobotViewer() {
   }, []);
 
   const pill = (on: boolean) =>
-    `rounded-full border px-4 py-1.5 text-sm lowercase transition ${on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 text-neutral-700 hover:border-neutral-500"}`;
+    `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs lowercase transition sm:px-4 sm:py-1.5 sm:text-sm ${on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 text-neutral-700 hover:border-neutral-500"}`;
 
   return (
     <div ref={wrapRef} className="relative h-full w-full">
@@ -455,10 +534,10 @@ export default function RobotViewer() {
         </div>
       )}
       <div className="absolute inset-x-0 bottom-4 flex flex-wrap items-center justify-between gap-3 px-1">
-        <span className="text-sm font-light lowercase text-neutral-500">drag to rotate, click then scroll to zoom</span>
-        <span className="flex gap-2">
+        <span className="hidden text-sm font-light lowercase text-neutral-500 sm:inline">drag to rotate, click then scroll to zoom</span>
+        <span className="flex flex-wrap gap-1 sm:gap-2">
           <button type="button" onClick={() => { shakeRef.current = 0; }} className={pill(false)}>shake</button>
-          <button type="button" aria-pressed={clock} onClick={() => { clockRef.current = !clockRef.current; setClock(clockRef.current); }} className={pill(clock)}>clock</button>
+          <button type="button" aria-pressed={dims} onClick={() => { dimsRef.current = !dimsRef.current; setDims(dimsRef.current); }} className={pill(dims)}>dimensions</button>
           <button type="button" aria-pressed={xray} onClick={() => { xrayRef.current = !xrayRef.current; setXray(xrayRef.current); }} className={pill(xray)}>x-ray</button>
           <button type="button" aria-pressed={spin} onClick={() => { spinRef.current = !spinRef.current; setSpin(spinRef.current); }} className={pill(spin)}>spin</button>
         </span>

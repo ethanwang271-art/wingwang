@@ -5,7 +5,7 @@ import Link from "next/link";
 import RobotViewer from "./RobotViewer";
 
 // ---- edit these ----
-const TITLE = "mini robot desk assistant";
+const TITLE = "salmon";
 const SUBTITLE = "a small desk buddy with a face, built around a raspberry pi pico 2 w. version 1 sits on the desk: a wi-fi clock, alarm and timer with moods. parts are ordered and not built yet.";
 
 // The parts for version 1. price = Canadian dollars for one, before tax, from the shop's page when I checked (nov 2026).
@@ -37,10 +37,10 @@ const WIRING: { pins: string; to: string }[] = [
 const PAGE_BG = "255,255,255"; // the page's background (white)
 
 export const metadata: Metadata = {
-  title: "mini robot desk assistant",
+  title: "salmon",
   description: "A small desk buddy built around a Raspberry Pi Pico 2 W: a Wi-Fi clock, alarm and timer with animated eyes that gets dizzy when shaken. 3D model, how it works, parts list and wiring.",
   alternates: { canonical: "/projects/robot" },
-  openGraph: { url: "/projects/robot", title: "mini robot desk assistant | wingwang", images: [{ url: "/projects/robot-v1.png" }] },
+  openGraph: { url: "/projects/robot", title: "salmon | wingwang", images: [{ url: "/projects/robot-v1.png" }] },
 };
 
 const CSS = `html, body { background-color: rgb(${PAGE_BG}) !important; }`;
@@ -91,7 +91,7 @@ export default function RobotPage() {
             </p>
             <p>
               the model on the left is laid out in real millimetres. turn on x-ray and hover over a part to see what it is.
-              press shake to see it get dizzy, or clock to see the time on its face. it&apos;s a little character with a big
+              press shake to see it get dizzy, or dimensions to see how big each part is. it&apos;s a little character with a big
               head, a small body and two feet: about 100 mm wide (ears included), 66 mm deep and 116 mm tall, or 135 mm to the
               tip of its antenna.
             </p>
