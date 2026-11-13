@@ -50,7 +50,7 @@ const PROJECTS: { name: string; year: string; text: string }[] = [
     year: "2026",
     text: "designed and built my portfolio from scratch in next.js 16 and react 19: an interactive canvas intro, a scroll-driven camera lens, folder-based photo albums and a working contact form.",
   },
-  { name: "salmon", year: "nov, 2026", text: "a small desk buddy with a face, built around a raspberry pi pico 2 w. version 1 sits on the desk: a wi-fi clock, alarm and timer with moods." },
+  { name: "aeon salmon v1", year: "nov, 2026", text: "a small desk buddy with a face, built around a raspberry pi pico 2 w. version 1 sits on the desk: a wi-fi clock, alarm and timer with moods." },
 ];
 
 const ACTIVITIES: { name: string; detail: string; years: string }[] = [

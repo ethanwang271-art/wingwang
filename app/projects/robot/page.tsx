@@ -5,7 +5,7 @@ import Link from "next/link";
 import RobotViewer, { RobotSpecs } from "./RobotViewer";
 
 // ---- edit these ----
-const TITLE = "salmon";
+const TITLE = "aeon salmon v1";
 const SUBTITLE = "a small desk buddy with a face, built around a raspberry pi pico 2 w. version 1 sits on the desk: a wi-fi clock, alarm and timer with moods. parts are ordered and not built yet.";
 
 // The parts for version 1. price = Canadian dollars for one, before tax, from the shop's page when I checked (nov 2026).
@@ -23,8 +23,7 @@ const PARTS: { name: string; does: string; size: string; price: number | null; q
   { name: "1n4001 diode, 10 pack", does: "stops usb power flowing back into the batteries", size: "", price: 2.45, qty: 1, shop: "pishop", url: "https://www.pishop.ca/product/1n4001-diode-10-pack/" },
   { name: "mini rocker switch, kcd1, 2 pin on/off, pre-wired, 10 pack (daiertek)", does: "the on/off switch, in the back of the head. it goes in the battery's red wire. it uses 1, so 9 are spares", size: "about 21 x 15 mm", price: 11.99, qty: 1, shop: "amazon", url: "https://www.amazon.ca/dp/B07S2QJKTX" },
   { name: "mpu6050 motion sensor (gy-521), pre-soldered", does: "accelerometer and gyro: feels being picked up and shaken", size: "about 21 x 16 mm", price: 12, qty: 1, shop: "amazon", url: "https://www.amazon.ca/dp/B0BMY15TC4" },
-  { name: "m4 x 16 mm flat head machine screws, 12 pack (paulin)", does: "hold the head's back cover and the battery base on. it uses 6, so half are spares", size: "m4-0.70 x 16 mm", price: 4.48, qty: 1, shop: "home depot", url: "https://www.homedepot.ca/product/paulin-flat-square-machine-screw-m4-70x16-12pcs/1001588003" },
-  { name: "m4 hex nuts (paulin, din 934)", does: "one behind each screw, pushed into a hex pocket so it can't turn", size: "m4-0.70, 7 mm across", price: 0.19, qty: 6, shop: "home depot", url: "https://www.homedepot.ca/product/paulin-m4-0-70-class-8-metric-hex-nut-din-934-zinc-plated/1000128515" },
+  { name: "m4 x 16 mm flat head machine screws, 12 pack (paulin)", does: "hold the head's back cover and the battery base on, threading straight into the plastic. it uses 6, so half are spares", size: "m4-0.70 x 16 mm", price: 4.48, qty: 1, shop: "home depot", url: "https://www.homedepot.ca/product/paulin-flat-square-machine-screw-m4-70x16-12pcs/1001588003" },
   { name: "0.96 inch i2c oled, 128 x 64, white, with case", does: "the face. ssd1306 driver, 4-pin header already on", size: "about 27 x 28 mm, plus its case", price: 13.76, qty: 1, shop: "amazon", url: "https://www.amazon.ca/dp/B0HFC38GLV" },
 ];
 
@@ -41,10 +40,10 @@ const WIRING: { pins: string; to: string }[] = [
 const PAGE_BG = "255,255,255"; // the page's background (white)
 
 export const metadata: Metadata = {
-  title: "salmon",
+  title: "aeon salmon v1",
   description: "A small desk buddy built around a Raspberry Pi Pico 2 W: a Wi-Fi clock, alarm and timer with animated eyes that gets dizzy when shaken. 3D model, how it works, parts list and wiring.",
   alternates: { canonical: "/projects/robot" },
-  openGraph: { url: "/projects/robot", title: "salmon | wingwang", images: [{ url: "/projects/robot-v1.png" }] },
+  openGraph: { url: "/projects/robot", title: "aeon salmon v1 | wingwang", images: [{ url: "/projects/robot-v1.png" }] },
 };
 
 const CSS = `html, body { background-color: rgb(${PAGE_BG}) !important; }`;
@@ -164,7 +163,7 @@ export default function RobotPage() {
           <Section title="parts">
             <p>
               most parts come from <A href="https://www.pishop.ca/">pishop.ca</A>. the motion sensor and the oled (both pre-soldered)
-              and the rocker switch come from amazon.ca, and the screws and nuts from home depot. prices are in canadian dollars, as of november 2026.
+              and the rocker switch come from amazon.ca, and the screws from home depot. prices are in canadian dollars, as of november 2026.
             </p>
             <ul className="!mt-6 divide-y divide-neutral-200 border-y border-neutral-200 text-base">
               {PARTS.map((p) => (
@@ -239,7 +238,7 @@ export default function RobotPage() {
               <strong className="font-semibold text-neutral-900">on/off.</strong> the rocker switch snaps into a hole in the back cover of the head. the wall is
               thinned to 2 mm round the hole so its clips can grip.
             </p>
-            <p>the antenna, the arms and the blue cheeks are just for looks.</p>
+            <p>the antenna and the arms are just for looks.</p>
           </Section>
 
           <Section title="dimensions">
@@ -253,15 +252,16 @@ export default function RobotPage() {
           <Section title="3d printing it">
             <p>
               every printed piece has 5 mm walls, so it&apos;s solid enough to be picked up and shaken. it&apos;s held
-              together with six m4 x 16 mm flat head screws and six m4 nuts (both in the parts list). the screws are
-              countersunk, so their heads sit flush. each nut sits in its own pocket with at least 2 mm of plastic round
-              it, and every pocket is open on one side so the nut can be pushed in. no glue except for the small parts.
+              together with six m4 x 16 mm flat head screws (in the parts list), and no nuts. the screws are countersunk, so
+              their heads sit flush, and each one threads straight into a 3.4 mm pilot hole printed in its tab, cutting its
+              own thread in the plastic. don&apos;t over-tighten them, or the thread strips. no glue except for the small
+              parts.
             </p>
             <ul className="list-disc space-y-2 pl-6">
               <li><strong className="font-semibold text-neutral-900">head, front shell:</strong> the face, top, sides and both ears in one piece, open at the back. it prints face down.</li>
-              <li><strong className="font-semibold text-neutral-900">head, back cover:</strong> a 5 mm plate with the on/off switch&apos;s hole in it, and four tabs that reach forward into the head, two against each side wall. four screws go in from the sides of the head (two per side), through the wall and into a nut in each tab. the nuts drop into slots in the tops of the tabs before the cover goes on.</li>
+              <li><strong className="font-semibold text-neutral-900">head, back cover:</strong> a 5 mm plate with the on/off switch&apos;s hole in it, and four tabs that reach forward into the head, two against each side wall. four screws go in from the sides of the head (two per side), through the wall and thread into a pilot hole in each tab.</li>
               <li><strong className="font-semibold text-neutral-900">upper body:</strong> with the motion sensor&apos;s shelf. a short hollow collar on its top pushes up into a hole in the head&apos;s floor and twists in with a quarter-turn lock. it&apos;s hidden inside the floor, so the head sits straight on the body.</li>
-              <li><strong className="font-semibold text-neutral-900">battery base:</strong> the bottom of the body, with the feet. two screws go through its back wall into nuts in two tabs that hang down from the upper body, and a lip on the front of the upper body hooks inside it.</li>
+              <li><strong className="font-semibold text-neutral-900">battery base:</strong> the bottom of the body, with the feet. two screws go through its back wall and thread into two tabs that hang down from the upper body, and a lip on the front of the upper body hooks inside it.</li>
               <li><strong className="font-semibold text-neutral-900">arms and antenna:</strong> printed separately and glued into holes.</li>
             </ul>
             <p>

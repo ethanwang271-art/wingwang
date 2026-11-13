@@ -32,42 +32,40 @@ const DIM_DETAIL_LABEL = "#4f7fd6"; // the writing on their labels
 const WALL = 5;                   // how thick the printed shell is, everywhere. Every part below sits at least this far inside it
 // the head: 110 wide x 75 tall x 72 deep. Big enough for the breadboard to stand upright inside it, behind the face, with WALL all round.
 // it prints as a front shell (open at the back) and a back cover that's WALL thick. The cover has 4 tabs that reach
-// forward into the head, and 4 screws through the sides of the head go into nuts in those tabs
-const HEAD = { hw: 55, y0: 49, y1: 124, z0: -39, z1: 33, round: 20 }; // half width, bottom, top, back, front, corner roundness
+// forward into the head, and 4 screws through the sides of the head thread straight into those tabs
+const HEAD = { hw: 55, y0: 49, y1: 124, z0: -36, z1: 36, round: 20 }; // half width, bottom, top, back, front, corner roundness. centred front to back over the body
 const FACE_Y = 87;                                    // how high the middle of the face is
 // the breadboard, standing upright (85 wide x 55 tall x 9.7 thick), its holes facing the back.
 // x0 = its left edge: pushed left so the pico's usb connector (which sticks out 1.5 past it) is flush with the inside of the left wall
-const BOARD = { x0: -48.5, y0: 59, y1: 114, z0: -3.7, z1: 6 };
+const BOARD = { x0: -48.5, y0: 59, y1: 114, z0: -0.7, z1: 9 };
 const EAR = { y: 86.5, z: BOARD.z0 - 4.85, r: 15 };   // the round ears on the sides of the head, centred on the pico's usb connector so its hole sits in the middle of the left ear
 // the body: two pieces. The battery base (y0 to split, with the feet) holds the batteries lying flat;
 // the upper body (split to y1, right up to the underside of the head: there's no neck) has a shelf for the motion sensor. 2 screws through the back of the base hold them together
 const BODY = { hw: 38, y0: 2, y1: HEAD.y0, z0: -35, z1: 35, round: 12, split: 30 };
-// the screws: six m4 x 16 mm flat head (countersunk, so they sit flush), each into an m4 nut in a printed pocket.
-// a nut is 7 mm across its flats, 8.08 across its corners and 3.2 thick. Its pocket is 7.3 across the flats and 3.5 deep,
-// always open to one face so the nut can be pushed in, with at least 2 mm of plastic round it everywhere else
-const SCREW = { r: 2, head: 4, len: 16, nut: 4.04, nutT: 3.2 };       // shaft radius, head radius, length, nut size (corner to centre), nut thickness
+// the screws: six m4 x 16 mm flat head (countersunk, so they sit flush). No nuts: each one threads straight into a
+// pilot hole printed in its tab and cuts its own thread in the plastic. pilot = the hole's diameter
+const SCREW = { r: 2, head: 4, len: 16, pilot: 3.4 };                 // shaft radius, head radius, length, pilot hole diameter
 // the 4 tabs on the head's back cover: 2 on each side, against the side walls. y = each one's middle, z = where its screw is
-const HEAD_TAB = { ys: [62, 111], h: 12, x0: 38, z0: HEAD.z0 + WALL, z1: -20.5, screwZ: -27, nutX: 40.6 };
+const HEAD_TAB = { ys: [62, 111], h: 12, x0: 38, z0: HEAD.z0 + WALL, z1: -17.5, screwZ: -24 };
 // the 2 tabs that hang down from the upper body at the back, inside the battery base. x, y = where each one's screw is.
 // y1 = how far up they go: 6 mm past the split, so each one is fused into the upper body's back wall, not just touching it
-const BASE_TAB = { xs: [-24, 24], y: 25, hw: 6.5, y0: 19, y1: BODY.split + 6, z0: BODY.z0 + WALL, z1: -21, nutZ: -24.3 };
+const BASE_TAB = { xs: [-24, 24], y: 25, hw: 6.5, y0: 19, y1: BODY.split + 6, z0: BODY.z0 + WALL, z1: -21 };
 // the 2 posts on the head's back cover that stop the breadboard sliding backwards: 4 x 4 mm, at the right end of the board
 // where nothing is plugged in. x = how far each one's middle is from the board's left edge, ys = their heights
 const STANDOFF = { x: 81, ys: [68, 105], hw: 2, gap: 0.3 };
-// the little bits outside: ears stick out EAR_OUT, the antenna, the arms (capsules), the feet (squashed spheres) and the cheeks
+// the little bits outside: ears stick out EAR_OUT, the antenna, the arms (capsules), the feet (squashed spheres)
 const EAR_OUT = 3.5;
-const USB_Z = EAR.z, BUZZ_Z = -16.5;  // where the pico's usb connector and the buzzer sit, front to back
+const USB_Z = EAR.z, BUZZ_Z = -13.5;  // where the pico's usb connector and the buzzer sit, front to back
 const USB_HOLE = { w: 13, h: 9 };      // the hole through the left ear and wall: long way front to back
 const GRILLE = { r: 1.1, pitch: 5 };   // the 7 sound holes in the right ear: radius, and spacing in a little hexagon
-const ANTENNA = { r: 1.6, top: 11, ball: 4.5, ballY: 14, z: -4 };     // stalk radius, how far it rises above the head, ball radius, ball centre above the head, front/back
+const ANTENNA = { r: 1.6, top: 11, ball: 4.5, ballY: 14, z: -1 };     // stalk radius, how far it rises above the head, ball radius, ball centre above the head, front/back
 const ARM = { r: 6.5, len: 16, x: BODY.hw + 4, y: 29, z: 2, tilt: 0.32 }; // capsule radius, straight length, where its middle is, tilt (radians)
 const FOOT = { x: 18, y: 8, z: 18, sx: 13, sy: 8, sz: 19 };           // middle and half-sizes
-const CHEEK = { r: 4.2, x: 35, dy: -14 };                              // radius, distance from the middle, height from the face's middle
 const VISOR = { hw: 27, hh: 17, r: 13 };                               // the dark face panel: half width, half height, corner radius
 // the on/off rocker switch, in the back cover of the head: its hole (upright), its front, how far its body reaches in,
 // and the pocket round the hole on the inside where the cover is thinned to 2 mm so its snap clips can grip.
 // sizes are estimates until the real switch is measured
-const ROCKER = { x: 21, y: 107, holeW: 13, holeH: 19, frontW: 15, frontH: 21, proud: 2, z1: -9, thin: 2, pocket: 4 };
+const ROCKER = { x: 21, y: 107, holeW: 13, holeH: 19, frontW: 15, frontH: 21, proud: 2, z1: -6, thin: 2, pocket: 4 };
 // the collar: a short hollow ring on top of the body that pushes up into a hole in the head's floor. It's hidden inside the
 // floor's thickness, so from outside the head sits straight on the body. The wires run up through it
 const COLLAR = { r: 14, y0: BODY.y1, y1: HEAD.y0 + WALL };
@@ -297,39 +295,30 @@ function buildRobot() {
   part("collar (printed with the upper body): a hollow ring hidden inside the head's floor. the wires run up through it, and it twists into the head with a quarter-turn lock", body, asGhost(cylY(COLLAR.r, COLLAR.y0, COLLAR.y1, 0, 0, M.base, 40)));
 
   // ---------- the screws: six m4 x 16 mm flat head, countersunk so their heads sit flush ----------
-  // tabs are see-through, so in x-ray you can see the nut and the screw inside each one
+  // tabs are see-through, so in x-ray you can see the screw threaded into each one
   const tabMat = std(0xdfe3ea, 0.5, 0, { transparent: true, opacity: 0.5, depthWrite: false });
-  // a nut. along = which way its hole points. Its flats always face up and down
-  const nut = (x: number, y: number, z: number, along: "x" | "z") => {
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(SCREW.nut, SCREW.nut, SCREW.nutT, 6, 1, false, along === "z" ? Math.PI / 2 : 0), M.chip);
-    if (along === "x") m.rotation.z = Math.PI / 2; else m.rotation.x = Math.PI / 2;
-    m.position.set(x, y, z);
-    return m;
-  };
   // 4 in the sides of the head (2 each side), going in along x through the side wall into the tabs on the back cover
   const headScrews: THREE.Object3D[] = [], headTabs: THREE.Object3D[] = [];
   for (const sx of [1, -1]) for (const y of HEAD_TAB.ys) {
     const z = HEAD_TAB.screwZ, out = sx * HEAD.hw;
     headScrews.push(cylX(SCREW.head, out - sx * 0.05, out + sx * 0.15, y, z, M.steel, 24), bx(out + sx * 0.1, out + sx * 0.2, y - 1, y + 1, z - 1, z + 1, M.chip),
-      cylX(SCREW.r, out, out - sx * SCREW.len, y, z, M.steel, 12),
-      nut(sx * (HEAD_TAB.nutX + SCREW.nutT / 2), y, z, "x"));
+      cylX(SCREW.r, out, out - sx * SCREW.len, y, z, M.steel, 12));
     headTabs.push(bx(sx * HEAD_TAB.x0, sx * (HEAD.hw - WALL), y - HEAD_TAB.h / 2, y + HEAD_TAB.h / 2, HEAD_TAB.z0, HEAD_TAB.z1, tabMat));
   }
   part("4 m4 x 16 mm flat head screws: 2 in each side of the head, flush with it. they go through the side wall into the tabs on the back cover", body, ...headScrews);
-  part("tabs (printed with the back cover): reach forward into the head, against the side walls. each has a slot in its top that an m4 nut drops into", body, ...headTabs);
-  // 2 through the back wall of the battery base, each into a nut in a tab that hangs down from the upper body.
+  part("tabs (printed with the back cover): reach forward into the head, against the side walls. each has a 3.4 mm pilot hole the screw threads into", body, ...headTabs);
+  // 2 through the back wall of the battery base, each threading into a tab that hangs down from the upper body.
   // a lip on the front of the upper body hooks inside the base, so these two are all it needs
   const baseScrews: THREE.Object3D[] = [], tabs: THREE.Object3D[] = [];
   for (const x of BASE_TAB.xs) {
     const y = BASE_TAB.y;
     baseScrews.push(cylZ(SCREW.head, BODY.z0 - 0.15, BODY.z0 + 0.05, x, y, M.steel, 24), bx(x - 1, x + 1, y - 1, y + 1, BODY.z0 - 0.2, BODY.z0 - 0.1, M.chip),
-      cylZ(SCREW.r, BODY.z0, BODY.z0 + SCREW.len, x, y, M.steel, 12),
-      nut(x, y, BASE_TAB.nutZ + SCREW.nutT / 2, "z"));
+      cylZ(SCREW.r, BODY.z0, BODY.z0 + SCREW.len, x, y, M.steel, 12));
     tabs.push(bx(x - BASE_TAB.hw, x + BASE_TAB.hw, BASE_TAB.y0, BASE_TAB.y1, BASE_TAB.z0, BASE_TAB.z1, tabMat));
   }
   tabs.push(bx(-20, 20, 22, BASE_TAB.y1, BODY.z1 - WALL - 2.5, BODY.z1 - WALL, M.hub)); // the lip at the front, fused into the front wall the same way
   part("2 m4 x 16 mm flat head screws: in the back of the battery base, flush with it. undo these to change the batteries", body, ...baseScrews);
-  part("tabs (printed with the upper body): hang down inside the battery base. the back two each hold an m4 nut, pushed in from the front. the front one is a lip that hooks in", body, ...tabs);
+  part("tabs (printed with the upper body): hang down inside the battery base. the back two each have a 3.4 mm pilot hole the screw threads into. the front one is a lip that hooks in", body, ...tabs);
   // two little feet, and two stubby arms
   for (const sx of [1, -1]) {
     const foot = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), M.base);
@@ -356,12 +345,6 @@ function buildRobot() {
   const gp = GRILLE.pitch, gq = gp * 0.866;
   for (const [dy, dz] of [[0, 0], [gp, 0], [-gp, 0], [gp / 2, gq], [-gp / 2, gq], [gp / 2, -gq], [-gp / 2, -gq]]) holes.push(cylX(GRILLE.r, HEAD.hw + 3.6, HEAD.hw + 3.8, EAR.y + dy, BUZZ_Z + dz, M.chip, 16));
   part("grille for the buzzer", body, ...holes);
-  // blue cheeks
-  for (const sx of [1, -1]) {
-    const cheek = new THREE.Mesh(new THREE.CircleGeometry(CHEEK.r, 32), M.accent);
-    cheek.position.set(sx * CHEEK.x, FACE_Y + CHEEK.dy, HEAD.z1 + 0.06);
-    body.add(cheek);
-  }
 
   // ---------- the face: a dark panel on the front of the head, with the oled behind a window in it ----------
   const face = new THREE.Group();
@@ -704,7 +687,6 @@ const SPECS: { title: string; rows: [string, string][] }[] = [
     ["panel centre: up from the head's bottom, left-right", `${mm(FACE_Y - HEAD.y0)}, centred`],
     ["panel stands out from the face", mm(0.4)],
     ["screen window, width x height", "21.7 x 10.9 mm, 1.5 mm above the panel's centre"],
-    ["cheeks: diameter, apart (centre to centre), below the panel's centre", `${CHEEK.r * 2} mm, ${CHEEK.x * 2} mm, ${-CHEEK.dy} mm`],
   ] },
   { title: "ears", rows: [
     ["diameter, and how far they stick out", `${EAR.r * 2} mm, ${EAR_OUT} mm`],
@@ -731,7 +713,7 @@ const SPECS: { title: string; rows: [string, string][] }[] = [
     ["feet (squashed balls): width x height x length", `${FOOT.sx * 2} x ${FOOT.sy * 2} x ${FOOT.sz * 2} mm`],
     ["feet centres: apart, up from the desk, forward of the middle", `${FOOT.x * 2} mm, ${FOOT.y} mm, ${FOOT.z} mm`],
   ] },
-  { title: "screws and nuts (m4 x 16 mm flat head, m4 nuts)", rows: [
+  { title: "screws (m4 x 16 mm flat head, no nuts)", rows: [
     ["head: 4 screws in the sides, 2 per side", `centres ${mm(HEAD_TAB.ys[0] - HEAD.y0)} and ${mm(HEAD_TAB.ys[1] - HEAD.y0)} up from the head's bottom, ${mm(HEAD_TAB.screwZ - HEAD.z0)} forward of the back`],
     ["head tabs (on the back cover): width x height x depth", `${HEAD.hw - WALL - HEAD_TAB.x0} x ${HEAD_TAB.h} x ${Math.round((HEAD_TAB.z1 - HEAD_TAB.z0) * 10) / 10} mm`],
     ["body: 2 screws in the back of the battery base", `${Math.abs(BASE_TAB.xs[0]) * 2} mm apart, ${mm(BASE_TAB.y - BODY.y0)} up from the body's bottom`],
@@ -739,7 +721,7 @@ const SPECS: { title: string; rows: [string, string][] }[] = [
     ["on/off rocker switch: hole in the back cover (width x height)", `${ROCKER.holeW} x ${ROCKER.holeH} mm, upright, centre ${mm(ROCKER.x)} right of the middle and ${mm(ROCKER.y - HEAD.y0)} up from the head's bottom`],
     ["rocker switch: pocket round the hole on the inside", `${ROCKER.holeW + ROCKER.pocket * 2} x ${ROCKER.holeH + ROCKER.pocket * 2} mm, cover thinned to ${ROCKER.thin} mm`],
     ["countersink, for the screw heads", `${SCREW.head * 2} mm across, flush`],
-    ["nut pockets", "7.3 mm across the flats, 3.5 mm deep, open on one side"],
+    ["pilot holes in the tabs, for the screws to thread into", `${SCREW.pilot} mm diameter, through the tab`],
   ] },
 ];
 
