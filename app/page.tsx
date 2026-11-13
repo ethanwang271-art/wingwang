@@ -383,7 +383,7 @@ const CAMERA_APERTURE_BLADES = 7;           // how many blades the aperture insi
 const LOGO_SIZE = 0.78;            // how tall the logo is, compared to the window (it also always fits the width)
 const LOGO_DOT_GAP = 4.5;          // how far apart its dots are, in px (lower = more, finer dots)
 const LOGO_DOT_SIZE = 1.3;         // how wide each dot is, in px (it grows a little when lit)
-const LOGO_DOT_FAINT = 0.1;        // how visible the dots are before the pointer passes over them (0 = hidden until lit)
+const LOGO_DOT_FAINT = 0.18;       // how visible the dots are before the pointer passes over them (0 = hidden until lit)
 const LOGO_BRUSH = 0.05;           // how big the patch that lights up under the pointer is, compared to the window
 const LOGO_INK = "17,17,17";       // r,g,b of the black parts of the W
 const LOGO_BLUE = "31,95,217";     // r,g,b of the blue part of the W
