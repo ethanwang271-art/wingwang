@@ -21,7 +21,7 @@ const CONTACT: { text: string; href?: string }[] = [
 // ---- Left column ----
 const EDUCATION: { school: string; dates: string; details: string; courses: string }[] = [
   {
-    school: "[HIGH SCHOOL NAME]",
+    school: "[SCHOOL NAME]",
     dates: "[2023] to 2027",
     details: "[PROGRAM / STREAM, e.g. IB, AP] · [AVERAGE OR GPA, optional]",
     courses: "relevant courses: [COURSE], [COURSE], [COURSE]",
@@ -31,14 +31,14 @@ const EDUCATION: { school: string; dates: string; details: string; courses: stri
 // one block per job, newest first. `points` = the bullet points
 const EXPERIENCE: { role: string; dates: string; where: string; points: string[] }[] = [
   {
-    role: "[ROLE / JOB TITLE]",
-    dates: "[MON YYYY] to [MON YYYY]",
-    where: "[COMPANY OR ORGANIZATION] · [CITY]",
-    points: ["[WHAT YOU DID, STARTING WITH A VERB, WITH A NUMBER IF YOU HAVE ONE]", "[ANOTHER RESULT OR RESPONSIBILITY]"],
+    role: "Coop Student",
+    dates: "september 2025 to january 2026",
+    where: "Scarbrough Health Network · Toronto",
+    points: ["Welcomed patient families, providing directions to proper rooms or clinics. Assisted nurses and staff with keeping PPE in stock, aiding in discharges and delivering medicine to nurses."],
   },
   {
-    role: "[FREELANCE PHOTOGRAPHER?]",
-    dates: "[YYYY] to now",
+    role: "FREELANCE PHOTOGRAPHER",
+    dates: "2026 to present",
     where: "[CLIENTS / EVENTS]",
     points: ["[e.g. shot N events for school clubs and teams]", "[e.g. delivered edited sets within 48 hours]"],
   },
@@ -50,19 +50,19 @@ const PROJECTS: { name: string; year: string; text: string }[] = [
     year: "2026",
     text: "designed and built my portfolio from scratch in next.js 16 and react 19: an interactive canvas intro, a scroll-driven camera lens, folder-based photo albums and a working contact form.",
   },
-  { name: "[PROJECT NAME]", year: "[YEAR]", text: "[ONE OR TWO LINES: WHAT IT IS, WHAT YOU USED, WHAT CAME OF IT]" },
+  { name: "mini robot desk assistant", year: "nov, 2026", text: "a small desk buddy with a face, built around a raspberry pi pico 2 w. version 1 sits on the desk: a wi-fi clock, alarm and timer with moods." },
 ];
 
 const ACTIVITIES: { name: string; detail: string; years: string }[] = [
-  { name: "senior volleyball", detail: "[SCHOOL TEAM, POSITION]", years: "2026 to 27" },
-  { name: "[CLUB OR ROLE]", detail: "[WHAT YOU DID]", years: "[YEARS]" },
-  { name: "[VOLUNTEERING]", detail: "[WHERE, HOURS]", years: "[YEARS]" },
+  { name: "oasis leader", detail: "led the youngins", years: "2026" },
+  { name: "HOSA PR", detail: "create meet the execs, manage media for mwhosa", years: "2nd year" },
+  { name: "a", detail: "[WHERE, HOURS]", years: "[YEARS]" },
 ];
 
 // ---- Right column: little tags ----
-const SKILLS = ["photography", "photo editing", "video editing", "web design", "[SKILL]"];
-const TOOLS = ["next.js", "react", "typescript", "tailwind", "[LIGHTROOM?]", "[PREMIERE?]"];
-const AWARDS = ["[AWARD, YEAR]", "[HONOUR ROLL, YEAR]"];
+const SKILLS = ["photography", "photo editing", "Intermediate (Standard) CPR First Aid Certified"];
+const TOOLS = ["next.js", "react", "typescript", "tailwind", "LIGHTROOM C"];
+const AWARDS = ["HONOUR ROLL, 23-24"];
 const LANGUAGES = ["english", "hakka chinese"];
 
 // ---- The bottom line ----
