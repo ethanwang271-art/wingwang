@@ -95,7 +95,7 @@ function Media({ src, title }: { src: string; title: string }) {
   if (/\.(mp4|webm|mov)$/i.test(src)) {
     return <video className="pj-media h-full w-full object-cover" src={src} autoPlay muted loop playsInline preload="metadata" aria-label={title} />;
   }
-  return <Image className="pj-media object-cover" src={src} alt={title} fill sizes="(min-width: 768px) 45vw, 92vw" />;
+  return <Image className="pj-media object-cover" src={src} alt={title} fill sizes="(min-width: 768px) 60vw, 92vw" />;
 }
 
 export default function ProjectsPage() {
@@ -110,25 +110,31 @@ export default function ProjectsPage() {
           <p className="pj-card mt-6 text-lg text-neutral-600 sm:text-xl">coming soon</p>
         )}
 
-        <div className="mt-10 grid gap-x-12 gap-y-16 sm:mt-12 md:grid-cols-2 md:gap-y-24">
+        {/* one project per row, full width: the picture on one side and the words on the other,
+            swapping sides every other row. on phones the picture sits on top */}
+        <div className="mt-10 flex flex-col gap-y-20 sm:mt-12 md:gap-y-28">
           {PROJECTS.map((p, i) => {
+            const flip = i % 2 === 1; // every other row has its picture on the right
             const inner = (
-              <>
-                <div className="relative aspect-[16/10] overflow-hidden rounded-md bg-neutral-200">
+              <div className="grid items-center gap-x-14 gap-y-7 md:grid-cols-[3fr_2fr]">
+                <div className={`relative aspect-[16/10] overflow-hidden rounded-md bg-neutral-200 ${flip ? "md:order-2" : ""}`}>
                   <Media src={p.media} title={p.title} />
                 </div>
-                <div className="mt-6 flex items-baseline justify-between gap-6">
-                  <h2 className="relative text-xl font-bold tracking-tight sm:text-2xl">
-                    {p.title}
-                    <Underline />
-                  </h2>
-                  <span className="relative shrink-0 px-1 text-lg text-neutral-600 sm:text-xl">
+                <div className={flip ? "md:order-1" : ""}>
+                  <span className="relative ml-2.5 inline-block text-lg text-neutral-600 sm:text-xl">
                     {p.date}
                     <Circle />
                   </span>
+                  <h2 className="mt-5 text-2xl font-bold tracking-tight sm:text-3xl">
+                    <span className="relative">
+                      {p.title}
+                      <Underline />
+                    </span>
+                  </h2>
+                  <p className="mt-5 max-w-prose text-base leading-relaxed text-neutral-600 sm:text-lg">{p.description}</p>
+                  {p.link && <p className="mt-6 text-base text-neutral-900 sm:text-lg">view project &rarr;</p>}
                 </div>
-                <p className="mt-4 max-w-prose text-base leading-relaxed text-neutral-600 sm:text-lg">{p.description}</p>
-              </>
+              </div>
             );
             const style = { "--i": i } as CSSProperties;
             if (!p.link) {
