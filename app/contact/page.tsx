@@ -248,8 +248,9 @@ const PLANE_WINGS = 74;     // how far the wings fold back out, in degrees (a bi
 const SIDE_VIEW = 62;       // where the camera ends up, in degrees from straight above (90 = exactly side on)
 const SIDE_BEHIND = 22;     // and how far round towards the back it goes, in degrees (0 = exactly from the right side)
 const PAPER_EPS = 0.006;    // how far apart the layers of folded paper sit (just enough that they don't flicker)
-// how far it zips off, in paper-widths (the paper is 2 long): away from you, to the right, and up (as you see it)
-const FLIGHT = { away: 16, right: 3.5, up: 1.8 };
+// which way it zooms off (as you see it): mostly to the right, a little up, and a little away from you. It flies until
+// it's off the right side of the window (exit: 1 = the window's edge), and the star pings just inside the edge (star)
+const FLIGHT = { right: 1, up: 0.3, away: 1, exit: 1.7, star: 0.8 };
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -389,25 +390,49 @@ function drawInk(msg: { message: string; name: string; email: string }) {
   return c;
 }
 
+// the star that pings where the plane vanishes: a four-point star in the site's blue with a navy ink outline,
+// a white glint, and two little sparkle dots beside it. drawn once onto a canvas
+function starTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d");
+  if (!g) return c;
+  g.translate(64, 64);
+  g.lineJoin = "round"; g.strokeStyle = "#262b3d"; g.lineWidth = 5;
+  g.beginPath();
+  for (let i = 0; i < 8; i++) { const r = i % 2 ? 12 : 52, a = (i * Math.PI) / 4; g.lineTo(Math.sin(a) * r, -Math.cos(a) * r); }
+  g.closePath(); g.fillStyle = STRIPE_BLUE; g.fill(); g.stroke();
+  g.fillStyle = "#ffffff"; g.beginPath(); g.ellipse(-6, -10, 4, 8, 0.5, 0, Math.PI * 2); g.fill();
+  g.fillStyle = "#262b3d";
+  for (const [x, y, r] of [[40, -38, 4], [-42, 34, 3]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+  return c;
+}
+
 // The canvas covers the whole window (so the plane can fly anywhere), and the camera is lined up so the paper sits
 // exactly where the card was. card = the card's box on the screen.
-// It's drawn like an anime: flat cel shading (white in the light, a pale blue shadow) with clean navy ink lines.
-// What they wrote fades gently off, the folds ease slowly in and out while the camera drifts round the whole time
-// (so it never stops and starts), then it leans back a touch and glides away with a slight bank, trailing two thin
-// wind streaks off its wingtips, and fades out in the distance.
+// It's drawn like a cartoon: flat cel shading with bold navy ink outlines, white paper with a pale blue underside.
+// What they wrote fades off, the paper shrinks as it folds itself up quickly while floating and swaying (so it never
+// moves like a machine), the camera drifts round to its side, the finished plane flutters its wings excitedly for a
+// moment, then zooms off instantly with a barrel roll, trailing wind streaks, and vanishes with a star that pings
+// in the distance (like a cartoon villain blasting off).
 const FLY = {
-  inkOff: [0.1, 0.75],                                                        // what they wrote fades off the paper
-  f1: [0.2, 0.78], f2: [0.82, 1.4], f3: [1.46, 2.06], f4: [2.06, 2.62],      // the four folds (start, end), in seconds
-  turn: [0.18, 2.55],                                                         // the camera drifting round to the plane's side
-  windup: [2.75, 3.08], glide: [3.08, 4.0],                                   // leaning back, then gliding away
-  fade: [3.8, 4.05],                                                          // then it fades out
-  ink: 0x262b3d, inkWidth: 2, inkIn: 0.5,                                     // the ink lines (colour, px, fade-in s)
-  shadow: 0xd2dcff, wind: 0x8db4ff, windWidth: 1.6,                           // the shadow's tint, and the wind streaks
+  inkOff: [0.05, 0.4],                                                        // what they wrote fades off the paper
+  f1: [0.08, 0.42], f2: [0.44, 0.76], f3: [0.78, 1.1], f4: [1.1, 1.4],       // the four folds (start, end), in seconds
+  shrink: [0.05, 1.2], size: 0.55,                                            // it shrinks as it folds, to this much of the card's size
+  turn: [0.05, 1.4],                                                          // the camera drifting round to the plane's side
+  flutter: [1.3, 1.9],                                                        // its wings flutter excitedly
+  zip: [1.9, 2.4],                                                            // then it zooms off
+  star: 0.5,                                                                  // how long the star at the edge lasts
+  fade: 0.15,                                                                 // then it all fades out
+  ink: 0x262b3d, inkWidth: 3, foldWidth: 2.2, inkIn: 0.3,                     // the ink (colour, outline px, fold-line px, fade-in s)
+  shadow: 0xc4d3ff, underside: 0xdbe7ff, wind: 0x8db4ff, windWidth: 2,                           // the shadow's tint, and the wind streaks
 };
 
 // the softest ease there is: starts gently, glides, and settles gently (no overshoot, no snap)
 const easeSine = (x: number) => (1 - Math.cos(Math.PI * clamp01(x))) / 2;
 const foldCurve = (t: number, [a, b]: number[]) => easeSine((t - a) / (b - a));
+// a fold: quick off the mark and settling softly, like a flick of paper (no overshoot)
+const snapCurve = (t: number, [a, b]: number[]) => 1 - Math.pow(1 - clamp01((t - a) / (b - a)), 3);
 
 function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string; email: string }; card: DOMRect; onDone: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -439,8 +464,8 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
     const camera = new THREE.PerspectiveCamera(fov, VW / VH, 0.3, 60); // a tight near / far, so the layers of paper sort cleanly
     camera.setViewOffset(VW, VH, VW / 2 - cx, VH / 2 - cy, w, h); // ...of which the window shows its part
 
-    const inkTex = new THREE.CanvasTexture(drawInk(msg));
-    inkTex.colorSpace = THREE.SRGBColorSpace;
+    const inkTex = new THREE.CanvasTexture(drawInk(msg)), starTex = new THREE.CanvasTexture(starTexture());
+    inkTex.colorSpace = starTex.colorSpace = THREE.SRGBColorSpace;
     inkTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     // two flat tones with a crisp edge: anything not facing the sun fairly squarely is in the pale blue shadow
     // (so the flat wings are white and the steep sides, like the keel, are shaded, as in an anime)
@@ -448,16 +473,18 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
     tones.minFilter = tones.magFilter = THREE.NearestFilter;
     tones.needsUpdate = true;
     // the paper (the same on both sides). it sits a hair behind its ink lines and writing, so those always draw on top
-    const paper = new THREE.MeshToonMaterial({ color: PAPER, gradientMap: tones, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 0.5, polygonOffsetUnits: 0.5 });
+    const faceOpts = { gradientMap: tones, polygonOffset: true, polygonOffsetFactor: 0.5, polygonOffsetUnits: 0.5 };
+    const paper = new THREE.MeshToonMaterial({ color: PAPER, side: THREE.FrontSide, ...faceOpts });
+    const under = new THREE.MeshToonMaterial({ color: FLY.underside, side: THREE.BackSide, ...faceOpts }); // the pale blue underside
     const ink = new THREE.MeshBasicMaterial({ map: inkTex, transparent: true, depthWrite: false, side: THREE.FrontSide });
     // the ink: one material for the paper's own edge, and one for the edges each fold makes (so each can fade in on its own)
-    const edges = [0, 1, 2, 3, 4].map(() => new LineMaterial({ color: FLY.ink, linewidth: FLY.inkWidth, transparent: true, opacity: 0 }));
+    const edges = [0, 1, 2, 3, 4].map((k) => new LineMaterial({ color: FLY.ink, linewidth: k ? FLY.foldWidth : FLY.inkWidth, transparent: true, opacity: 0 }));
     const windM = new LineMaterial({ color: FLY.wind, linewidth: FLY.windWidth, transparent: true, opacity: 0.85 });
     for (const m of [...edges, windM]) m.resolution.set(w, h);
 
     const plane = new THREE.Group();
     scene.add(plane);
-    const disposables: { dispose: () => void }[] = [inkTex, tones, paper, ink, windM, ...edges];
+    const disposables: { dispose: () => void }[] = [inkTex, starTex, tones, paper, under, ink, windM, ...edges];
     const inkMeshes: THREE.Mesh[] = [];
     const pieces = buildPieces().map((p) => {
       const pos: number[] = [], uv: number[] = [];
@@ -475,7 +502,7 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
       disposables.push(geo);
       const inkMesh = new THREE.Mesh(geo, ink);
       inkMeshes.push(inkMesh);
-      const objs: THREE.Object3D[] = [new THREE.Mesh(geo, paper), inkMesh];
+      const objs: THREE.Object3D[] = [new THREE.Mesh(geo, paper), new THREE.Mesh(geo, under), inkMesh];
       // its ink lines (see buildPieces): the paper's edge, and the edges its folds make
       (p.edges ?? []).forEach((line, k) => {
         if (!line.length) return;
@@ -490,7 +517,7 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
     // the paper's two back corners, which become the wingtips (for the wind streaks)
     const tips = [0.5, -0.5].map((z) => ({ piece: pieces.find(({ p }) => p.orig.some((q) => Math.abs(q[0] + 1) < 1e-6 && Math.abs(q[1] - z) < 1e-6)), local: new THREE.Vector3(-1, 0, z) }));
     // a wind streak behind each wingtip: the tip's last few places, joined up (drawn only while it glides)
-    const TRAIL = 14, TRAIL_SECONDS = 0.22; // how many points each streak has, and how far back in time it reaches
+    const TRAIL = 14, TRAIL_SECONDS = 0.15; // how many points each streak has, and how far back in time it reaches
     const trails = tips.map(() => {
       const geo = new LineGeometry();
       geo.setPositions(new Array(TRAIL * 3).fill(0));
@@ -502,61 +529,107 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
       return { geo, line, pts: [] as { p: THREE.Vector3; t: number }[] };
     });
 
+    // the star where it vanishes
+    const starM = new THREE.SpriteMaterial({ map: starTex, transparent: true, depthWrite: false, depthTest: false });
+    const star = new THREE.Sprite(starM);
+    star.scale.setScalar(0);
+    scene.add(star);
+    disposables.push(starM);
+
     // get everything onto the graphics card before the clock starts, so the first frames don't stutter
     renderer.initTexture(inkTex);
+    renderer.initTexture(starTex);
     renderer.compile(scene, camera);
 
     const lift = (y: number) => new THREE.Matrix4().makeTranslation(0, y, 0);
-    const bank = new THREE.Quaternion(), nose = new THREE.Vector3(1, 0, 0);
+    const nose = new THREE.Vector3(1, 0, 0), upAxis = new THREE.Vector3(0, 1, 0), wingAxis = new THREE.Vector3(0, 0, 1);
+    const qLook = new THREE.Quaternion(), qPitch = new THREE.Quaternion(), qRoll = new THREE.Quaternion();
+    const deg = Math.PI / 180;
     let raf = 0, start = -1, away: THREE.Vector3 | null = null, heading: THREE.Quaternion | null = null;
+    let starAt = Infinity; const starPos = new THREE.Vector3(); // when and where the star pings (worked out once it knows its path)
     const frame = (now: number) => {
       if (start < 0) start = now;
       const t = (now - start) / 1000;
-      const s1 = foldCurve(t, FLY.f1), s2 = foldCurve(t, FLY.f2), s3 = foldCurve(t, FLY.f3), s4 = foldCurve(t, FLY.f4);
+      const s1 = snapCurve(t, FLY.f1), s2 = snapCurve(t, FLY.f2), s3 = snapCurve(t, FLY.f3), s4 = snapCurve(t, FLY.f4);
       // the writing fades off, and the paper's edges fade in, both softly
       ink.opacity = 1 - foldCurve(t, FLY.inkOff);
       for (const m of inkMeshes) m.visible = ink.opacity > 0.002;
       edges[0].opacity = easeSine(t / FLY.inkIn);
       [FLY.f1, FLY.f2, FLY.f3, FLY.f4].forEach((f, k) => { edges[k + 1].opacity = easeSine((t - f[0]) / ((f[1] - f[0]) * 0.6)); });
+      // the flutter and the zoom, worked out first because the wings use them
+      const fl = clamp01((t - FLY.flutter[0]) / (FLY.flutter[1] - FLY.flutter[0]));
+      const z = clamp01((t - FLY.zip[0]) / (FLY.zip[1] - FLY.zip[0]));
+      // quick excited flaps, strongest in the middle of the flutter, and still going a little as it zooms off
+      const flap = 18 * Math.sin(t * 2 * Math.PI * 7) * (Math.sin(Math.PI * fl) + 0.4 * (1 - z) * (z > 0 ? 1 : 0));
       for (const { p, objs } of pieces) {
         let M: THREE.Matrix4;
         if (t < FLY.f2[0]) M = p.c1 ? lift(PAPER_EPS * s1).multiply(rotAbout(p.c1.a, p.c1.dir, Math.PI * s1)) : new THREE.Matrix4();
         else if (t < FLY.f3[0]) M = p.c2 ? lift(PAPER_EPS * (p.L1 + (p.L2 - p.L1) * s2)).multiply(rotAbout(p.c2.a, p.c2.dir, Math.PI * s2)).multiply(p.W1) : lift(PAPER_EPS * p.L1).multiply(p.W1);
         else M = lift(PAPER_EPS * p.L2).multiply(p.W2);
-        if (p.c4 && t > FLY.f4[0]) M = rotAbout(p.c4.a, p.c4.dir, -PLANE_WINGS * Math.PI / 180 * s4).multiply(M); // the wings fold back out
-        if (p.c3 && t > FLY.f3[0]) M = rotAbout(p.c3.a, p.c3.dir, PLANE_HALF * Math.PI / 180 * s3).multiply(M);   // each half folds up
+        if (p.c4 && t > FLY.f4[0]) M = rotAbout(p.c4.a, p.c4.dir, -(PLANE_WINGS * s4 + flap) * deg).multiply(M); // the wings fold back out (and flap)
+        if (p.c3 && t > FLY.f3[0]) M = rotAbout(p.c3.a, p.c3.dir, PLANE_HALF * deg * s3).multiply(M);           // each half folds up
         objs.forEach((m) => m.matrix.copy(M));
       }
-      // the camera drifts round to the plane's side, slowly, the whole time it's folding
+      // the camera drifts round to the plane's side, pulling back a little so the plane sits small on the page
       const turn = foldCurve(t, FLY.turn);
-      const phi = SIDE_VIEW * Math.PI / 180 * turn, az = -SIDE_BEHIND * Math.PI / 180 * turn;
-      const r = d0 * (1 - 0.1 * turn), ty = 0.05 * s3;
+      const phi = SIDE_VIEW * deg * turn, az = -SIDE_BEHIND * deg * turn;
+      const r = d0 * (1 + 0.15 * turn), ty = 0.05 * s3;
       camera.position.set(r * Math.sin(phi) * Math.sin(az), ty + r * Math.cos(phi), r * Math.sin(phi) * Math.cos(az));
       camera.up.set(-Math.cos(phi) * Math.sin(az), Math.sin(phi), -Math.cos(phi) * Math.cos(az));
       camera.lookAt(0, ty, 0);
 
-      // which way it'll fly: away from you, to the right and up, worked out from where the camera ended up
+      // which way it'll fly, worked out from where the camera ended up: off the right side of the window. It steps
+      // along that line to find how far it has to go to be off screen, and where it passes the edge (for the star)
       if (t > FLY.turn[1] && !away) {
         const fwd = new THREE.Vector3(0, ty, 0).sub(camera.position).normalize();
         const right = new THREE.Vector3().crossVectors(fwd, camera.up).normalize();
         const up = new THREE.Vector3().crossVectors(right, fwd).normalize();
-        away = fwd.multiplyScalar(FLIGHT.away).add(right.multiplyScalar(FLIGHT.right)).add(up.multiplyScalar(FLIGHT.up));
-        heading = new THREE.Quaternion().setFromUnitVectors(nose, away.clone().normalize());
+        const dir = right.multiplyScalar(FLIGHT.right).add(up.multiplyScalar(FLIGHT.up)).add(fwd.multiplyScalar(FLIGHT.away)).normalize();
+        camera.updateMatrixWorld();
+        const onScreen = (d: number) => dir.clone().multiplyScalar(d).add(new THREE.Vector3(0, 0.12, 0)).project(camera).x;
+        let dStar = 0, dExit = 0;
+        for (let d = 0; d < 80 && !dExit; d += 0.05) {
+          if (!dStar && onScreen(d) > FLIGHT.star) dStar = d;
+          if (onScreen(d) > FLIGHT.exit) dExit = d;
+        }
+        dExit = dExit || 20; dStar = dStar || dExit * 0.8;
+        away = dir.clone().multiplyScalar(dExit);
+        starPos.copy(dir).multiplyScalar(dStar).add(new THREE.Vector3(0, 0.12, 0));
+        // the moment it passes the star's spot (the zoom below covers 1 - (1 - z)^2.2 of the way)
+        starAt = FLY.zip[0] + (FLY.zip[1] - FLY.zip[0]) * (1 - Math.pow(1 - dStar / dExit, 1 / 2.2));
+        heading = new THREE.Quaternion().setFromUnitVectors(nose, dir);
       }
-      // a slow drift up and down once it's a plane, then it leans back a touch and glides away, speeding up gently
-      const wind = foldCurve(t, FLY.windup);
-      const g = clamp01((t - FLY.glide[0]) / (FLY.glide[1] - FLY.glide[0]));
-      const hover = Math.sin((t - FLY.f4[1]) * 2.6) * 0.014 * easeSine((t - FLY.f4[1]) * 1.5);
+      // it shrinks as it folds, and floats up a touch, swaying and tipping as it goes (so it's never stiff)
+      const size = 1 - (1 - FLY.size) * foldCurve(t, FLY.shrink);
+      const folding = Math.sin(Math.PI * clamp01(t / FLY.f4[1]));
+      const float = 0.12 * foldCurve(t, [0.1, 1.4]) + Math.sin(t * 9) * 0.02 * fl;
+      qLook.setFromAxisAngle(upAxis, 0.12 * Math.sin(t * 5.5) * folding);
+      qRoll.setFromAxisAngle(nose, 0.1 * Math.sin(t * 7) * folding + 0.08 * Math.sin(t * 23) * fl + Math.PI * 2 * easeSine(z * 1.3));
+      // a tiny squash while it flutters, then it stretches out long the instant it zooms off
+      const stretch = z > 0 ? 0.45 * Math.pow(1 - z, 0.5) : 0;
+      const squash = 0.05 * Math.sin(t * 2 * Math.PI * 7) * Math.sin(Math.PI * fl);
+      plane.scale.set(size * (1 + stretch - squash), size * (1 - 0.25 * stretch + squash), size * (1 - 0.25 * stretch + squash));
+      // its nose lifts eagerly while it flutters
+      qPitch.setFromAxisAngle(wingAxis, 0.18 * Math.sin(Math.PI * fl));
       if (away && heading) {
-        const pull = away.clone().normalize().multiplyScalar(-0.16 * wind * (1 - easeSine(g * 2)));
-        plane.position.copy(away).multiplyScalar(g * g * (0.35 + 0.65 * g)).add(pull).add(new THREE.Vector3(0, hover, 0));
-        // it turns to face where it's going, and banks gently as it glides
-        bank.setFromAxisAngle(nose, Math.sin(Math.PI * g) * 0.22);
-        plane.quaternion.identity().slerp(heading, easeSine((t - FLY.f4[1]) / 0.7)).multiply(bank);
+        // the zoom: fast from the very first moment, easing off only as it gets far away
+        plane.position.copy(away).multiplyScalar(1 - Math.pow(1 - z, 2.2)).add(new THREE.Vector3(0, float, 0));
+        // it turns to face the way it's going while it flutters
+        plane.quaternion.identity().slerp(heading, easeSine((t - FLY.turn[1]) / (FLY.flutter[1] - FLY.turn[1]))).multiply(qLook).multiply(qPitch).multiply(qRoll);
       } else {
-        plane.position.set(0, hover, 0);
+        plane.position.set(0, float, 0);
+        plane.quaternion.copy(qLook).multiply(qPitch).multiply(qRoll);
       }
-      plane.visible = g < 0.98;
+      const g = z; // (the wind streaks show while it's zooming off)
+      plane.visible = z < 0.96;
+      // the star pings at the edge as it passes: it pops up, spins, and shrinks away
+      const st = clamp01((t - starAt) / FLY.star);
+      if (away && st > 0 && st < 1) {
+        star.position.copy(starPos);
+        // (sized by how far it is from the camera, so it's always about the same size on screen)
+        star.scale.setScalar(0.045 * camera.position.distanceTo(starPos) * Math.pow(Math.sin(Math.PI * st), 0.7) * (st < 0.25 ? 1 + 0.25 * Math.sin(Math.PI * st * 4) : 1));
+        starM.rotation = st * Math.PI;
+      } else star.scale.setScalar(0);
       // the wind streaks: follow each wingtip while it glides
       plane.updateMatrixWorld();
       trails.forEach((tr, i) => {
@@ -585,9 +658,10 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
         buf.data.needsUpdate = true;
       });
       // then it all fades out softly
-      canvas.style.opacity = String(1 - foldCurve(t, FLY.fade));
+      const fadeAt = Number.isFinite(starAt) ? Math.max(FLY.zip[1], starAt + FLY.star - 0.05) : Infinity;
+      canvas.style.opacity = t > fadeAt ? String(1 - foldCurve(t, [fadeAt, fadeAt + FLY.fade])) : "1";
       renderer.render(scene, camera);
-      if (t > FLY.fade[1]) { done.current(); return; }
+      if (t > fadeAt + FLY.fade) { done.current(); return; }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
