@@ -286,9 +286,10 @@ function LogoDots() {
 
 /* ---------- The camera ---------- */
 
-const CAMERA_TURN_SCROLL = 100;             // how much scrolling it takes to turn round and zoom in on the screen, in % of the window's height
+const CAMERA_TURN_SCROLL = 120;             // how much scrolling it takes to turn round and zoom in on the screen, in % of the window's height
+const CAMERA_TURN_WHEEL = 1.6;              // how far each flick of the wheel or trackpad goes while the camera turns round to the screen (lower = more resistance)
 const CAMERA_PAGE_SCROLL = 170;             // how much scrolling each page on the screen takes, in % of the window's height (more = harder to scroll past one by accident)
-const CAMERA_SCREEN_WHEEL = 1.2;            // how far each flick of the wheel or trackpad goes while you're on the screen (the rest of the page uses LENIS_WHEEL; lower = slower)
+const CAMERA_SCREEN_WHEEL = 2.2;            // how far each flick of the wheel or trackpad goes while you're on the screen (the rest of the page uses LENIS_WHEEL; lower = slower)
 const CAMERA_START_SIZE = 0.62;             // how big the whole camera is at the start (1 = as big as fits)
 // once zoomed in on the screen, the white page behind the camera fades to this dark colour, so no white shows
 // round the camera's edges (r,g,b)
@@ -366,7 +367,7 @@ const SCREEN_X = 19, SCREEN_Y = 62.5, SCREEN_W = 352, SCREEN_H = 231, SCREEN_Z =
 // at one of these points, and add the function to CAMERA_PARTS.
 const CAMERA_ANCHORS = {
   hotShoe: { x: 6, y: -208, z: 120 },    // the flash shoe on top of the viewfinder
-  coldShoe: { x: 211, y: -158, z: 23 },  // the extra shoe on the cage, on the arm beside the viewfinder hump
+  coldShoe: { x: 210, y: -171, z: 24 },  // the extra shoe on the cage, on the top bar beside the viewfinder hump
   tripod: { x: 0, y: 241, z: 95 },       // the screw thread underneath
   lensFront: { x: LENS_X, y: LENS_Y, z: -477 }, // the front of the filter
 };
@@ -892,34 +893,38 @@ function buildCage(k: Kit) {
   k.shell(box(-22, 22, 240.4, 241.6, 91, 99), k.M.gloss);
 
   // the strut up the grip side, drawn from the side: a wall round the bottom of the grip, a thin bar up the back,
-  // then a wide block with holes that meets the top bar (it sits behind the strap loop)
-  k.shell(extrude("M 112 -202 L 176 -202 Q 184 -202 184 -194 L 184 -44 L 164 -8 L 164 128 L 184 162 L 184 205 L -112 205 L -112 152 Q -112 142 -102 142 L -64 142 L -30 170 L 112 170 L 136 128 L 136 -8 L 112 -44 Z",
-    -372, -352, "side", 3, [[148, -160, 8], [148, -120, 8], [148, -80, 8], [10, 188, 5.5], [60, 188, 5.5]]), C);
+  // then a wider block with holes that the top bar bends down into (it sits behind the strap loop)
+  k.shell(extrude("M 115.5 -150 L 176.5 -150 L 176.5 -48 Q 176.5 -38 171 -30 L 164 -20 L 164 128 L 184 162 L 184 205 L -112 205 L -112 152 Q -112 142 -102 142 L -64 142 L -30 170 L 112 170 L 136 128 L 136 -8 L 115.5 -40 Z",
+    -372, -352, "side", 3, [[146, -120, 8], [146, -84, 8], [10, 188, 5.5], [60, 188, 5.5]]), C);
 
   // the strut up the other side. Low down it's a block across the front corner of the body, set at an angle, with a row of holes...
   const corner = extrude(rr(-25, 30, 27, 204, 9), 1, 17, "front", 2.5, [[1, 60, 9], [1, 96, 9], [1, 132, 9], [1, 168, 9]]);
   const c45 = Math.SQRT1_2;
   place(corner, new THREE.Matrix4().set(c45, 0, c45, 237.2, 0, 1, 0, 0, c45, 0, -c45, 8.8, 0, 0, 0, 1));
   k.shell(corner, C);
-  // ...then it steps back and carries on up the side, with a slot for a strap and a round socket, to the top of the body
-  k.shell(extrude(cut("M 16 205 L 62 205 L 62 44 L 76 14 L 76 -132 Q 76 -146 62 -146 L 2 -146 L 2 -128 L 24 -108 L 30 -4 L 16 30 Z", rr(42, -130, 58, -98, 7)),
+  // ...then it steps back and carries on up the side, with a slot for a strap and a round socket, narrowing at the top to meet the top bar
+  k.shell(extrude(cut("M 16 205 L 62 205 L 62 44 L 76 14 L 76 -96 Q 76 -110 66 -118 L 52 -132 Q 48.5 -136 48.5 -142 L 48.5 -146 L -0.5 -146 L -0.5 -128 L 24 -108 L 30 -4 L 16 30 Z", rr(44, -104, 60, -74, 7)),
     250, 268, "side", 3), C);
   k.shell(ring(8, 15, 268, 271, "x", -56, 53, 1), k.M.steel);
   k.shell(cyl(8, 268, 268.8, "x", -56, 53), k.M.black, false);
 
-  // the top, starting on that side: an arm along the front edge of the body, with a shoe on it for accessories...
-  k.shell(extrude("M 99 2 L 254 2 Q 268 2 268 16 L 268 44 L 99 44 Z", -146, -128, "top", 2.5, [[124, 23, 5.5], [150, 23, 5.5]]), C);
-  for (const [a, b, c, d] of [[182, 192, -157, -146], [230, 240, -157, -146], [182, 198, -159, -155.5], [224, 240, -159, -155.5]]) k.shell(box(a, b, c, d, 4, 42), C);
-  // ...which climbs the side of the viewfinder hump...
-  k.shell(extrude("M 102 -128 L 122 -128 L 96 -200 L 76 -200 Z", 2, 44, "front", 2), C);
-  // ...to the plate on top of the hump, in front of the flash shoe, with its holes, its screws, and the lip down its front
-  k.shell(extrude(rr(-78, -26, 96, 48, 8), -208, -194, "top", 2.5, [[-20, 0, 5], [6, 0, 5], [32, 0, 5], [-20, 26, 5], [6, 26, 5], [32, 26, 5]]), C);
-  for (const [x, z] of [[-58, -8], [76, -8], [-58, 32], [76, 32]]) k.shell(cyl(7, -210, -207, "y", x, z, 1), k.M.steel);
-  k.shell(extrude(rr(-86, -206, 104, -160, 6), -28, -14, "front", 2.5), C);
-  // from there an arm runs back over the dials to a bar above the grip side, which sits on top of the grip-side strut
-  k.shell(extrude("M -360 110 L -205 110 L -85 -4 L -68 -4 L -68 40 L -220 184 L -360 184 Q -372 184 -372 172 L -372 122 Q -372 110 -360 110 Z", -202, -182, "top", 3,
-    [[-336, 132, 6], [-336, 162, 6], [-296, 132, 6], [-296, 162, 6], [-256, 147, 6]]), C);
+  // the top bar: one slim strip, 4 mm thick, along the front of the top. Seen from behind it bends down into the
+  // side strut with a rounded corner, runs low over the photo / video switch, climbs over the front of the viewfinder
+  // hump (in front of the flash shoe, so that stays free), then drops down again on the grip side
+  k.shell(extrude("M -112 -176 L -106 -176 Q -98 -176 -94 -181 L -82 -196 Q -75 -207 -62 -207 L 88 -207 Q 98 -207 104 -198 L 118 -174 Q 124 -165 136 -165 L 249 -165 Q 267.5 -165 267.5 -146 L 267.5 -136 L 250.5 -136 L 250.5 -146 Q 250.5 -150 246 -150 L 116 -150 Q 110 -150 107 -155 L 77 -188 Q 74 -192 69 -192 L -64 -192 Q -68 -192 -70 -189 L -88 -166 Q -92 -160 -98 -160 L -112 -160 Z",
+    0, 48, "front", 2.5), C);
+  // its threaded holes over the hump, and the four screws holding it on
+  for (const x of [-20, 6, 32]) for (const z of [14, 34]) k.shell(cyl(5, -207.6, -206.9, "y", x, z), k.M.black, false);
+  for (const x of [-46, 72]) for (const z of [10, 38]) k.shell(cyl(6, -208.6, -206.5, "y", x, z, 1), k.M.steel);
+  // a cold shoe for accessories on the low part, beside the hump: a base with two lips the foot slides under
+  k.shell(extrude("M 186 -164 L 186 -180 L 200 -180 L 200 -176 L 193 -176 L 193 -171 L 227 -171 L 227 -176 L 220 -176 L 220 -180 L 234 -180 L 234 -164 Z", 6, 42, "front", 1), C);
+  // on the grip side it angles back over the dials, staying just above them...
+  k.shell(extrude("M -100 1 L -120 1 Q -131 1 -137 11 L -183 98 Q -193 117 -213 117 L -330 117 L -330 175 L -184 175 Q -175 175 -170 166 L -106 47 L -100 47 Z",
+    -175.6, -160.4, "top", 3, [[-290, 131, 5.5], [-290, 161, 5.5], [-254, 131, 5.5], [-254, 161, 5.5], [-218, 146, 5.5]]), C);
+  // ...to a rounded corner that bends down into the grip-side strut
+  k.shell(extrude("M -300 -176 L -346 -176 Q -371.5 -176 -371.5 -150 L -371.5 -140 L -352.5 -140 L -352.5 -150 Q -352.5 -160 -342 -160 L -300 -160 Z", 116, 176, "front", 3), C);
 }
+
 
 // one piece of lens glass: zf = where its front is, R = its radius, th = how thick in the middle,
 // k1 / k2 = how curved its front and back are (above 0 = the middle bulges towards the front of the lens)
@@ -1421,7 +1426,15 @@ export default function Home() {
 
   // Lenis smooth scrolling (only on this page: it switches itself off when you leave)
   useEffect(() => {
-    const lenis = new Lenis({ lerp: LENIS_LERP, wheelMultiplier: LENIS_WHEEL, smoothWheel: true });
+    // (Lenis only reads wheelMultiplier once, when it starts, so changes the camera makes to lenis.options.wheelMultiplier
+    // are applied here, to each flick of the wheel or trackpad, as a share of the normal speed)
+    const lenis: Lenis = new Lenis({
+      lerp: LENIS_LERP, wheelMultiplier: LENIS_WHEEL, smoothWheel: true,
+      virtualScroll: (d) => {
+        if (d.event.type === "wheel") { const k = lenis.options.wheelMultiplier / LENIS_WHEEL; d.deltaX *= k; d.deltaY *= k; }
+        return true;
+      },
+    });
     lenisRef.current = lenis;
     let raf = 0;
     const loop = (time: number) => {
@@ -1677,7 +1690,8 @@ export default function Home() {
       // Snapping: if the scrolling stops part way between two pages, glide on to whichever is closer
       const l = lenisRef.current;
       // scrolling is gentler while you're on the screen, so a normal flick doesn't skip a page
-      if (l) l.options.wheelMultiplier = p > T * 0.95 && p < 1 ? CAMERA_SCREEN_WHEEL : LENIS_WHEEL;
+      // and it pushes back a little while the camera turns round to the screen, so the turn doesn't fly past
+      if (l) l.options.wheelMultiplier = p > T * 0.95 && p < 1 ? CAMERA_SCREEN_WHEEL : br.top <= 1 && p < 1 ? CAMERA_TURN_WHEEL : LENIS_WHEEL;
       if (snapping && now - snapAt > 1500) { snapping = false; forced = -1; } // in case a new scroll cut the glide short
       if (CAMERA_SNAP > 0 && l && !snapping && !spinning && !swipe && !l.isTouching && !l.isScrolling && now - lastScroll > 200) {
         const pu = clamp((p - T) / (1 - T), 0, 1) * n, pk = Math.floor(pu), pf = pu - pk;
