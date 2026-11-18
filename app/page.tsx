@@ -12,7 +12,7 @@ const ABOUT_TITLE = "who am i?";
 // Each line in quotes is one paragraph. This is the short intro at the top, like the "about" on linkedin.
 // Anything in [square brackets] is a placeholder: swap it for your own words (and drop the brackets).
 const ABOUT_TEXT = [
-  "i'm ethan, a [program] student at [school] in toronto. i'm a photographer and a maker: i shoot events, street and sports, and i build small electronics projects to learn hardware and code.",
+  "i'm ethan, a student in toronto. i'm a photographer and do enginnering things for fun: i shoot events, street and sports, and i build small electronics projects to learn hardware and code.",
 ];
 
 // a word in ABOUT_TEXT that gets written and circled in blue, like with a marker, when the "who am i" page shows ("" = none)
