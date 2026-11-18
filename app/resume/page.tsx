@@ -69,7 +69,7 @@ const LANGUAGES = ["english", "hakka chinese"];
 const FOOTNOTE = "last updated [NOV 2026] · references available on request";
 
 // ---- colours (same as the rest of the site) ----
-const PAGE_BG = "255,255,255"; // the page's background (white)
+const PAGE_BG = "236,236,233"; // the page's background behind the résumé (a light grey, so the white sheet stands out)
 const AMBER = "178,104,14"; // the section headings (a deeper amber, so they read on white)
 const BLUE = "100,159,255";  // the download button's outline
 
@@ -152,26 +152,26 @@ export default function ResumePage() {
       <div className="mx-auto max-w-5xl px-4 pb-24 pt-8 sm:px-6 sm:pt-10">
         {/* the bar above the resume (hidden when printed) */}
         <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="font-mono text-xs text-neutral-600 transition hover:text-black">&larr; home</Link>
+          <Link href="/" className="font-mono text-xs text-neutral-700 transition hover:text-black">&larr; home</Link>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => window.print()} className={`${btn} text-neutral-900 hover:bg-black/5`} style={{ borderColor: `rgb(${BLUE})`, background: `rgba(${BLUE},.08)` }}>
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
               download pdf
             </button>
-            <button type="button" onClick={copy} className={`${btn} border-black/15 text-neutral-900 hover:bg-black/5`} aria-live="polite">
+            <button type="button" onClick={copy} className={`${btn} border-black/20 bg-white text-neutral-900 hover:bg-black/5`} aria-live="polite">
               {copied ? "copied" : "copy text"}
             </button>
-            <Link href="/contact" className={`${btn} border-black/15 text-neutral-900 hover:bg-black/5`}>contact me</Link>
+            <Link href="/contact" className={`${btn} border-black/20 bg-white text-neutral-900 hover:bg-black/5`}>contact me</Link>
           </div>
         </div>
 
         {/* the resume */}
-        <article className="rs-card rounded-2xl border border-black/10 bg-black/[0.02] px-6 py-10 sm:px-12 sm:py-14">
+        <article className="rs-card rounded-lg border border-black/15 bg-white px-6 py-10 shadow-[0_1px_2px_rgba(0,0,0,.08),0_18px_40px_-18px_rgba(0,0,0,.28)] sm:px-12 sm:py-14">
           {/* name, headline and contact */}
           <div className="rs-top flex flex-col gap-6 border-b border-black/10 pb-8 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1 className="text-5xl font-bold tracking-tight sm:text-6xl">{NAME}</h1>
-              <p className="rs-muted mt-3 text-neutral-600 sm:text-lg">{HEADLINE}</p>
+              <p className="rs-muted mt-3 text-neutral-700 sm:text-lg">{HEADLINE}</p>
             </div>
             <ul className="space-y-1 font-mono text-xs text-neutral-700 sm:text-right">
               {CONTACT.map((c, i) => (
@@ -191,9 +191,9 @@ export default function ResumePage() {
                   <div key={i} className="break-inside-avoid">
                     <div className="flex items-baseline justify-between gap-4">
                       <h3 className="text-lg font-medium">{e.school}</h3>
-                      <span className="rs-muted shrink-0 font-mono text-xs text-neutral-500">{e.dates}</span>
+                      <span className="rs-muted shrink-0 font-mono text-xs text-neutral-700">{e.dates}</span>
                     </div>
-                    <p className="rs-muted mt-1 text-sm text-neutral-600">{e.details}</p>
+                    <p className="rs-muted mt-1 text-sm text-neutral-700">{e.details}</p>
                     <p className="mt-1 text-sm text-neutral-800">{e.courses}</p>
                   </div>
                 ))}
@@ -206,10 +206,10 @@ export default function ResumePage() {
                     <div key={i} className="break-inside-avoid py-5">
                       <div className="flex items-baseline justify-between gap-4">
                         <h3 className="text-lg font-medium">{x.role}</h3>
-                        <span className="rs-muted shrink-0 font-mono text-xs text-neutral-500">{x.dates}</span>
+                        <span className="rs-muted shrink-0 font-mono text-xs text-neutral-700">{x.dates}</span>
                       </div>
-                      <p className="rs-muted mt-1 text-sm text-neutral-600">{x.where}</p>
-                      <ul className="mt-3 list-disc space-y-1 pl-4 text-sm text-neutral-800 marker:text-neutral-500">
+                      <p className="rs-muted mt-1 text-sm text-neutral-700">{x.where}</p>
+                      <ul className="mt-3 list-disc space-y-1 pl-4 text-sm text-neutral-800 marker:text-neutral-700">
                         {x.points.map((pt, j) => <li key={j}>{pt}</li>)}
                       </ul>
                     </div>
@@ -224,7 +224,7 @@ export default function ResumePage() {
                     <div key={i} className="break-inside-avoid py-5">
                       <div className="flex items-baseline justify-between gap-4">
                         <h3 className="text-lg font-medium">{p.name}</h3>
-                        <span className="rs-muted shrink-0 font-mono text-xs text-neutral-500">{p.year}</span>
+                        <span className="rs-muted shrink-0 font-mono text-xs text-neutral-700">{p.year}</span>
                       </div>
                       <p className="mt-2 text-sm leading-relaxed text-neutral-800">{p.text}</p>
                     </div>
@@ -239,9 +239,9 @@ export default function ResumePage() {
                     <li key={i} className="flex items-baseline justify-between gap-4 py-3.5">
                       <span>
                         <span className="font-medium">{a.name}</span>
-                        <span className="rs-muted text-neutral-600"> · {a.detail}</span>
+                        <span className="rs-muted text-neutral-700"> · {a.detail}</span>
                       </span>
-                      <span className="rs-muted shrink-0 font-mono text-xs text-neutral-500">{a.years}</span>
+                      <span className="rs-muted shrink-0 font-mono text-xs text-neutral-700">{a.years}</span>
                     </li>
                   ))}
                 </ul>
@@ -257,10 +257,10 @@ export default function ResumePage() {
             </aside>
           </div>
 
-          <p className="rs-muted mt-8 border-t border-black/10 pt-6 font-mono text-xs text-neutral-500">{FOOTNOTE}</p>
+          <p className="rs-muted mt-8 border-t border-black/10 pt-6 font-mono text-xs text-neutral-700">{FOOTNOTE}</p>
         </article>
 
-        <p className="no-print mt-6 max-w-2xl text-sm leading-relaxed text-neutral-500">
+        <p className="no-print mt-6 max-w-2xl text-sm leading-relaxed text-neutral-700">
           &ldquo;download pdf&rdquo; opens the print window with a clean white version: choose &ldquo;Save as PDF&rdquo;.
           &ldquo;copy text&rdquo; copies the whole resume as plain text.
         </p>

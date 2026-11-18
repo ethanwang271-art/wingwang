@@ -12,7 +12,7 @@ const ABOUT_TITLE = "who am i?";
 // Each line in quotes is one paragraph. This is the short intro at the top, like the "about" on linkedin.
 // Anything in [square brackets] is a placeholder: swap it for your own words (and drop the brackets).
 const ABOUT_TEXT = [
-  "i'm ethan, a student in toronto. i'm a photographer and do enginnering things for fun: i shoot events, street and sports, and i build small electronics projects to learn hardware and code.",
+  "i'm ethan, a student in toronto. i'm a photographer and do engineering things for fun: i shoot events, street and sports, and i build small electronics projects to learn hardware and code.",
 ];
 
 // a word in ABOUT_TEXT that gets written and circled in blue, like with a marker, when the "who am i" page shows ("" = none)
@@ -130,6 +130,19 @@ const BUTTON_BLUE = "#2f6fde";
 const BUTTON_BLUE_HOVER = "#255bbd";
 
 const CONTACT_CSS = `
+/* the hidden camera buttons: nothing shows until you point at one (it lights up), and pressing it sinks it in like a real button */
+.cam-btn { background: transparent; border: 0; padding: 0; -webkit-tap-highlight-color: transparent; transition: background .25s ease, box-shadow .25s ease; }
+/* pointing at one gives it a faint white glow, so you can find them again */
+@media (hover: hover) {
+  .cam-btn:hover { background: rgba(255,255,255,.05); box-shadow: 0 0 0 1px rgba(255,255,255,.22), 0 0 14px 1px rgba(255,255,255,.16); }
+}
+.cam-btn:active { background: rgba(0,0,0,.35); box-shadow: inset 0 3px 8px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.22); }
+.cam-btn:focus-visible { outline: 2px solid rgb(${BLUE}); outline-offset: 2px; }
+/* the picture the menu button pops up */
+@keyframes menu-pop { from { opacity: 0; transform: translateY(10px); } }
+@keyframes menu-fade { from { opacity: 0; } }
+.menu-back { animation: menu-fade .25s ease both; }
+.menu-card { animation: menu-pop .3s cubic-bezier(.2,.7,.2,1) both; }
 /* the screen's pages were drawn for a black screen; these swap their light colours for dark ones on the white screen */
 .scr-light, .scr-light .text-white { color: rgb(${SCREEN_INK}); }
 .scr-light .text-neutral-300 { color: rgba(${SCREEN_INK}, .92); }
@@ -277,6 +290,18 @@ const CAMERA_TURN_SCROLL = 100;             // how much scrolling it takes to tu
 const CAMERA_PAGE_SCROLL = 170;             // how much scrolling each page on the screen takes, in % of the window's height (more = harder to scroll past one by accident)
 const CAMERA_SCREEN_WHEEL = 1.2;            // how far each flick of the wheel or trackpad goes while you're on the screen (the rest of the page uses LENIS_WHEEL; lower = slower)
 const CAMERA_START_SIZE = 0.62;             // how big the whole camera is at the start (1 = as big as fits)
+// once zoomed in on the screen, the white page behind the camera fades to this dark colour, so no white shows
+// round the camera's edges (r,g,b)
+const CAMERA_ZOOM_BG = "20,20,22";
+// the hidden buttons on the camera's back (an easter egg): press them like real ones once you've zoomed in.
+// x, y = where each is on the model, r = its size. go = the page it opens ("" = it does something else, see below)
+const CAMERA_BUTTONS: { name: string; x: number; y: number; r: number; go: string }[] = [
+  { name: "menu", x: 178, y: -74, r: 19.5, go: "" },          // opens the picture of me (MENU_PHOTO)
+  { name: "info", x: -205, y: 24, r: 19.5, go: "/contact" },
+  { name: "playback", x: -205, y: 142, r: 17.5, go: "/photos" },
+];
+const MENU_PHOTO = "/ethan.jpg"; // the picture the menu button pops up: put a photo of you at public/ethan.jpg
+const MENU_CAPTION = "woah, it's me";
 const CAMERA_SCREEN_SIZE = 0.86;            // once zoomed in, how much of the window's width the camera's screen may fill (it also always fits the height)
 const CAMERA_SWIPE = 50;                    // how far (px) you have to swipe or drag across the screen to go to the next page
 const CAMERA_YAW = 0;                       // how far it's turned at the start, in degrees (0 = facing you straight on)
@@ -1365,6 +1390,9 @@ export default function Home() {
   }, []);
   // the settings of the preview photo you're hovering on the photos page (shown in the bar along the top of the screen)
   const [shotInfo, setShotInfo] = useState<string[] | null>(null);
+  const camBtnEls = useRef<(HTMLElement | null)[]>([]); // the hidden camera buttons, moved to sit over the drawn ones
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPhotoOk, setMenuPhotoOk] = useState(true);
   const shotCache = useRef(new Map<string, string[]>());
   const shotKey = useRef("");
   const leaveShot = () => { shotKey.current = ""; setShotInfo(null); };
@@ -1683,6 +1711,12 @@ export default function Home() {
           pz: lerp(-150, SCREEN_Z, z),
           depth: lerp(4000, 2400, f),
         };
+        // the page behind the camera darkens as it zooms in, so no white shows round its edges
+        const bgA = smooth(0.82, 1, f).toFixed(3);
+        if (cv.parentElement && cv.parentElement.dataset.bg !== bgA) {
+          cv.parentElement.dataset.bg = bgA;
+          cv.parentElement.style.backgroundColor = `rgba(${CAMERA_ZOOM_BG},${bgA})`;
+        }
         screenFacing = -Math.cos(pose.yaw) * Math.cos(pose.tilt);
         // only draw when something has visibly moved (once zoomed in on the screen, the camera holds still)
         // (angles to a twentieth of a degree: the slow sway at the start then redraws only when it has moved enough to see)
@@ -1706,6 +1740,20 @@ export default function Home() {
           }
         }
         sb = drawnBox;
+        // the hidden buttons follow the drawn ones; they only work once it's zoomed right in on the screen
+        const pb = poseProjector(pose);
+        CAMERA_BUTTONS.forEach((b, i) => {
+          const el = camBtnEls.current[i];
+          if (!el) return;
+          const live = on > 0.97;
+          const c = pb({ x: b.x, y: b.y, z: 191 }), e = pb({ x: b.x + b.r, y: b.y, z: 191 });
+          const d = Math.max(24, Math.abs(e.x - c.x) * 2);
+          const style = live ? `translate3d(${(c.x - d / 2).toFixed(1)}px,${(c.y - d / 2).toFixed(1)}px,0)|${d.toFixed(1)}` : "off";
+          if (el.dataset.at === style) return;
+          el.dataset.at = style;
+          el.style.display = live ? "block" : "none";
+          if (live) { el.style.transform = style.split("|")[0]; el.style.width = el.style.height = `${d.toFixed(1)}px`; }
+        });
       }
       if (sb && on > 0.001) {
         // lay the pages over the screen's four corners. Once the screen sits square on (within half a pixel),
@@ -1807,6 +1855,17 @@ export default function Home() {
           {/* your W logo in dots, behind the camera */}
           <LogoDots />
           <canvas key="camera-3d" ref={camCanvasRef} role="img" aria-label="A 3D model of my camera. Drag to turn it." className="absolute inset-0 h-full w-full" style={{ touchAction: "pan-y" }} />
+
+          {/* the hidden camera buttons: invisible until you press one (an easter egg) */}
+          {CAMERA_BUTTONS.map((b, i) =>
+            b.go ? (
+              <Link key={b.name} href={b.go} ref={(el) => { camBtnEls.current[i] = el; }} aria-label={`the camera's ${b.name} button`} draggable={false}
+                className="cam-btn absolute left-0 top-0 z-10 rounded-full" style={{ display: "none" }} />
+            ) : (
+              <button key={b.name} type="button" ref={(el) => { camBtnEls.current[i] = el; }} aria-label={`the camera's ${b.name} button`}
+                onClick={() => setMenuOpen(true)} className="cam-btn absolute left-0 top-0 z-10 rounded-full" style={{ display: "none" }} />
+            ),
+          )}
 
           {/* the camera's back screen: laid exactly over the screen in the drawing once it's zoomed in */}
           <div
@@ -2066,6 +2125,29 @@ export default function Home() {
       </section>
 
       {/* plain one-line footer: grey monospace, lowercase, links with a faint underline */}
+      {/* what the camera's menu button pops up: a picture of me. click anywhere or press escape to close it */}
+      {menuOpen && (
+        <div role="dialog" aria-modal="true" aria-label="a picture of me" className="menu-back fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-6"
+          onClick={() => setMenuOpen(false)} onKeyDown={(e) => { if (e.key === "Escape") setMenuOpen(false); }}>
+          <figure className="menu-card w-[min(78vw,320px)]" onClick={(e) => e.stopPropagation()}>
+            {/* a plain polaroid: square corners, an even white border with a deeper strip at the bottom for the caption */}
+            <div className="bg-white px-3 pb-3 pt-3 shadow-[0_1px_2px_rgba(0,0,0,.25),0_18px_40px_-12px_rgba(0,0,0,.5)]">
+              <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-200">
+                {menuPhotoOk ? (
+                  <Image src={MENU_PHOTO} alt="ethan" fill sizes="320px" className="object-cover" onError={() => setMenuPhotoOk(false)} />
+                ) : (
+                  <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-neutral-800">add a photo of you at public/ethan.jpg</p>
+                )}
+              </div>
+              <figcaption className="pb-2 pt-4 text-base font-medium text-neutral-900">{MENU_CAPTION}</figcaption>
+            </div>
+            <button type="button" autoFocus onClick={() => setMenuOpen(false)} className="mx-auto mt-4 block text-sm text-white/90 underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none">
+              close
+            </button>
+          </figure>
+        </div>
+      )}
+
       <footer className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 py-6 font-mono text-sm lowercase text-neutral-800">
         <span>© 2026 ethan wang</span>
         {/* your resume page (app/resume/page.tsx) */}
