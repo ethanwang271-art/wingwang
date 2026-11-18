@@ -18,7 +18,7 @@ export default function PhotosPage() {
       {folders.length === 0 ? (
         <div className="mx-auto max-w-5xl px-6 py-12">
           <h1 className="text-4xl font-bold tracking-tight">Photos</h1>
-          <div className="mt-8 rounded-3xl border border-dashed border-black/25 p-10 text-center text-neutral-600">
+          <div className="mt-8 rounded-3xl border border-dashed border-black/25 p-10 text-center text-neutral-700">
             Add folders of images inside <code>public/photos/</code>, for example{" "}
             <code>public/photos/japan-2024/beach-day.jpg</code>.
           </div>

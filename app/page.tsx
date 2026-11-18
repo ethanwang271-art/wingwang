@@ -9,31 +9,31 @@ import * as THREE from "three";
 
 // ---- About me section: edit these ----
 const ABOUT_TITLE = "who am i?";
-// Each line in quotes is one paragraph. Change them, add more, or delete some.
+// Each line in quotes is one paragraph. This is the short intro at the top, like the "about" on linkedin.
+// Anything in [square brackets] is a placeholder: swap it for your own words (and drop the brackets).
 const ABOUT_TEXT = [
-  "hi my names ethan",
-  "site is still a work in progress!",
+  "i'm ethan, a [program] student at [school] in toronto. i'm a photographer and a maker: i shoot events, street and sports, and i build small electronics projects to learn hardware and code.",
 ];
 
 // a word in ABOUT_TEXT that gets written and circled in blue, like with a marker, when the "who am i" page shows ("" = none)
 const ABOUT_CIRCLE = "ethan";
 
 // ---- The rest of your about me: edit these ----
-// These show under "who am i?" on the first page of the camera's screen, in two columns: the professional side
-// on the left and the personal side on the right. Anything in [square brackets] is a placeholder: swap it for your own words (and drop the brackets).
-// Keep each one to a line or two so it all fits on a phone. You can delete a row or add one (5 or so per side fits best).
-const ABOUT_PRO: { title: string; text: string }[] = [
-  { title: "what i do", text: "currently a student, trying to make and do cool things" },
-  { title: "what i shoot", text: "events, street and sports" },
-  { title: "tools", text: "canon r8, photos edited on lightroom classic" },
-  { title: "open to", text: "freelance shoots, collaborations, and job opportunities" },
-];
-const ABOUT_PERSONAL: { title: string; text: string }[] = [
-  { title: "where i'm from", text: "based in Toronto" },
-  { title: "why photos", text: "photography has always been cool to me" },
-  { title: "outside of photos", text: "i like to play games & hang out w my friends" },
-  { title: "currently into", text: "building my portfolio" },
-  { title: "what's next", text: "trying to develop new projects" },
+// These show under the intro on the first page of the camera's screen, as short sections in two columns.
+// Think of them as the sections of your linkedin profile. Keep each one short so it all fits on a phone
+// (about 3 sections a column fits best).
+// side = which column it's in. points = an optional list of bullet points under the text.
+const ABOUT_SECTIONS: { title: string; text: string; side: "left" | "right"; points?: string[] }[] = [
+  { side: "left", title: "photography", text: "i shoot events, street and sports on my canon r8 and edit in lightroom classic." },
+  { side: "left", title: "projects", text: "i'm teaching myself electronics and 3d design. my first build, aeon salmon v1, is a desk robot built around a raspberry pi pico 2 w." },
+  { side: "left", title: "skills", text: "photography, photo editing, lightroom classic, teamwork." },
+  {
+    side: "right", title: "experience", text: "Co-op Student at Scarborough Health Network, Sept 2025 - Jan 2026.",
+    points: ["Assisted nurses and staff with keeping PPE in stock", "Aided in patient discharges", "Delivered medicine to nurses"],
+  },
+  { side: "right", title: "open to", text: "freelance shoots, collaborations, internships or part-time roles. reach me through the contact page or linkedin." },
+  // to add education back:
+  // { side: "left", title: "education", text: "[program], [school], [start year] to [end year]." },
 ];
 
 // ---- The other pages on the camera's screen (photos, videos, projects): edit these ----
@@ -120,34 +120,52 @@ const MARKER_CSS = `
 @media (prefers-reduced-motion: reduce) { .marker path, .marker.drawn path { stroke-dashoffset: 0; transition: none; } }
 `;
 
+// ---- the camera's screen: white, with dark writing ----
+const SCREEN_BG = "#ffffff";   // the screen's background
+const SCREEN_INK = "17,17,17"; // r,g,b of the main writing on it (the softer greys below are made from this)
+
+// the buttons (résumé, see all photos, contact me...): solid blue, a little deeper than the site blue so the white
+// writing on them is easy to read
+const BUTTON_BLUE = "#2f6fde";
+const BUTTON_BLUE_HOVER = "#255bbd";
+
 const CONTACT_CSS = `
+/* the screen's pages were drawn for a black screen; these swap their light colours for dark ones on the white screen */
+.scr-light, .scr-light .text-white { color: rgb(${SCREEN_INK}); }
+.scr-light .text-neutral-300 { color: rgba(${SCREEN_INK}, .92); }
+.scr-light .text-neutral-400 { color: rgba(${SCREEN_INK}, .82); }
+.scr-light .text-neutral-500 { color: rgba(${SCREEN_INK}, .78); }
+.scr-light .text-white\\/70 { color: rgba(${SCREEN_INK}, .75); }
+.scr-light .border-white\\/15, .scr-light .border-white\\/10, .scr-light .border-white\\/25 { border-color: rgba(${SCREEN_INK}, .14); }
+.scr-light .divide-white\\/10 > * { border-color: rgba(${SCREEN_INK}, .12); }
+.scr-light .bg-white\\/5 { background-color: rgba(${SCREEN_INK}, .04); }
+.scr-light .bg-neutral-900 { background-color: #ececec; }
+.scr-light .decoration-white\\/30 { text-decoration-color: rgba(${SCREEN_INK}, .3); }
+.scr-light .hover\\:text-white:hover, .scr-light .group:hover .group-hover\\:text-white { color: #000; }
+.scr-light .hover\\:decoration-white:hover { text-decoration-color: #000; }
+.scr-light .focus-visible\\:outline-white:focus-visible { outline-color: #000; }
+
 .contact-btn {
   display: inline-flex;
   align-items: center;
   gap: .5rem;
-  padding: .5rem 1rem;
-  border-radius: .5rem;
-  border: 1px solid rgba(${BLUE}, .75);
-  background: rgba(${BLUE}, .14);
-  color: #e9edf9;
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: .55rem 1rem;
+  border-radius: 4px;
+  border: 0;
+  background: ${BUTTON_BLUE};
+  color: #fff;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   font-size: .875rem;
-  letter-spacing: .01em;
+  font-weight: 500;
   text-decoration: none;
-  transition: transform .3s ease, background .3s ease, border-color .3s ease, box-shadow .3s ease;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.18);
+  transition: background .2s ease, transform .1s ease;
 }
-/* the same button on the white page (the ones on the camera's black screen keep the light writing) */
-.contact-btn.on-light { color: #0d2350; background: rgba(${BLUE}, .1); }
-.contact-btn.on-light:hover, .contact-btn.on-light:focus-visible { background: rgba(${BLUE}, .22); box-shadow: 0 0 22px rgba(${BLUE}, .3); }
-.contact-arrow { width: 1em; height: 1em; flex-shrink: 0; transition: transform .3s ease; }
+.contact-btn:hover { background: ${BUTTON_BLUE_HOVER}; }
+.contact-btn:active { transform: translateY(1px); }
+.contact-btn:focus-visible { outline: 2px solid ${BUTTON_BLUE}; outline-offset: 2px; }
+.contact-arrow { width: 1em; height: 1em; flex-shrink: 0; transition: transform .2s ease; }
 .contact-btn:hover .contact-arrow, .contact-btn:focus-visible .contact-arrow { transform: translate(2px, -2px); }
-.contact-btn:hover, .contact-btn:focus-visible {
-  transform: translateY(-2px);
-  background: rgba(${BLUE}, .3);
-  border-color: rgb(${BLUE});
-  box-shadow: 0 0 28px rgba(${BLUE}, .4);
-  outline: none;
-}
 `;
 
 // make the whole page the same white
@@ -256,8 +274,8 @@ function LogoDots() {
 /* ---------- The camera ---------- */
 
 const CAMERA_TURN_SCROLL = 100;             // how much scrolling it takes to turn round and zoom in on the screen, in % of the window's height
-const CAMERA_PAGE_SCROLL = 130;             // how much scrolling each page on the screen takes, in % of the window's height (more = harder to scroll past one by accident)
-const CAMERA_SCREEN_WHEEL = 2;              // how far each flick of the wheel or trackpad goes while you're on the screen (the rest of the page uses LENIS_WHEEL; lower = slower)
+const CAMERA_PAGE_SCROLL = 170;             // how much scrolling each page on the screen takes, in % of the window's height (more = harder to scroll past one by accident)
+const CAMERA_SCREEN_WHEEL = 1.2;            // how far each flick of the wheel or trackpad goes while you're on the screen (the rest of the page uses LENIS_WHEEL; lower = slower)
 const CAMERA_START_SIZE = 0.62;             // how big the whole camera is at the start (1 = as big as fits)
 const CAMERA_SCREEN_SIZE = 0.86;            // once zoomed in, how much of the window's width the camera's screen may fill (it also always fits the height)
 const CAMERA_SWIPE = 50;                    // how far (px) you have to swipe or drag across the screen to go to the next page
@@ -266,7 +284,7 @@ const CAMERA_TILT = 0;                      // how much you look down on it at t
 const CAMERA_SPIN = 0.45;                   // at the start you can drag the camera round to look at it from any side: degrees it turns per pixel dragged
 const CAMERA_MOUSE = 6;                     // how much it leans to follow the mouse at the start, in degrees (0 = not at all)
 const CAMERA_SPIN_UNTIL = 0.48;              // you can still drag the camera round until it has zoomed this far towards its screen (0 = only before any scrolling, 1 = right up to the screen)
-const CAMERA_SNAP = 0.35;                   // when you stop scrolling between two pages, it glides to the nearest one in this many seconds (0 = off)
+const CAMERA_SNAP = 0.55;                   // when you stop scrolling between two pages, it glides to the nearest one in this many seconds (0 = off)
 const CAMERA_DOTS = "235,235,235";          // r,g,b of the little dots on the camera's back screen (soft white)
 const CAMERA_DOTS_LIT = "255,255,255";      // r,g,b of a dot once the pointer has passed over it (bright white)
 const CAMERA_DOT_GAP = 7;                   // how far apart the dots on the screen are (lower = more, finer dots; about 4.5 = 1mm)
@@ -281,7 +299,7 @@ const CAMERA_APERTURE_BLADES = 7;           // how many blades the aperture insi
 const LOGO_SIZE = 0.78;            // how tall the logo is, compared to the window (it also always fits the width)
 const LOGO_DOT_GAP = 4.5;          // how far apart its dots are, in px (lower = more, finer dots)
 const LOGO_DOT_SIZE = 1.3;         // how wide each dot is, in px (it grows a little when lit)
-const LOGO_DOT_FAINT = 0.18;       // how visible the dots are before the pointer passes over them (0 = hidden until lit)
+const LOGO_DOT_FAINT = 0.3;        // how visible the dots are before the pointer passes over them (0 = hidden until lit)
 const LOGO_BRUSH = 0.05;           // how big the patch that lights up under the pointer is, compared to the window
 const LOGO_INK = "17,17,17";       // r,g,b of the black parts of the W
 const LOGO_BLUE = "31,95,217";     // r,g,b of the blue part of the W
@@ -295,7 +313,10 @@ const LOGO_BLADES = [
 const LOGO_BOX = { x: 140, y: 100, w: 285, h: 260 }; // the area the blades above fill
 
 // the pages on the camera's screen, in order
-const SCREEN_PAGES = ["who am i", "photos", "videos", "projects", "contact"];
+// the videos page is switched off until there's a video (its code is kept below: set SHOW_VIDEOS to true to bring it back)
+const SHOW_VIDEOS = false;
+const SCREEN_PAGES = ["who am i", "photos", ...(SHOW_VIDEOS ? ["videos"] : []), "projects", "contact"];
+const pageNo = (name: string) => SCREEN_PAGES.indexOf(name); // where a page is on the screen (0 = first)
 // worked out from the settings above: how tall the camera part is, and how much of its scrolling is the turn
 const CAMERA_SCROLL = CAMERA_TURN_SCROLL + CAMERA_PAGE_SCROLL * SCREEN_PAGES.length;
 const CAMERA_HEIGHT = `${CAMERA_SCROLL + 100}vh`;
@@ -314,7 +335,7 @@ type V3 = { x: number; y: number; z: number };
 // where the lens is (its middle, seen from the front)
 const LENS_X = 0, LENS_Y = 30;
 // the screen on the back: the middle of its picture, its size (3 by 2, like the real one) and how far back it is
-const SCREEN_X = 19, SCREEN_Y = 64.5, SCREEN_W = 338, SCREEN_H = 225, SCREEN_Z = 198;
+const SCREEN_X = 19, SCREEN_Y = 62.5, SCREEN_W = 352, SCREEN_H = 231, SCREEN_Z = 198; // nearly fills the black glass, so its dark rim is thin
 // Places to attach other models later (a flash, a microphone, a tripod...), in the camera's own units.
 // To add one: write a function like buildLens below that adds its pieces to the kit, shift its pieces to start
 // at one of these points, and add the function to CAMERA_PARTS.
@@ -1724,7 +1745,7 @@ export default function Home() {
         screenDotEls.current.forEach((el, i) => {
           if (!el) return;
           el.setAttribute("aria-current", String(i === page));
-          el.style.background = i === page ? "rgb(255,255,255)" : "rgba(255,255,255,.25)";
+          el.style.background = i === page ? `rgb(${SCREEN_INK})` : `rgba(${SCREEN_INK},.2)`;
           el.style.width = i === page ? "18px" : "6px";
         });
       }
@@ -1780,7 +1801,7 @@ export default function Home() {
 
       {/* The camera. Scrolling through this tall block turns it round and zooms in on its back
           screen. Then the screen's pages slide past: who am i, photos, videos, projects and contact
-          (edit ABOUT_TITLE, ABOUT_TEXT, ABOUT_PRO, ABOUT_PERSONAL, HOME_ALBUMS, HOME_VIDEO, HOME_PROJECTS and CONTACT_TEXT at the top). */}
+          (edit ABOUT_TITLE, ABOUT_TEXT, ABOUT_SECTIONS, HOME_ALBUMS, HOME_VIDEO, HOME_PROJECTS and CONTACT_TEXT at the top). */}
       <section ref={camRef} className="relative -mt-16" style={{ height: CAMERA_HEIGHT }}>
         <div className="sticky top-0 z-10 h-dvh w-full overflow-hidden">
           {/* your W logo in dots, behind the camera */}
@@ -1793,18 +1814,19 @@ export default function Home() {
             role="region"
             aria-roledescription="carousel"
             aria-label="the camera's screen"
-            className="absolute flex select-none flex-col overflow-hidden rounded-[2px] text-white"
+            className="scr-light absolute flex select-none flex-col overflow-hidden rounded-[2px] text-white"
             style={{
               left: 0, top: 0, width: 0, height: 0, opacity: 0, visibility: "hidden",
               containerType: "size", touchAction: "pan-y",
-              background: "#000",
+              background: SCREEN_BG,
             }}
           >
             {/* the bar along the top, like a camera's screen: the battery, plus the settings of whichever album preview
                 you're hovering (focal length, f-number, shutter, ISO, read from that photo) */}
             <div className="flex shrink-0 items-center justify-end font-mono text-neutral-400" style={{ ...scrSmall, padding: "clamp(8px, 2.4cqmin, 20px) clamp(14px, 5cqmin, 48px) 0" }}>
-              <span className="flex items-center gap-[1.4em]">
-                <span className="flex items-center gap-[1.4em] transition-opacity duration-300" style={{ opacity: shotInfo && shotInfo.length ? 1 : 0 }} aria-hidden={!shotInfo?.length}>
+              {/* a fixed height, so the settings fading in never push the page down */}
+              <span className="flex h-[1.4em] items-center gap-[1.4em] overflow-hidden leading-none">
+                <span className="flex items-center gap-[1.4em] whitespace-nowrap transition-opacity duration-300" style={{ opacity: shotInfo && shotInfo.length ? 1 : 0 }} aria-hidden={!shotInfo?.length}>
                   {(shotInfo || []).map((p, i) => <span key={i}>{p}</span>)}
                 </span>
                 {/* the visitor's battery: the percentage (if their browser shares it), and the icon filled to match.
@@ -1817,9 +1839,9 @@ export default function Home() {
                     <rect
                       x="2.5" y="2.5" height="7" rx="1"
                       width={(18 * clamp(battery ? battery.level : 1, 0.06, 1)).toFixed(2)}
-                      fill={battery && battery.level <= 0.2 && !battery.charging ? "rgb(255,95,95)" : "rgb(255,255,255)"}
+                      fill={battery && battery.level <= 0.2 && !battery.charging ? "rgb(230,70,70)" : "currentColor"}
                     />
-                    {battery?.charging && <path d="M12.5 1.8 8.6 6.6h3l-1.2 3.6 4-4.9h-3z" fill="#fff" />}
+                    {battery?.charging && <path d="M12.5 1.8 8.6 6.6h3l-1.2 3.6 4-4.9h-3z" fill={SCREEN_BG} />}
                   </svg>
                 </span>
               </span>
@@ -1828,9 +1850,13 @@ export default function Home() {
             {/* the pages, side by side; the strip slides along to show one at a time */}
             <div className="relative min-h-0 flex-1 overflow-hidden">
               <div ref={screenTrackRef} className="flex h-full will-change-transform">
-                {/* 1: who am i */}
-                <div ref={(el) => { screenPageEls.current[0] = el; }} role="group" aria-roledescription="slide" aria-label={`1 of ${SCREEN_PAGES.length}: who am i`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
-                  <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{ABOUT_TITLE}</h2>
+                {/* who am i */}
+                <div ref={(el) => { screenPageEls.current[pageNo("who am i")] = el; }} role="group" aria-roledescription="slide" aria-label={`${pageNo("who am i") + 1} of ${SCREEN_PAGES.length}: who am i`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
+                  {/* the title, with the résumé button on the right */}
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{ABOUT_TITLE}</h2>
+                    <Link href="/resume" className="contact-btn shrink-0" draggable={false}>Résumé<ArrowUpRight /></Link>
+                  </div>
                   <div className="mt-[0.6em] space-y-[0.3em] leading-snug text-neutral-300" style={scrText}>
                     {ABOUT_TEXT.map((paragraph, i) => {
                       // colour ABOUT_CIRCLE (the first time it comes up) blue and circle it in blue, like with a marker
@@ -1860,26 +1886,28 @@ export default function Home() {
                       );
                     })}
                   </div>
-                  {/* two columns (the professional side, then the personal side), spread out to fill the page */}
-                  <div className="grid min-h-0 flex-1 grid-cols-2 gap-x-[2em] py-[1.4em]" style={{ fontSize: "clamp(0.75rem, 2.5cqmin, 1.3rem)" }}>
-                    {[ABOUT_PRO, ABOUT_PERSONAL].map((rows, c) => (
-                      <dl key={c} className="flex min-w-0 flex-col justify-between gap-[0.8em]">
+                  {/* the sections, in two columns (left one filled first) */}
+                  <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-x-[2.6em] pt-[1.6em]" style={{ fontSize: "clamp(0.7rem, 2.55cqmin, 1.3rem)" }}>
+                    {(["left", "right"] as const).map((side) => ABOUT_SECTIONS.filter((row) => row.side === side)).map((rows, c) => (
+                      <div key={c} className="flex min-w-0 flex-col gap-[1.3em] sm:gap-[2em]">
                         {rows.map((row, i) => (
-                          <div key={i}>
-                            <dt className="font-semibold text-white">{row.title}</dt>
-                            <dd className="mt-[0.15em] leading-snug text-neutral-400">{row.text}</dd>
-                          </div>
+                          <section key={i}>
+                            <h3 className="border-b border-white/15 pb-[0.3em] font-semibold text-white">{row.title}</h3>
+                            <p className="mt-[0.5em] leading-snug text-neutral-400">{row.text}</p>
+                            {row.points && (
+                              <ul className="mt-[0.4em] list-disc space-y-[0.2em] pl-[1.2em] leading-snug text-neutral-400 marker:text-neutral-400">
+                                {row.points.map((pt) => <li key={pt}>{pt}</li>)}
+                              </ul>
+                            )}
+                          </section>
                         ))}
-                      </dl>
+                      </div>
                     ))}
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    <Link href="/resume" className="contact-btn" draggable={false}>Résumé<ArrowUpRight /></Link>
                   </div>
                 </div>
 
-                {/* 2: photos */}
-                <div ref={(el) => { screenPageEls.current[1] = el; }} role="group" aria-roledescription="slide" aria-label={`2 of ${SCREEN_PAGES.length}: photos`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
+                {/* photos */}
+                <div ref={(el) => { screenPageEls.current[pageNo("photos")] = el; }} role="group" aria-roledescription="slide" aria-label={`${pageNo("photos") + 1} of ${SCREEN_PAGES.length}: photos`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
                   <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>photos</h2>
                   <p className="mt-[0.5em] text-neutral-400" style={scrText}>
                     {albums.length > 0 ? `${albums.length} albums so far! the latest few:` : "albums from my camera roll."}
@@ -1916,8 +1944,8 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* 3: videos */}
-                <div ref={(el) => { screenPageEls.current[2] = el; }} role="group" aria-roledescription="slide" aria-label={`3 of ${SCREEN_PAGES.length}: videos`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
+                {/* videos (hidden while SHOW_VIDEOS is false) */}
+                {SHOW_VIDEOS && <div ref={(el) => { screenPageEls.current[pageNo("videos")] = el; }} role="group" aria-roledescription="slide" aria-label={`${pageNo("videos") + 1} of ${SCREEN_PAGES.length}: videos`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
                   <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>videos</h2>
                   <p className="mt-[0.5em] text-neutral-400" style={scrText}>{HOME_VIDEO.caption}</p>
                   <div className="relative mt-[1em] min-h-0 flex-1 overflow-hidden rounded-[3px] bg-neutral-900">
@@ -1938,10 +1966,10 @@ export default function Home() {
                   <div className="flex flex-wrap gap-3 pt-[1em]">
                     <Link href="/videos" className="contact-btn" draggable={false}>See videos<ArrowUpRight /></Link>
                   </div>
-                </div>
+                </div>}
 
-                {/* 4: projects */}
-                <div ref={(el) => { screenPageEls.current[3] = el; }} role="group" aria-roledescription="slide" aria-label={`4 of ${SCREEN_PAGES.length}: projects`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
+                {/* projects */}
+                <div ref={(el) => { screenPageEls.current[pageNo("projects")] = el; }} role="group" aria-roledescription="slide" aria-label={`${pageNo("projects") + 1} of ${SCREEN_PAGES.length}: projects`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
                   <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>projects</h2>
                   {HOME_PROJECTS.length === 0 ? (
                     <p className="mt-[0.5em] text-neutral-400" style={scrText}>coming soon</p>
@@ -1950,7 +1978,7 @@ export default function Home() {
                       {HOME_PROJECTS.map((pj, i) => (
                         <li key={i}>
                           <Link href={pj.href} draggable={false} className="group flex items-baseline gap-[1em] py-[0.7em]">
-                            <span className="w-[5em] shrink-0 text-neutral-500" style={scrSmall}>{pj.date}</span>
+                            <span className="w-[5em] shrink-0 font-medium text-neutral-300" style={scrSmall}>{pj.date}</span>
                             <span className="min-w-0 flex-1">
                               <span className="block font-semibold">{pj.title}</span>
                               <span className="mt-[0.1em] block text-neutral-400">{pj.text}</span>
@@ -1966,8 +1994,8 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* 5: contact */}
-                <div ref={(el) => { screenPageEls.current[4] = el; }} role="group" aria-roledescription="slide" aria-label={`5 of ${SCREEN_PAGES.length}: contact`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
+                {/* contact */}
+                <div ref={(el) => { screenPageEls.current[pageNo("contact")] = el; }} role="group" aria-roledescription="slide" aria-label={`${pageNo("contact") + 1} of ${SCREEN_PAGES.length}: contact`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
                   {/* on computers: the title, words and button on the left, the details down the right.
                       On phones it's all one column, with the button at the bottom */}
                   <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_1fr_auto] md:grid-cols-[2fr_3fr] md:grid-rows-[1fr_auto] md:gap-x-[3em]">
@@ -2010,7 +2038,7 @@ export default function Home() {
                   aria-label={`show ${name}`}
                   onClick={() => goToPageRef.current(i)}
                   className="relative h-1.5 rounded-full transition-all duration-300 before:absolute before:-inset-3 before:content-['']"
-                  style={{ width: 6, background: "rgba(255,255,255,.25)" }}
+                  style={{ width: 6, background: `rgba(${SCREEN_INK},.2)` }}
                 />
               ))}
             </div>
@@ -2023,7 +2051,7 @@ export default function Home() {
             role="switch"
             aria-checked={xray}
             onClick={() => { xrayRef.current = !xrayRef.current; setXray(xrayRef.current); }}
-            className="absolute bottom-7 right-5 flex items-center gap-3 rounded-full px-3 py-2 text-sm font-light lowercase text-neutral-500 sm:right-[5%]"
+            className="absolute bottom-7 right-5 flex items-center gap-3 rounded-full px-3 py-2 text-sm lowercase text-neutral-800 sm:right-[5%]"
           >
             x-ray
             <span className="relative block h-5 w-9 rounded-full transition-colors duration-300" style={{ background: xray ? `rgb(${BLUE})` : "rgba(0,0,0,.18)" }}>
@@ -2031,14 +2059,14 @@ export default function Home() {
             </span>
           </button>
 
-          <div ref={camHintRef} className="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-sm font-light lowercase text-neutral-500">
+          <div ref={camHintRef} className="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-sm lowercase text-neutral-800">
             drag to turn/scroll
           </div>
         </div>
       </section>
 
       {/* plain one-line footer: grey monospace, lowercase, links with a faint underline */}
-      <footer className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 py-6 font-mono text-sm lowercase text-neutral-500">
+      <footer className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 py-6 font-mono text-sm lowercase text-neutral-800">
         <span>© 2026 ethan wang</span>
         {/* your resume page (app/resume/page.tsx) */}
         <Link href="/resume" className="border-b border-neutral-300 transition-colors hover:border-neutral-500 hover:text-neutral-800">résumé</Link>

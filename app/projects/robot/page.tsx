@@ -55,7 +55,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <section className="mt-14">
       <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-      <div className="mt-4 space-y-4 text-lg leading-relaxed text-neutral-600">{children}</div>
+      <div className="mt-4 space-y-4 text-lg leading-relaxed text-neutral-700">{children}</div>
     </section>
   );
 }
@@ -78,9 +78,9 @@ export default function RobotPage() {
 
         {/* right: everything about it */}
         <article className="pb-28 pt-6 md:pt-14">
-          <Link href="/projects" className="text-sm lowercase text-neutral-500 transition hover:text-neutral-900">&lt; projects</Link>
+          <Link href="/projects" className="text-sm lowercase text-neutral-700 transition hover:text-neutral-900">&lt; projects</Link>
           <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">{TITLE}</h1>
-          <p className="mt-4 text-xl leading-relaxed text-neutral-500">{SUBTITLE}</p>
+          <p className="mt-4 text-xl leading-relaxed text-neutral-700">{SUBTITLE}</p>
 
           <Section title="what is this?">
             <p>
@@ -170,11 +170,11 @@ export default function RobotPage() {
                 <li key={p.name} className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-1 py-4">
                   <span className="font-semibold text-neutral-900">
                     <A href={p.url}>{p.name}</A>
-                    {p.qty > 1 && <span className="font-normal text-neutral-500"> x{p.qty}</span>}
+                    {p.qty > 1 && <span className="font-normal text-neutral-700"> x{p.qty}</span>}
                   </span>
                   <span className="text-right tabular-nums text-neutral-900">{p.price === null ? p.shop : money(p.price * p.qty)}</span>
-                  <span className="text-neutral-600">{p.does}</span>
-                  <span className="text-right text-sm text-neutral-500">{p.size}</span>
+                  <span className="text-neutral-700">{p.does}</span>
+                  <span className="text-right text-sm text-neutral-700">{p.size}</span>
                 </li>
               ))}
               <li className="grid grid-cols-[1fr_auto] gap-x-6 py-4 text-neutral-900">

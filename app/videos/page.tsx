@@ -23,7 +23,7 @@ export default function VideosPage() {
       <style>{CSS}</style>
       <div className="mx-auto max-w-6xl px-6 pb-24 pt-12 sm:pt-16">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">videos</h1>
-        <p className="vd-rise mt-6 text-lg text-neutral-600 sm:text-xl">coming soon</p>
+        <p className="vd-rise mt-6 text-lg text-neutral-700 sm:text-xl">coming soon</p>
       </div>
     </main>
   );

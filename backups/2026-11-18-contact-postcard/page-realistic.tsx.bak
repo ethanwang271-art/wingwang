@@ -1,0 +1,357 @@
+"use client";
+// app/contact/page.tsx  (the page the "Contact me" button on the home page opens; everything for it lives in this one file)
+// The form is a postcard: one of my photos on the front, and you write your message on the back.
+// When it's sent, a blue postmark stamps onto it and it flies off.
+
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import Image from "next/image";
+import Link from "next/link";
+
+// ---- Contact page: edit these ----
+const EMAIL = "ethan@wingwang.ca"; // shown on the page. (Messages from the form are delivered to the address inside app/api/contact/route.ts)
+const CONTACT_TITLE = "contact";
+const CONTACT_BLURB = "write me a postcard. tell me a little about what you're working on and i'll get back to you soon.";
+const PHONE: string = ""; // optional, for example "647-555-0123". Leave it empty to hide the phone line
+// your links (the same ones as in the navbar). Any with an empty link "" is hidden
+const SOCIALS: { label: string; href: string }[] = [
+  { label: "instagram", href: "https://instagram.com/etnwingwang" },
+  { label: "linkedin", href: "https://www.linkedin.com/in/ethan-wang-9206563a1/" },
+];
+
+// ---- the postcard: edit these ----
+const POSTCARD_PHOTO = "/photos/norway '25/1.jpg";       // the picture on the front (any photo in public/)
+const POSTCARD_CAPTION = "greetings from wingwang";      // written across the front
+const STAMP_PHOTO = "/photos/norway '25/IMG_6789.JPG";   // the little picture on the stamp
+// the address printed on the back, one line each
+const POSTCARD_TO = ["ethan", "wingwang.ca", "toronto, on"];
+const POSTMARK_TEXT = "wingwang * toronto * "; // round the edge of the postmark (the date goes in the middle)
+const FLIP_AFTER = 900; // when the page opens, the postcard shows its front, then flips over after this many ms (0 = start on the back)
+
+// ---- colours ----
+const PAGE_BG = "255,255,255"; // the page's background (white)
+const BLUE = "100,159,255";    // the site blue
+const INK = "38,84,196";       // the postmark's ink (a deeper blue so it reads on the paper)
+const PAPER = "#fbf8f1";       // the back of the postcard
+const HAND = '"Comic Sans MS", "Comic Sans", "Chalkboard SE", "Comic Neue", cursive'; // handwriting (the same as the logo)
+
+const CSS = `
+html, body { background-color: rgb(${PAGE_BG}) !important; }
+
+@keyframes cp-rise { from { opacity: 0; transform: translateY(.7em); filter: blur(10px); } }
+.cp-in { animation: cp-rise .9s cubic-bezier(.22,1,.36,1) backwards; animation-delay: calc(var(--i, 0) * 120ms + 150ms); }
+
+/* the postcard: two faces in the same spot, one turned round. it flips by turning the whole card */
+.pc-stage { perspective: 2200px; }
+.pc-fly { transition: transform .9s cubic-bezier(.5,0,.75,0), opacity .9s ease; }
+.pc-fly.is-flown { transform: translate(18vw, -115vh) rotate(-14deg); opacity: 0; }
+.pc-card { position: relative; display: grid; transform-style: preserve-3d; transition: transform 1s cubic-bezier(.3,.1,.15,1); }
+.pc-card.is-back { transform: rotateY(180deg); }
+.pc-face {
+  grid-area: 1 / 1; position: relative; overflow: hidden; border-radius: 10px;
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 30px 60px -28px rgba(0,0,0,.35);
+}
+.pc-back { transform: rotateY(180deg); background: ${PAPER}; border: 1px solid rgba(0,0,0,.08); }
+@media (min-width: 768px) { .pc-card { aspect-ratio: 3 / 2; } }
+@media (max-width: 767px) { .pc-front { min-height: 30rem; } }
+
+/* a little bump when the postmark hits */
+@keyframes pc-thud { 0% { transform: rotateY(180deg) scale(1); } 30% { transform: rotateY(180deg) scale(.985); } 100% { transform: rotateY(180deg) scale(1); } }
+.pc-card.is-back.is-stamped { animation: pc-thud .35s ease-out .2s; }
+
+/* the back: message on the left, a line down the middle, the stamp and addresses on the right. on phones: stamp, message, then who it's from */
+.pc-grid { display: grid; height: 100%; padding: 1.25rem; gap: 1.25rem;
+  grid-template-areas: "addr" "msg" "from"; }
+@media (min-width: 768px) {
+  .pc-grid { padding: 2rem 2.25rem; gap: 0 2.25rem; grid-template-columns: 1.4fr 1px 1fr; grid-template-rows: auto 1fr;
+    grid-template-areas: "msg line addr" "msg line from"; }
+}
+.pc-line { grid-area: line; background: rgba(0,0,0,.14); }
+@media (max-width: 767px) { .pc-line { display: none; } }
+
+.pc-hand { font-family: ${HAND}; color: #1d2433; }
+/* the message: written on ruled lines that scroll with the text */
+.pc-lines {
+  display: block; width: 100%; resize: none; border: 0; outline: none; background-color: transparent;
+  font: inherit; font-family: ${HAND}; font-size: 1.1rem; line-height: 2.1rem; color: #1d2433;
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(2.1rem - 1px), rgba(0,0,0,.14) calc(2.1rem - 1px), rgba(0,0,0,.14) 2.1rem);
+  background-attachment: local;
+}
+.pc-lines::placeholder, .pc-field::placeholder { color: rgba(29,36,51,.35); }
+.pc-field {
+  display: block; width: 100%; border: 0; border-bottom: 1px solid rgba(0,0,0,.18); outline: none; background: transparent;
+  padding: .35rem 0; font: inherit; font-family: ${HAND}; font-size: 1.05rem; color: #1d2433;
+  transition: border-color .25s ease;
+}
+.pc-field:focus, .pc-lines:focus { border-color: rgba(${BLUE}, .9); }
+.pc-lines:focus { background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(2.1rem - 1px), rgba(${BLUE},.45) calc(2.1rem - 1px), rgba(${BLUE},.45) 2.1rem); }
+.pc-small { font-size: .7rem; letter-spacing: .2em; text-transform: uppercase; color: rgba(0,0,0,.45); }
+
+/* the stamp: a photo with a perforated edge (the holes are dots of the paper colour round a white border) */
+.pc-stamp { position: relative; width: 84px; height: 102px; padding: 7px; flex: none; transform: rotate(3deg);
+  background: radial-gradient(circle at 4px 4px, ${PAPER} 2.6px, #fff 3px) -4px -4px / 8px 8px;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.18)); }
+.pc-stamp-in { position: relative; width: 100%; height: 100%; overflow: hidden; outline: 1px solid rgba(0,0,0,.06); }
+
+/* the postmark: slams down onto the stamp */
+@keyframes pc-stamp { 0% { opacity: 0; transform: rotate(-14deg) scale(1.9); } 55% { opacity: 1; transform: rotate(-14deg) scale(.94); } 100% { opacity: .9; transform: rotate(-14deg) scale(1); } }
+.pc-postmark { position: absolute; top: -10px; right: 34px; width: 132px; pointer-events: none; mix-blend-mode: multiply; opacity: .9; transform: rotate(-14deg);
+  animation: pc-stamp .45s cubic-bezier(.3,.7,.3,1.2) .15s backwards; }
+
+/* buttons */
+.cf-send {
+  display: inline-flex; align-items: center; gap: .6rem;
+  border: 0; border-radius: 9999px; padding: .9rem 1.6rem;
+  background: linear-gradient(#222222, #000000); color: #fff;
+  font: inherit; font-size: 1.02rem; font-weight: 500;
+  box-shadow: 0 10px 30px -12px rgba(0,0,0,.4); cursor: pointer;
+  transition: transform .3s ease, box-shadow .3s ease, opacity .3s ease;
+}
+.cf-send:hover:not(:disabled), .cf-send:focus-visible { transform: translateY(-2px); box-shadow: 0 16px 40px -10px rgba(${BLUE}, .6); outline: none; }
+.cf-send:disabled { opacity: .6; cursor: default; }
+.cf-pill {
+  display: inline-flex; align-items: center; gap: .5rem;
+  border-radius: 9999px; border: 1px solid rgba(0,0,0,.2); padding: .6rem 1.2rem;
+  color: rgba(0,0,0,.85); text-decoration: none; background: transparent; font: inherit; cursor: pointer;
+  transition: background .3s ease, border-color .3s ease, transform .3s ease;
+}
+.cf-pill:hover, .cf-pill:focus-visible { background: rgba(0,0,0,.05); border-color: rgba(${BLUE}, .8); transform: translateY(-2px); outline: none; }
+
+/* the hidden field that catches spam bots (real people never see it) */
+.cf-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-in, .pc-postmark, .pc-card.is-back.is-stamped { animation: none; }
+  .pc-card, .pc-fly { transition: none; }
+}
+`;
+
+// the round postmark, with the date in the middle and wavy lines trailing off to the left
+function Postmark({ date }: { date: string }) {
+  const ink = `rgb(${INK})`;
+  return (
+    <svg className="pc-postmark" viewBox="0 0 132 80" aria-hidden="true">
+      <defs>
+        <path id="pc-ring" d="M 92 40 m -27 0 a 27 27 0 1 1 54 0 a 27 27 0 1 1 -54 0" />
+      </defs>
+      {[30, 40, 50].map((y) => (
+        <path key={y} d={`M 2 ${y} q 8 -5 16 0 t 16 0 t 16 0 t 14 0`} fill="none" stroke={ink} strokeWidth="2.2" strokeLinecap="round" />
+      ))}
+      <circle cx="92" cy="40" r="36" fill="none" stroke={ink} strokeWidth="2.4" />
+      <circle cx="92" cy="40" r="20" fill="none" stroke={ink} strokeWidth="1.6" />
+      <text fill={ink} fontSize="8.4" fontWeight="700" letterSpacing="1.2" fontFamily="ui-monospace, monospace">
+        <textPath href="#pc-ring">{POSTMARK_TEXT.toUpperCase().repeat(2)}</textPath>
+      </text>
+      <text x="92" y="43.5" textAnchor="middle" fill={ink} fontSize="9" fontWeight="700" fontFamily="ui-monospace, monospace">{date}</text>
+    </svg>
+  );
+}
+
+const ArrowUpRight = () => (
+  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M7 17L17 7M8 7h9v9" />
+  </svg>
+);
+
+// idle = writing it, sending = on its way, stamped = sent (the postmark lands), flown = flying off, done = the thank-you
+type Phase = "idle" | "sending" | "error" | "stamped" | "flown" | "done";
+
+export default function ContactPage() {
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [error, setError] = useState("");
+  const [side, setSide] = useState<"front" | "back">(FLIP_AFTER > 0 ? "front" : "back");
+  const [date, setDate] = useState("");
+
+  // when the page opens: show the photo on the front for a moment, then flip it over to write on
+  useEffect(() => {
+    if (FLIP_AFTER <= 0) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const t = setTimeout(() => setSide("back"), still ? 0 : FLIP_AFTER);
+    return () => clearTimeout(t);
+  }, []);
+
+  // after the postmark lands, the card flies off, then the thank-you shows
+  useEffect(() => {
+    if (phase !== "stamped" && phase !== "flown") return;
+    const t = setTimeout(() => setPhase(phase === "stamped" ? "flown" : "done"), phase === "stamped" ? 1300 : 850);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  // sends the form to /api/contact (app/api/contact/route.ts), which emails it to you with Resend
+  const onSend = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (phase === "sending") return;
+    const form = e.currentTarget; // grab it now: it's gone after the await below
+    const data = Object.fromEntries(new FormData(form));
+
+    setPhase("sending");
+    setError("");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "something went wrong, please try again");
+      const d = new Date();
+      setDate(`${d.getDate()} ${d.toLocaleString("en", { month: "short" }).toLowerCase()} ${String(d.getFullYear()).slice(2)}`);
+      form.reset();
+      setPhase("stamped");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "something went wrong, please try again");
+      setPhase("error");
+    }
+  };
+
+  const back = side === "back";
+  const locked = phase === "sending" || phase === "stamped" || phase === "flown";
+
+  return (
+    <main className="relative min-h-[calc(100dvh-4rem)] overflow-hidden text-neutral-900" style={{ background: `rgb(${PAGE_BG})` }}>
+      <style>{CSS}</style>
+
+      <div className="relative mx-auto max-w-5xl px-6 pb-24 pt-8 sm:pt-10 md:pb-32">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1 text-sm text-neutral-600 transition hover:text-black focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+          home
+        </Link>
+
+        {/* the title, the blurb, and the other ways to reach me */}
+        <div className="mt-10 flex flex-wrap items-end justify-between gap-x-12 gap-y-6 md:mt-12">
+          <div>
+            <h1 className="cp-in text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl">{CONTACT_TITLE}</h1>
+            <p className="cp-in mt-5 max-w-md text-lg leading-relaxed text-neutral-600" style={{ "--i": 1 } as CSSProperties}>
+              {CONTACT_BLURB}
+            </p>
+          </div>
+          <div className="cp-in flex flex-col gap-3 text-neutral-600 md:items-end" style={{ "--i": 2 } as CSSProperties}>
+            <a href={`mailto:${EMAIL}`} className="text-lg text-neutral-900 underline decoration-neutral-300 underline-offset-4 transition hover:decoration-neutral-900">
+              {EMAIL}
+            </a>
+            {PHONE && (
+              <a href={`tel:${PHONE.replace(/[^+\d]/g, "")}`} className="text-lg text-neutral-900 transition hover:text-neutral-600">
+                {PHONE}
+              </a>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {SOCIALS.filter((s) => s.href).map((s) => (
+                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" className="cf-pill text-sm">
+                  {s.label}<ArrowUpRight />
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {phase === "done" ? (
+          // the thank-you, where the postcard was
+          <div role="status" className="cp-in mx-auto mt-16 max-w-md text-center">
+            <p className="text-3xl font-bold tracking-tight">postcard sent!</p>
+            <p className="mt-3 text-lg text-neutral-600">thanks for writing. i&rsquo;ll get back to you soon.</p>
+            <button type="button" className="cf-pill mt-8" onClick={() => { setPhase("idle"); setSide("back"); }}>
+              write another
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={onSend} className="cp-in mt-12 md:mt-14" style={{ "--i": 3 } as CSSProperties}>
+            <div className="pc-stage">
+              <div className={`pc-fly ${phase === "flown" ? "is-flown" : ""}`}>
+                <div className={`pc-card ${back ? "is-back" : ""} ${phase === "stamped" ? "is-stamped" : ""}`}>
+                  {/* the front: a photo */}
+                  <div className="pc-face pc-front bg-neutral-200" inert={back} aria-hidden={back}>
+                    <Image src={encodeURI(POSTCARD_PHOTO)} alt="" fill priority sizes="(min-width: 1024px) 960px, 100vw" className="object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-black/0" />
+                    <p className="pc-hand absolute bottom-6 left-6 right-6 text-3xl text-white sm:bottom-8 sm:left-8 sm:text-5xl" style={{ color: "#fff", textShadow: "0 2px 12px rgba(0,0,0,.35)" }}>
+                      {POSTCARD_CAPTION}
+                    </p>
+                  </div>
+
+                  {/* the back: write your message here */}
+                  <div className="pc-face pc-back" inert={!back || locked} aria-hidden={!back}>
+                    <div className="pc-grid">
+                      <div style={{ gridArea: "msg" }} className="flex min-h-0 flex-col">
+                        <p className="pc-hand text-xl">dear ethan,</p>
+                        <label htmlFor="cf-message" className="sr-only">your message</label>
+                        <textarea
+                          id="cf-message" name="message" required maxLength={5000} rows={8}
+                          placeholder="tell me about your project..."
+                          className="pc-lines mt-2 h-[12.6rem] md:h-[29.4rem]"
+                        />
+                      </div>
+                      <div className="pc-line" />
+                      {/* the stamp, and who it's to */}
+                      <div style={{ gridArea: "addr" }} className="flex items-start justify-between gap-4">
+                        <div className="pt-1">
+                          <p className="pc-small">to</p>
+                          {POSTCARD_TO.map((l) => (
+                            <p key={l} className="pc-hand border-b border-black/15 py-1 text-base">{l}</p>
+                          ))}
+                        </div>
+                        <div className="relative">
+                          <div className="pc-stamp">
+                            <div className="pc-stamp-in">
+                              <Image src={encodeURI(STAMP_PHOTO)} alt="" fill sizes="80px" className="object-cover" />
+                            </div>
+                          </div>
+                          {(phase === "stamped" || phase === "flown") && <Postmark date={date} />}
+                        </div>
+                      </div>
+                      {/* who it's from */}
+                      <div style={{ gridArea: "from" }} className="flex flex-col justify-end gap-4 md:pb-1">
+                        <div>
+                          <label htmlFor="cf-name" className="pc-small">from</label>
+                          <input id="cf-name" name="name" type="text" required maxLength={100} autoComplete="name" placeholder="your name" className="pc-field" />
+                        </div>
+                        <div>
+                          <label htmlFor="cf-email" className="pc-small">reply to</label>
+                          <input id="cf-email" name="email" type="email" required maxLength={200} autoComplete="email" placeholder="you@example.com" className="pc-field" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* spam trap: hidden from people, bots tend to fill it in */}
+                    <div className="cf-hp" aria-hidden="true">
+                      <label htmlFor="cf-website">website</label>
+                      <input id="cf-website" name="website" type="text" tabIndex={-1} autoComplete="off" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* flip it, and send it */}
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+              <button type="button" className="cf-pill" disabled={locked} onClick={() => setSide(back ? "front" : "back")}>
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5" />
+                </svg>
+                {back ? "see the front" : "flip it over to write"}
+              </button>
+              <button
+                type="submit"
+                disabled={locked}
+                className="cf-send"
+                // on the front, the first press just flips it over so you can fill it in
+                onClick={(e) => { if (!back) { e.preventDefault(); setSide("back"); } }}
+              >
+                {phase === "sending" ? "sending..." : phase === "stamped" || phase === "flown" ? "sent!" : "send postcard"}
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                </svg>
+              </button>
+            </div>
+            <p role="alert" aria-live="polite" className="mt-3 min-h-5 text-right text-sm text-red-500">
+              {phase === "error" ? error : ""}
+            </p>
+          </form>
+        )}
+      </div>
+    </main>
+  );
+}

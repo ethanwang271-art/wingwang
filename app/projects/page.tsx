@@ -87,7 +87,7 @@ function Circle() {
 function Media({ src, title }: { src: string; title: string }) {
   if (!src) {
     return (
-      <div className="pj-media flex h-full w-full items-center justify-center text-sm text-neutral-400">
+      <div className="pj-media flex h-full w-full items-center justify-center text-sm text-neutral-700">
         add a picture or video in PROJECTS
       </div>
     );
@@ -107,7 +107,7 @@ export default function ProjectsPage() {
 
         {/* while there are no projects in PROJECTS yet */}
         {PROJECTS.length === 0 && (
-          <p className="pj-card mt-6 text-lg text-neutral-600 sm:text-xl">coming soon</p>
+          <p className="pj-card mt-6 text-lg text-neutral-700 sm:text-xl">coming soon</p>
         )}
 
         {/* one project per row, full width: the picture on one side and the words on the other,
@@ -121,7 +121,7 @@ export default function ProjectsPage() {
                   <Media src={p.media} title={p.title} />
                 </div>
                 <div className={flip ? "md:order-1" : ""}>
-                  <span className="relative ml-2.5 inline-block text-lg text-neutral-600 sm:text-xl">
+                  <span className="relative ml-2.5 inline-block text-lg text-neutral-700 sm:text-xl">
                     {p.date}
                     <Circle />
                   </span>
@@ -131,7 +131,7 @@ export default function ProjectsPage() {
                       <Underline />
                     </span>
                   </h2>
-                  <p className="mt-5 max-w-prose text-base leading-relaxed text-neutral-600 sm:text-lg">{p.description}</p>
+                  <p className="mt-5 max-w-prose text-base leading-relaxed text-neutral-700 sm:text-lg">{p.description}</p>
                   {p.link && <p className="mt-6 text-base text-neutral-900 sm:text-lg">view project &rarr;</p>}
                 </div>
               </div>
