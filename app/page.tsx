@@ -443,7 +443,7 @@ function LogoDots() {
 const CAMERA_TURN_SCROLL = 100;             // how much scrolling it takes to turn round and zoom in on the screen, in % of the window's height
 const CAMERA_TURN_WHEEL = 2.4;              // how far each flick of the wheel or trackpad goes while the camera turns round to the screen (lower = more resistance)
 const CAMERA_PAGE_SCROLL = 170;             // how much scrolling each page on the screen takes, in % of the window's height (more = harder to scroll past one by accident)
-const CAMERA_SCREEN_WHEEL = 2.2;            // how far each flick of the wheel or trackpad goes while you're on the screen (the rest of the page uses LENIS_WHEEL; lower = slower)
+const CAMERA_SCREEN_WHEEL = 2.45;          // how far each flick of the wheel or trackpad goes while you're on the screen (the rest of the page uses LENIS_WHEEL; lower = slower)
 const CAMERA_START_SIZE = 0.62;             // how big the whole camera is at the start (1 = as big as fits)
 // once zoomed in on the screen, the white page behind the camera fades to this dark colour, so no white shows
 // round the camera's edges (r,g,b)
