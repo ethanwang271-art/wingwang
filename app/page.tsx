@@ -1,7 +1,7 @@
 "use client";
 // app/page.tsx  (everything for the home page lives in this one file)
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Lenis from "lenis";
@@ -60,6 +60,16 @@ const HOME_PROJECTS: { date: string; title: string; text: string; href: string }
 // the last page on the camera's screen
 const CONTACT_TITLE = "contact me";
 const CONTACT_TEXT = "want to shoot something together, or just say hi?";
+// two live lines under it: the time where you are, and how long until golden hour there (both tick over by themselves).
+// {time} is swapped for the time (e.g. "3:42 pm"). CONTACT_TIME_ZONE is your time zone's name, and CONTACT_PLACE is
+// where you are on the map (for working out when the sun is low). Set a line to "" to hide it
+const CONTACT_TIME_LINE = "it's {time} in toronto";
+const CONTACT_GOLDEN_LINE = true;
+const CONTACT_TIME_ZONE = "America/Toronto";
+const CONTACT_PLACE = { lat: 43.6532, lon: -79.3832 };
+// the empty space under them is a shutter: press it and the screen blinks like a camera taking a shot, with a soft
+// click, and a counter of how many shots each visitor has taken. SHUTTER_SOUND = false to make it silent
+const SHUTTER_SOUND = true;
 // the details next to it (underneath on phones), one per row. Anything in [square brackets] is a placeholder:
 // swap it for your own words (and drop the brackets). Delete a row or add one (5 or 6 fits best).
 // A row can have `links` instead of `text`: each one shows as its name and opens in a new tab.
@@ -67,7 +77,7 @@ const CONTACT_MORE: { title: string; text?: string; links?: { label: string; hre
   { title: "best for", text: "event coverage, portraits, sports, & collabs" },
   { title: "availability", text: "weekends" },
   { title: "reply time", text: "usually within a day" },
-  { title: "based in", text: "Toronto" },
+  { title: "based in", text: "toronto" },
   { title: "find me on", links: [
     { label: "instagram", href: "https://instagram.com/etnwingwang" },
     { label: "github", href: "https://github.com/ethanwang271-art" },
@@ -178,6 +188,23 @@ const CONTACT_CSS = `
 .contact-btn:active { transform: translateY(1px); }
 .contact-btn:focus-visible { outline: 2px solid ${BUTTON_BLUE}; outline-offset: 2px; }
 .contact-arrow { width: 1em; height: 1em; flex-shrink: 0; transition: transform .2s ease; }
+/* the little "live" dot before the time line: it breathes slowly */
+@keyframes live-dot { 0%, 100% { box-shadow: 0 0 0 0 rgba(47,111,222,.45); } 50% { box-shadow: 0 0 0 .35em rgba(47,111,222,0); } }
+.live-dot { display: inline-block; width: .5em; height: .5em; border-radius: 50%; background: ${BUTTON_BLUE}; animation: live-dot 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+/* the shutter: the screen blinks black and fades back, like a camera's screen when it takes a shot */
+@keyframes shot-flash { from { opacity: .92; } to { opacity: 0; } }
+.shot-flash { position: absolute; inset: 0; z-index: 5; background: #000; pointer-events: none; animation: shot-flash .38s cubic-bezier(.2,.7,.3,1) forwards; }
+/* the doodle floats gently, and hops when you take a shot */
+@keyframes doodle-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4%); } }
+@keyframes doodle-hop { 0% { transform: translateY(0) rotate(0); } 40% { transform: translateY(-10%) rotate(-4deg); } 100% { transform: translateY(0) rotate(0); } }
+.doodle-plane { transform-box: fill-box; transform-origin: center; animation: doodle-float 3.2s ease-in-out infinite; }
+.shutter-pad:active .doodle-plane, .doodle-hop .doodle-plane { animation: doodle-hop .45s ease-out; }
+.shutter-pad { cursor: pointer; }
+.shutter-pad:focus-visible { outline: 2px solid ${BUTTON_BLUE}; outline-offset: 4px; border-radius: 6px; }
+.shutter-hint { opacity: .55; transition: opacity .2s ease; }
+.shutter-pad:hover .shutter-hint { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .doodle-plane { animation: none; } }
 .contact-btn:hover .contact-arrow, .contact-btn:focus-visible .contact-arrow { transform: translate(2px, -2px); }
 `;
 
@@ -186,7 +213,134 @@ const BG_CSS = `
 html, body { background-color: rgb(${PAGE_BG}) !important; }
 `;
 
-// small up-right arrow shown on the Résumé and Contact me buttons
+// ---- the live lines on the contact page ----
+// how high the sun is in the sky (degrees above the horizon) at a moment, at CONTACT_PLACE. It's the standard
+// approximate formula (good to well under a degree), so no weather service is needed
+function sunHeight(when: number) {
+  const r = Math.PI / 180, d = when / 86400000 - 10957.5; // days since noon on 1 jan 2000
+  const g = (357.529 + 0.98560028 * d) * r, q = 280.459 + 0.98564736 * d;
+  const L = (q + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * r, e = (23.439 - 0.00000036 * d) * r;
+  const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L)), dec = Math.asin(Math.sin(e) * Math.sin(L));
+  const ha = ((18.697374558 + 24.06570982441908 * d) * 15 + CONTACT_PLACE.lon) * r - ra;
+  const lat = CONTACT_PLACE.lat * r;
+  return Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(ha)) / r;
+}
+// golden hour: the sun between 4 degrees below and 6 degrees above the horizon (the soft, warm light)
+const isGolden = (when: number) => { const h = sunHeight(when); return h > -4 && h < 6; };
+const clockFmt = (when: number) =>
+  new Intl.DateTimeFormat("en-US", { timeZone: CONTACT_TIME_ZONE, hour: "numeric", minute: "2-digit", hour12: true }).format(when).toLowerCase();
+const span = (ms: number) => { const m = Math.max(1, Math.round(ms / 60000)), h = Math.floor(m / 60); return h ? `${h}h ${m % 60}m` : `${m}m`; };
+function goldenText(now: number) {
+  const step = 2 * 60000;
+  if (isGolden(now)) {
+    let end = now;
+    while (isGolden(end) && end - now < 4 * 3600000) end += step;
+    return `it's golden hour, until ${clockFmt(end)}`;
+  }
+  for (let at = now + step; at - now < 36 * 3600000; at += step) {
+    if (isGolden(at)) return at - now < 6 * 3600000 ? `golden hour in ${span(at - now)}` : `next golden hour at ${clockFmt(at)}`;
+  }
+  return "";
+}
+// both lines, kept up to date: checked every few seconds, and only redrawn when the words change.
+// (Before the page has loaded in the browser it shows nothing, so it never shows a wrong time.)
+const statusText = () => { const now = Date.now(); return `${clockFmt(now)}|${CONTACT_GOLDEN_LINE ? goldenText(now) : ""}`; };
+const clockTick = (onChange: () => void) => { const id = window.setInterval(onChange, 5000); return () => window.clearInterval(id); };
+function LiveStatus() {
+  const [time, golden] = useSyncExternalStore(clockTick, statusText, () => "|").split("|");
+  if (!time) return <div style={{ minHeight: "3.2em" }} />;
+  const row = "flex items-center gap-[0.65em] leading-snug";
+  return (
+    <div className="mt-[1.1em] space-y-[0.35em] text-neutral-400" style={{ fontSize: "clamp(0.75rem, 2.5cqmin, 1.3rem)" }}>
+      {CONTACT_TIME_LINE && (
+        <p className={row}>
+          <span className="flex w-[0.9em] justify-center"><span className="live-dot" aria-hidden="true" /></span>
+          {CONTACT_TIME_LINE.replace("{time}", time)}
+        </p>
+      )}
+      {golden && (
+        <p className={row}>
+          <svg viewBox="0 0 24 24" className="h-[0.9em] w-[0.9em] shrink-0" fill="none" stroke="#e0951b" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.2" fill="#f5b440" />
+            {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+              <line key={a} x1="12" y1="2.5" x2="12" y2="5" transform={`rotate(${a} 12 12)`} />
+            ))}
+          </svg>
+          {golden}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---- the shutter ----
+// how many shots this visitor has taken (kept in their browser; if the browser won't keep it, it just counts this visit)
+const SHOTS_KEY = "wingwang-shots";
+let shotsFallback = 0;
+const readShots = () => { try { return Number(localStorage.getItem(SHOTS_KEY)) || 0; } catch { return shotsFallback; } };
+const onShots = (cb: () => void) => { window.addEventListener("wingwang-shots", cb); return () => window.removeEventListener("wingwang-shots", cb); };
+const addShot = () => {
+  const n = readShots() + 1;
+  shotsFallback = n;
+  try { localStorage.setItem(SHOTS_KEY, String(n)); } catch { /* private window: just this visit */ }
+  window.dispatchEvent(new Event("wingwang-shots"));
+};
+// the click: two tiny bursts of noise, like a shutter opening and closing (made on the spot, no sound file)
+let shutterAudio: AudioContext | null = null;
+function shutterClick() {
+  if (!SHUTTER_SOUND) return;
+  try {
+    const ctx = (shutterAudio ??= new AudioContext());
+    for (const [at, vol] of [[0, 0.22], [0.075, 0.16]]) {
+      const len = Math.floor(ctx.sampleRate * 0.035), buf = ctx.createBuffer(1, len, ctx.sampleRate), ch = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+      const src = ctx.createBufferSource(), gain = ctx.createGain(), tone = ctx.createBiquadFilter();
+      tone.type = "bandpass"; tone.frequency.value = 2600; tone.Q.value = 0.8; gain.gain.value = vol;
+      src.buffer = buf; src.connect(tone).connect(gain).connect(ctx.destination);
+      src.start(ctx.currentTime + at);
+    }
+  } catch { /* no sound available: the blink still happens */ }
+}
+// the doodle: a little paper plane (like the one on the contact page) on a dashed loop, with a star
+function PlaneDoodle() {
+  const ink = "#262b3d";
+  return (
+    <svg viewBox="0 0 260 130" className="h-full max-h-[11em] w-full max-w-[22em]" fill="none" aria-hidden="true">
+      <path d="M8 112 C 48 116, 70 84, 96 88 C 128 93, 128 124, 102 118 C 76 112, 98 60, 150 58 C 172 57, 182 60, 190 62" stroke={ink} strokeWidth="2" strokeLinecap="round" strokeDasharray="1 9" opacity=".75" />
+      <g className="doodle-plane" stroke={ink} strokeWidth="2.6" strokeLinejoin="round">
+        <path d="M250 34 L196 30 L214 52 Z" fill="#ffffff" />
+        <path d="M250 34 L214 52 L208 72 Z" fill="#dbe7ff" />
+        <path d="M250 34 L208 72 L222 54 Z" fill="#c4d3ff" />
+      </g>
+      <path d="M234 6 L237 13 L244 16 L237 19 L234 26 L231 19 L224 16 L231 13 Z" fill="#649fff" stroke={ink} strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function ShutterPad() {
+  const shots = useSyncExternalStore(onShots, readShots, () => 0);
+  const [flash, setFlash] = useState(0);
+  const take = (e: ReactMouseEvent<HTMLButtonElement>) => {
+    shutterClick(); addShot(); setFlash((n) => n + 1);
+    // the blink: a black layer over the whole camera screen that fades away by itself
+    const screen = e.currentTarget.closest<HTMLElement>("[data-camera-screen]");
+    if (!screen) return;
+    const blink = document.createElement("div");
+    blink.className = "shot-flash";
+    blink.addEventListener("animationend", () => blink.remove());
+    screen.appendChild(blink);
+  };
+  return (
+    <button type="button" onClick={take} aria-label="take a photo" className="shutter-pad mt-[1em] mb-[1em] hidden min-h-0 flex-1 flex-col items-start justify-end text-left md:flex">
+      {/* (a new key each shot restarts the doodle's hop) */}
+      <span key={`doodle-${flash}`} className={`flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden ${flash ? "doodle-hop" : ""}`}><PlaneDoodle /></span>
+      <span className="shutter-hint mt-[0.4em] text-neutral-400" style={{ fontSize: "clamp(0.65rem, 2cqmin, 1rem)" }}>
+        {shots ? `shots taken: ${shots}` : "tap here to take a shot"}
+      </span>
+    </button>
+  );
+}
+
+// small up-right arrow shown on the résumé and contact me buttons
 function ArrowUpRight() {
   return (
     <svg viewBox="0 0 24 24" className="contact-arrow" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1887,6 +2041,7 @@ export default function Home() {
             role="region"
             aria-roledescription="carousel"
             aria-label="the camera's screen"
+            data-camera-screen
             className="scr-light absolute flex select-none flex-col overflow-hidden rounded-[2px] text-white"
             style={{
               left: 0, top: 0, width: 0, height: 0, opacity: 0, visibility: "hidden",
@@ -1928,7 +2083,7 @@ export default function Home() {
                   {/* the title, with the résumé button on the right */}
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{ABOUT_TITLE}</h2>
-                    <Link href="/resume" className="contact-btn shrink-0" draggable={false}>Résumé<ArrowUpRight /></Link>
+                    <Link href="/resume" className="contact-btn shrink-0" draggable={false}>résumé<ArrowUpRight /></Link>
                   </div>
                   <div className="mt-[0.6em] space-y-[0.3em] leading-snug text-neutral-300" style={scrText}>
                     {ABOUT_TEXT.map((paragraph, i) => {
@@ -2013,7 +2168,7 @@ export default function Home() {
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-3 pt-[1em]">
-                    <Link href="/photos" className="contact-btn" draggable={false}>See all photos<ArrowUpRight /></Link>
+                    <Link href="/photos" className="contact-btn" draggable={false}>see all photos<ArrowUpRight /></Link>
                   </div>
                 </div>
 
@@ -2037,7 +2192,7 @@ export default function Home() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-3 pt-[1em]">
-                    <Link href="/videos" className="contact-btn" draggable={false}>See videos<ArrowUpRight /></Link>
+                    <Link href="/videos" className="contact-btn" draggable={false}>see videos<ArrowUpRight /></Link>
                   </div>
                 </div>}
 
@@ -2063,7 +2218,7 @@ export default function Home() {
                     </ul>
                   )}
                   <div className="mt-auto flex flex-wrap gap-3 pt-[1em]">
-                    <Link href="/projects" className="contact-btn" draggable={false}>See projects<ArrowUpRight /></Link>
+                    <Link href="/projects" className="contact-btn" draggable={false}>see projects<ArrowUpRight /></Link>
                   </div>
                 </div>
 
@@ -2072,9 +2227,11 @@ export default function Home() {
                   {/* on computers: the title, words and button on the left, the details down the right.
                       On phones it's all one column, with the button at the bottom */}
                   <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_1fr_auto] md:grid-cols-[2fr_3fr] md:grid-rows-[1fr_auto] md:gap-x-[3em]">
-                    <div className="md:col-start-1 md:row-start-1">
+                    <div className="flex min-h-0 flex-col md:col-start-1 md:row-start-1">
                       <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{CONTACT_TITLE}</h2>
                       <p className="mt-[0.6em] leading-snug text-neutral-300" style={{ fontSize: "clamp(0.9rem, 3.2cqmin, 1.75rem)" }}>{CONTACT_TEXT}</p>
+                      <LiveStatus />
+                      <ShutterPad />
                     </div>
                     <dl className="my-[1.2em] flex min-h-0 flex-col justify-between divide-y divide-white/10 border-y border-white/10 md:col-start-2 md:row-span-2 md:row-start-1 md:my-0" style={{ fontSize: "clamp(0.75rem, 2.5cqmin, 1.3rem)" }}>
                       {CONTACT_MORE.map((row, i) => (
@@ -2094,7 +2251,7 @@ export default function Home() {
                       ))}
                     </dl>
                     <div className="flex flex-wrap items-end gap-3 md:col-start-1 md:row-start-2">
-                      <Link href="/contact" className="contact-btn" draggable={false}>Contact me<ArrowUpRight /></Link>
+                      <Link href="/contact" className="contact-btn" draggable={false}>contact me<ArrowUpRight /></Link>
                     </div>
                   </div>
                 </div>

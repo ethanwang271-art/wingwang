@@ -29,7 +29,8 @@ const POSTCARD_CAPTION = "say hi!";            // written big on the front
 const LABEL_TEXT = "wingwang";                 // on the blue label
 const LABEL_SMALL = "airmail";                 // the small line under it
 const POSTMARK_TEXT = "wingwang * toronto * "; // round the edge of the postmark
-const FLIP_SECONDS = 0.8; // how long it takes to turn over (lower = faster)
+const FLIP_SECONDS = 1.05;
+const PC_THICK = 6; // how thick the postcard is, in px (real postcard stock is thin, so keep this small) // how long it takes to turn over (lower = faster)
 const SEND_NOTE = "send it!"; // the little handwritten note next to the blue label on the back (the label is the send button)
 
 // ---- colours ----
@@ -51,7 +52,7 @@ html, body { background-color: rgb(${PAGE_BG}) !important; }
 .cp-in { animation: cp-rise .9s cubic-bezier(.22,1,.36,1) backwards; animation-delay: calc(var(--i, 0) * 120ms + 150ms); }
 
 /* the postcard: two faces in the same spot, one turned round. it flips by turning the whole card */
-.pc-stage { position: relative; perspective: 1400px; }
+.pc-stage { position: relative; perspective: 1500px; perspective-origin: 50% 40%; }
 /* when it's sent, the card fades out as the drawn paper (the same size) takes its place and folds into a plane */
 .pc-fly { transition: opacity .25s ease, transform .25s ease; }
 .pc-fly.is-folding { opacity: 0; transition: opacity .45s ease; }
@@ -59,16 +60,21 @@ html, body { background-color: rgb(${PAGE_BG}) !important; }
 @keyframes pc-in { from { opacity: 0; } }
 .pc-plane { animation: pc-in .45s ease backwards; }
 .pc-card { position: relative; display: grid; transform-style: preserve-3d; }
-.pc-card.is-back { transform: rotateY(180deg); }
-/* turning over: it lifts towards you and tips back a little as it spins, then settles down flat again */
-@keyframes pc-to-back { 0% { transform: rotateY(0deg); } 50% { transform: translateZ(90px) rotateX(-8deg) rotateY(90deg) scale(1.03); } 100% { transform: rotateY(180deg); } }
-@keyframes pc-to-front { 0% { transform: rotateY(180deg); } 50% { transform: translateZ(90px) rotateX(-8deg) rotateY(270deg) scale(1.03); } 100% { transform: rotateY(360deg); } }
-.pc-card.anim-to-back { animation: pc-to-back ${FLIP_SECONDS}s cubic-bezier(.45,.05,.2,1); }
-.pc-card.anim-to-front { animation: pc-to-front ${FLIP_SECONDS}s cubic-bezier(.45,.05,.2,1); }
+.pc-card.is-back { transform: translateZ(0) rotateX(0deg) rotateY(180deg) rotateZ(0deg); }
+/* turning over is animated in code (see flipCard below), like a sheet of paper flipped over on a table */
+/* the card's thickness: its two faces sit a little apart, joined by edges you can see while it's side on */
+/* (PC_THICK = how thick the card is, in px: thin, like real postcard stock. the edges are shaded so they read as
+   the cut edge of the card, a touch darker at the two faces and lighter in the middle) */
+.pc-edge { position: absolute; pointer-events: none; }
+.pc-edge-l, .pc-edge-r { top: 3px; bottom: 3px; width: ${PC_THICK}px; background: linear-gradient(to right, #c9d0dc, #f6f8fb 50%, #c9d0dc); }
+.pc-edge-l { left: -${PC_THICK / 2}px; transform: rotateY(90deg); }
+.pc-edge-r { right: -${PC_THICK / 2}px; transform: rotateY(90deg); }
+.pc-edge-t, .pc-edge-b { left: 3px; right: 3px; height: ${PC_THICK}px; background: linear-gradient(#c9d0dc, #f6f8fb 50%, #c9d0dc); }
+.pc-edge-t { top: -${PC_THICK / 2}px; transform: rotateX(90deg); }
+.pc-edge-b { bottom: -${PC_THICK / 2}px; transform: rotateX(90deg); }
 /* its shadow on the page shrinks and softens while it's lifted */
 .pc-shadow { position: absolute; left: 5%; right: 5%; bottom: -10px; height: 46px; border-radius: 50%; background: rgba(0,0,0,.2); filter: blur(18px); pointer-events: none; }
-@keyframes pc-shadow { 50% { transform: scale(.82, .7); opacity: .45; } }
-.pc-shadow.is-flipping { animation: pc-shadow ${FLIP_SECONDS}s cubic-bezier(.45,.05,.2,1); }
+
 
 /* the little turned-up corner that flips the card over. the corner of the card is folded back (showing the pale
    underside), and it peels up a bit more when you point at it */
@@ -81,6 +87,10 @@ html, body { background-color: rgb(${PAGE_BG}) !important; }
 .pc-corner:hover, .pc-corner:focus-visible { width: 54px; height: 54px; outline: none; }
 .pc-corner:hover svg, .pc-corner:focus-visible svg { transform: rotate(180deg); }
 .pc-corner:focus-visible::before { filter: drop-shadow(0 0 2px rgb(${BLUE})); }
+/* the corner on the side facing away is hidden (its shadow would otherwise show through the card, mirrored at the
+   bottom left). it swaps halfway through a flip, when the card is edge-on */
+.pc-corner { transition-property: width, height, visibility; transition-duration: .3s, .3s, 0s; transition-delay: 0s, 0s, ${FLIP_SECONDS * 0.45}s; }
+.pc-face[aria-hidden="true"] .pc-corner { visibility: hidden; }
 @media (min-width: 768px) { .pc-corner { width: 46px; height: 46px; } .pc-corner svg { width: 15px; height: 15px; left: 6px; top: 6px; } .pc-corner:hover, .pc-corner:focus-visible { width: 62px; height: 62px; } }
 @media (min-width: 768px) { .pc-card { aspect-ratio: 2 / 1; } }
 
@@ -91,7 +101,10 @@ html, body { background-color: rgb(${PAGE_BG}) !important; }
   background: repeating-linear-gradient(135deg, ${STRIPE_DARK} 0 16px, ${PAPER} 16px 26px, ${STRIPE_BLUE} 26px 42px, ${PAPER} 42px 52px);
 }
 @media (min-width: 768px) { .pc-face { padding: 16px; } }
-.pc-back { transform: rotateY(180deg); }
+.pc-face { transform: translateZ(${PC_THICK / 2}px);
+  /* the card's thin edge showing just under it while it lies flat, so it reads as a real card on the page */
+  box-shadow: 0 1px 0 #e1e5ec, 0 2px 0 #d3d9e3, 0 3px 0 #c6cdd9; }
+.pc-back { transform: rotateY(180deg) translateZ(${PC_THICK / 2}px); }
 .pc-paper { position: relative; height: 100%; background: ${PAPER}; border-radius: 2px; }
 
 /* the back: message on the left, a line down the middle, the stamp and who it's from on the right. on phones: stamp, message, then who it's from */
@@ -248,9 +261,9 @@ const PLANE_WINGS = 74;     // how far the wings fold back out, in degrees (a bi
 const SIDE_VIEW = 62;       // where the camera ends up, in degrees from straight above (90 = exactly side on)
 const SIDE_BEHIND = 22;     // and how far round towards the back it goes, in degrees (0 = exactly from the right side)
 const PAPER_EPS = 0.006;    // how far apart the layers of folded paper sit (just enough that they don't flicker)
-// which way it zooms off (as you see it): mostly to the right, a little up, and a little away from you. It flies until
-// it's off the right side of the window (exit: 1 = the window's edge), and the star pings just inside the edge (star)
-const FLIGHT = { right: 1, up: 0.3, away: 1, exit: 1.7, star: 0.8 };
+// which way it zooms off (as you see it): to the right, a little up, and away from you into the distance. It flies
+// straight into the star, which sits over on the right of the window (star: 0 = the middle, 1 = the right edge)
+const FLIGHT = { right: 1, up: 0.3, away: 1.6, star: 0.88 };
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -578,8 +591,8 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
       camera.up.set(-Math.cos(phi) * Math.sin(az), Math.sin(phi), -Math.cos(phi) * Math.cos(az));
       camera.lookAt(0, ty, 0);
 
-      // which way it'll fly, worked out from where the camera ended up: off the right side of the window. It steps
-      // along that line to find how far it has to go to be off screen, and where it passes the edge (for the star)
+      // which way it'll fly, worked out from where the camera ended up. It steps along that line to find where it
+      // reaches the star's spot on the right of the window: that's where it ends up, and where the star pings
       if (t > FLY.turn[1] && !away) {
         const fwd = new THREE.Vector3(0, ty, 0).sub(camera.position).normalize();
         const right = new THREE.Vector3().crossVectors(fwd, camera.up).normalize();
@@ -587,16 +600,13 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
         const dir = right.multiplyScalar(FLIGHT.right).add(up.multiplyScalar(FLIGHT.up)).add(fwd.multiplyScalar(FLIGHT.away)).normalize();
         camera.updateMatrixWorld();
         const onScreen = (d: number) => dir.clone().multiplyScalar(d).add(new THREE.Vector3(0, 0.12, 0)).project(camera).x;
-        let dStar = 0, dExit = 0;
-        for (let d = 0; d < 80 && !dExit; d += 0.05) {
-          if (!dStar && onScreen(d) > FLIGHT.star) dStar = d;
-          if (onScreen(d) > FLIGHT.exit) dExit = d;
-        }
-        dExit = dExit || 20; dStar = dStar || dExit * 0.8;
-        away = dir.clone().multiplyScalar(dExit);
-        starPos.copy(dir).multiplyScalar(dStar).add(new THREE.Vector3(0, 0.12, 0));
-        // the moment it passes the star's spot (the zoom below covers 1 - (1 - z)^2.2 of the way)
-        starAt = FLY.zip[0] + (FLY.zip[1] - FLY.zip[0]) * (1 - Math.pow(1 - dStar / dExit, 1 / 2.2));
+        let dStar = 0;
+        for (let d = 0; d < 80 && !dStar; d += 0.05) if (onScreen(d) > FLIGHT.star) dStar = d;
+        dStar = dStar || 12;
+        away = dir.clone().multiplyScalar(dStar);
+        starPos.copy(away).add(new THREE.Vector3(0, 0.12, 0));
+        // the star pings just as the plane arrives in it
+        starAt = FLY.zip[1] - 0.07;
         heading = new THREE.Quaternion().setFromUnitVectors(nose, dir);
       }
       // it shrinks as it folds, and floats up a touch, swaying and tipping as it goes (so it's never stiff)
@@ -608,7 +618,9 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
       // a tiny squash while it flutters, then it stretches out long the instant it zooms off
       const stretch = z > 0 ? 0.45 * Math.pow(1 - z, 0.5) : 0;
       const squash = 0.05 * Math.sin(t * 2 * Math.PI * 7) * Math.sin(Math.PI * fl);
-      plane.scale.set(size * (1 + stretch - squash), size * (1 - 0.25 * stretch + squash), size * (1 - 0.25 * stretch + squash));
+      // ...and right at the end it shrinks away into the star
+      const into = Math.max(0.02, 1 - easeSine((z - 0.72) / 0.28));
+      plane.scale.set(size * into * (1 + stretch - squash), size * into * (1 - 0.25 * stretch + squash), size * into * (1 - 0.25 * stretch + squash));
       // its nose lifts eagerly while it flutters
       qPitch.setFromAxisAngle(wingAxis, 0.18 * Math.sin(Math.PI * fl));
       if (away && heading) {
@@ -621,8 +633,8 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
         plane.quaternion.copy(qLook).multiply(qPitch).multiply(qRoll);
       }
       const g = z; // (the wind streaks show while it's zooming off)
-      plane.visible = z < 0.96;
-      // the star pings at the edge as it passes: it pops up, spins, and shrinks away
+      plane.visible = z < 0.99;
+      // the star pings where the plane flew into it: it pops up, spins, and shrinks away
       const st = clamp01((t - starAt) / FLY.star);
       if (away && st > 0 && st < 1) {
         star.position.copy(starPos);
@@ -676,6 +688,31 @@ function FoldAway({ msg, card, onDone }: { msg: { message: string; name: string;
   return createPortal(<canvas ref={ref} className="pc-plane pointer-events-none fixed inset-0 z-[60] h-full w-full" aria-hidden="true" />, document.body);
 }
 
+// Turning the card over, like a sheet of paper on a table: you lift its right edge, it rises and swings over towards
+// the left in one continuous motion (slow as it lifts, quicker as it falls, never stopping half way), then drops
+// flat and settles with a tiny bounce. Its soft shadow underneath fades while it's in the air. to = the side it ends up showing
+function flipCard(card: HTMLElement, rest: HTMLElement | null, to: "front" | "back", onDone: () => void) {
+  const W = card.offsetWidth, N = 48, ms = FLIP_SECONDS * 1000;
+  const from = to === "back" ? 0 : -180; // (turning the negative way lifts the right edge towards you)
+  const cardK: Keyframe[] = [], restK: Keyframe[] = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, main = Math.min(1, t / 0.86); // the turn takes the first 86%, then it settles
+    const u = 0.5 - 0.5 * Math.cos(Math.PI * Math.pow(main, 1.18)); // how far over it is: gentle lift, quicker fall
+    const up = Math.sin(Math.PI * u); // 0 flat, 1 standing on its edge
+    const settle = t > 0.86 ? Math.sin(((t - 0.86) / 0.14) * Math.PI) * (1 - (t - 0.86) / 0.14) : 0;
+    const ang = from - 180 * u;
+    const x = -0.13 * W * up, z = 0.17 * W * up + 6 * settle;
+    const tiltX = 6 * up - 1.2 * settle, tiltZ = -2.2 * up;
+    cardK.push({ transform: `translate3d(${x.toFixed(2)}px, 0, ${z.toFixed(2)}px) rotateX(${tiltX.toFixed(2)}deg) rotateY(${ang.toFixed(2)}deg) rotateZ(${tiltZ.toFixed(2)}deg)` });
+    restK.push({ opacity: (1 - Math.min(1, up * 2.5)).toFixed(3) }); // the resting shadow fades out while it's in the air
+  }
+  const opts: KeyframeAnimationOptions = { duration: ms, easing: "linear" };
+  const a = card.animate(cardK, opts);
+  rest?.animate(restK, opts);
+  a.onfinish = onDone;
+  a.oncancel = onDone;
+}
+
 export default function ContactPage() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
@@ -684,7 +721,15 @@ export default function ContactPage() {
   const [sent, setSent] = useState<{ message: string; name: string; email: string } | null>(null); // what they wrote, for the paper plane
   const [side, setSide] = useState<"front" | "back">("back"); // it opens on the back, ready to write on
   const [anim, setAnim] = useState(""); // which way it's turning over right now, for the animation
-  const flip = () => { const to = side === "back" ? "front" : "back"; setSide(to); setAnim(`anim-to-${to}`); };
+  const cardRef = useRef<HTMLDivElement>(null), restRef = useRef<HTMLDivElement>(null);
+  const flip = () => {
+    if (anim) return; // let it land first
+    const to = side === "back" ? "front" : "back";
+    setSide(to);
+    setAnim(`anim-to-${to}`);
+    if (cardRef.current) flipCard(cardRef.current, restRef.current, to, () => setAnim(""));
+    else setAnim("");
+  };
 
 
   // sends the form to /api/contact (app/api/contact/route.ts), which emails it to you with Resend
@@ -773,8 +818,10 @@ export default function ContactPage() {
             <div ref={stageRef} className="pc-stage">
               {phase === "flying" && sent && cardBox && <FoldAway msg={sent} card={cardBox} onDone={() => setPhase("done")} />}
               <div className={`pc-fly ${phase === "flying" ? "is-folding" : ""}`}>
-                <div className={`pc-shadow ${anim ? "is-flipping" : ""}`} key={`shadow-${anim}-${side}`} aria-hidden="true" />
-                <div className={`pc-card ${back ? "is-back" : ""} ${anim}`} onAnimationEnd={() => setAnim("")}>
+                <div ref={restRef} className="pc-shadow" aria-hidden="true" />
+                <div ref={cardRef} className={`pc-card ${back ? "is-back" : ""}`}>
+                  {/* the card's edges, so it has some thickness when it turns */}
+                  {["l", "r", "t", "b"].map((k) => <div key={k} className={`pc-edge pc-edge-${k}`} aria-hidden="true" />)}
                   {/* the front: the label, the stamp with a postmark, and a plane flying a dashed loop round "say hi!" */}
                   <div className="pc-face" inert={back} aria-hidden={back}>
                     <div className="pc-paper flex min-h-[26rem] flex-col p-5 sm:p-8">

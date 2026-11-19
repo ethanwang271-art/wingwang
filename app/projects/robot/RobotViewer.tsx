@@ -777,9 +777,9 @@ export default function RobotViewer() {
           {label.text}
         </div>
       )}
-      <div className="absolute inset-x-0 bottom-4 flex flex-wrap items-center justify-between gap-3 px-1">
-        <span className="hidden text-sm font-light lowercase text-neutral-500 sm:inline">drag to rotate, click then scroll to zoom</span>
-        <span className="flex flex-wrap gap-1 sm:gap-2">
+      <div className="absolute inset-x-0 bottom-4 flex flex-col items-center gap-2 px-4">
+        <span className="hidden text-center text-sm font-light lowercase text-neutral-600 sm:inline">drag to rotate, click then scroll to zoom</span>
+        <span className="flex flex-wrap justify-center gap-1 sm:gap-2">
           <button type="button" onClick={() => { shakeRef.current = 0; }} className={pill(false)}>shake</button>
           <button type="button" aria-pressed={dims} onClick={() => { dimsRef.current = !dimsRef.current; setDims(dimsRef.current); }} className={pill(dims)}>dimensions</button>
           <button type="button" aria-pressed={apart} onClick={() => { apartRef.current = !apartRef.current; setApart(apartRef.current); }} className={pill(apart)}>unscrew</button>
