@@ -19,7 +19,8 @@ export function generateStaticParams() {
   return getFolders().map((f) => ({ folder: f.id }));
 }
 
-// each album gets its own title, description and share picture (its first photo)
+// each album gets its own title and description. Its share picture (the cover photo with the album's name)
+// is made by opengraph-image.tsx, next to this file
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const name = await folderName(params);
   const data = getFolder(name);
@@ -27,17 +28,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const desc = ownDescription(data.description);
   const description = `${name}: ${data.photos.length} photos by Ethan Wang.${desc ? ` ${desc}` : ""}`;
   const path = `/photos/${encodeURIComponent(name)}`;
-  const cover = data.photos[0];
   return {
     title: name,
     description,
     alternates: { canonical: path },
-    openGraph: {
-      url: path,
-      title: `${name} | wingwang`,
-      description,
-      images: cover ? [{ url: cover.src, width: cover.w, height: cover.h, alt: cover.alt }] : undefined,
-    },
+    openGraph: { url: path, title: `${name} | wingwang`, description },
+    // (leaving out a picture here lets x / twitter use the album's own share picture instead of the site's)
+    twitter: { card: "summary_large_image", title: `${name} | wingwang`, description },
   };
 }
 

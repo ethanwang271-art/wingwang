@@ -74,11 +74,12 @@ const SHUTTER_SOUND = true;
 // swap it for your own words (and drop the brackets). Delete a row or add one (5 or 6 fits best).
 // A row can have `links` instead of `text`: each one shows as its name and opens in a new tab.
 const CONTACT_MORE: { title: string; text?: string; links?: { label: string; href: string }[] }[] = [
-  { title: "best for", text: "event coverage, portraits, sports, & collabs" },
-  { title: "availability", text: "weekends" },
-  { title: "reply time", text: "usually within a day" },
-  { title: "based in", text: "toronto" },
-  { title: "find me on", links: [
+  { title: "what i shoot", text: "events, portraits, sports & collabs" },
+  { title: "when i'm free", text: "weekends, mostly" },
+  { title: "how fast i reply", text: "usually within a day" },
+  // (toronto is already in the time line on the left; to show it here too:)
+  // { title: "where i am", text: "toronto" },
+  { title: "where else i am", links: [
     { label: "instagram", href: "https://instagram.com/etnwingwang" },
     { label: "github", href: "https://github.com/ethanwang271-art" },
     { label: "linkedin", href: "https://www.linkedin.com/in/ethan-wang-9206563a1/" },
@@ -168,25 +169,31 @@ const CONTACT_CSS = `
 .scr-light .hover\\:decoration-white:hover { text-decoration-color: #000; }
 .scr-light .focus-visible\\:outline-white:focus-visible { outline-color: #000; }
 
+/* the links (résumé, see all photos, contact me...): blue words with a wobbly hand-drawn line under them,
+   which draws itself again when you point at it */
 .contact-btn {
   display: inline-flex;
   align-items: center;
-  gap: .5rem;
-  padding: .55rem 1rem;
-  border-radius: 4px;
+  gap: .35rem;
+  padding: .2rem 0 .5rem;
   border: 0;
-  background: ${BUTTON_BLUE};
-  color: #fff;
+  background: none;
+  color: ${BUTTON_BLUE};
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: .875rem;
+  font-size: 1rem;
   font-weight: 500;
   text-decoration: none;
-  box-shadow: inset 0 -1px 0 rgba(0,0,0,.18);
-  transition: background .2s ease, transform .1s ease;
+  transition: color .2s ease, transform .1s ease;
 }
-.contact-btn:hover { background: ${BUTTON_BLUE_HOVER}; }
+.contact-btn:hover { color: ${BUTTON_BLUE_HOVER}; }
 .contact-btn:active { transform: translateY(1px); }
-.contact-btn:focus-visible { outline: 2px solid ${BUTTON_BLUE}; outline-offset: 2px; }
+.contact-btn:focus-visible { outline: 2px solid ${BUTTON_BLUE}; outline-offset: 4px; border-radius: 2px; }
+.ink-word { position: relative; }
+.ink-line { position: absolute; left: 0; bottom: -.4em; width: 100%; height: .5em; overflow: visible; pointer-events: none; }
+.ink-line path { stroke-dasharray: 1; stroke-dashoffset: 0; }
+@keyframes ink-redraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.contact-btn:hover .ink-line path, .contact-btn:focus-visible .ink-line path { animation: ink-redraw .6s cubic-bezier(.65,0,.35,1); }
+@media (prefers-reduced-motion: reduce) { .contact-btn .ink-line path { animation: none !important; } }
 .contact-arrow { width: 1em; height: 1em; flex-shrink: 0; transition: transform .2s ease; }
 /* the little "live" dot before the time line: it breathes slowly */
 @keyframes live-dot { 0%, 100% { box-shadow: 0 0 0 0 rgba(47,111,222,.45); } 50% { box-shadow: 0 0 0 .35em rgba(47,111,222,0); } }
@@ -246,12 +253,31 @@ function goldenText(now: number) {
 // (Before the page has loaded in the browser it shows nothing, so it never shows a wrong time.)
 const statusText = () => { const now = Date.now(); return `${clockFmt(now)}|${CONTACT_GOLDEN_LINE ? goldenText(now) : ""}`; };
 const clockTick = (onChange: () => void) => { const id = window.setInterval(onChange, 5000); return () => window.clearInterval(id); };
+
+// "updated 2 days ago" in the footer: how long since the site was last built and put online (see next.config.ts)
+const SITE_UPDATED = process.env.SITE_UPDATED ?? "";
+const updatedText = () => {
+  const at = Date.parse(SITE_UPDATED);
+  if (!Number.isFinite(at)) return "";
+  const mins = Math.max(0, Math.floor((Date.now() - at) / 60000)), hours = Math.floor(mins / 60), days = Math.floor(hours / 24);
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"} ago`;
+  if (mins < 1) return "just now";
+  if (mins < 60) return plural(mins, "minute");
+  if (hours < 24) return plural(hours, "hour");
+  if (days < 2) return "yesterday";
+  if (days < 30) return plural(days, "day");
+  return "on " + new Date(at).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric", timeZone: CONTACT_TIME_ZONE }).toLowerCase();
+};
+function LastUpdated() {
+  const text = useSyncExternalStore(clockTick, updatedText, () => "");
+  return text ? <span>updated {text}</span> : null;
+}
 function LiveStatus() {
   const [time, golden] = useSyncExternalStore(clockTick, statusText, () => "|").split("|");
   if (!time) return <div style={{ minHeight: "3.2em" }} />;
   const row = "flex items-center gap-[0.65em] leading-snug";
   return (
-    <div className="mt-[1.1em] space-y-[0.35em] text-neutral-400" style={{ fontSize: "clamp(0.75rem, 2.5cqmin, 1.3rem)" }}>
+    <div className="mt-[1.1em] space-y-[0.35em] text-neutral-400" style={{ fontSize: "clamp(0.85rem, 3.1cqmin, 1.65rem)" }}>
       {CONTACT_TIME_LINE && (
         <p className={row}>
           <span className="flex w-[0.9em] justify-center"><span className="live-dot" aria-hidden="true" /></span>
@@ -305,7 +331,7 @@ function shutterClick() {
 function PlaneDoodle() {
   const ink = "#262b3d";
   return (
-    <svg viewBox="0 0 260 130" className="h-full max-h-[11em] w-full max-w-[22em]" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 260 130" className="h-full max-h-[15em] w-full max-w-[30em]" fill="none" aria-hidden="true">
       <path d="M8 112 C 48 116, 70 84, 96 88 C 128 93, 128 124, 102 118 C 76 112, 98 60, 150 58 C 172 57, 182 60, 190 62" stroke={ink} strokeWidth="2" strokeLinecap="round" strokeDasharray="1 9" opacity=".75" />
       <g className="doodle-plane" stroke={ink} strokeWidth="2.6" strokeLinejoin="round">
         <path d="M250 34 L196 30 L214 52 Z" fill="#ffffff" />
@@ -333,14 +359,29 @@ function ShutterPad() {
     <button type="button" onClick={take} aria-label="take a photo" className="shutter-pad mt-[1em] mb-[1em] hidden min-h-0 flex-1 flex-col items-start justify-end text-left md:flex">
       {/* (a new key each shot restarts the doodle's hop) */}
       <span key={`doodle-${flash}`} className={`flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden ${flash ? "doodle-hop" : ""}`}><PlaneDoodle /></span>
-      <span className="shutter-hint mt-[0.4em] text-neutral-400" style={{ fontSize: "clamp(0.65rem, 2cqmin, 1rem)" }}>
+      <span className="shutter-hint mt-[0.4em] text-neutral-400" style={{ fontSize: "clamp(0.7rem, 2.4cqmin, 1.15rem)" }}>
         {shots ? `shots taken: ${shots}` : "tap here to take a shot"}
       </span>
     </button>
   );
 }
 
-// small up-right arrow shown on the résumé and contact me buttons
+// a link on the camera's screen: blue words, a hand-drawn line under them, and a small arrow
+function InkLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link href={href} className="contact-btn" draggable={false}>
+      <span className="ink-word">
+        {label}
+        <svg className="ink-line" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M1 7 C 18 4, 34 9, 52 6 S 86 4, 99 6.5" pathLength={1} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+      </span>
+      <ArrowUpRight />
+    </Link>
+  );
+}
+
+// small up-right arrow shown on the links
 function ArrowUpRight() {
   return (
     <svg viewBox="0 0 24 24" className="contact-arrow" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -2182,7 +2223,7 @@ export default function Home() {
                   </div>
                   {/* the résumé button, bottom left like the other pages */}
                   <div className="flex flex-wrap gap-3 pt-[1em]">
-                    <Link href="/resume" className="contact-btn" draggable={false}>résumé<ArrowUpRight /></Link>
+                    <InkLink href="/resume" label="résumé" />
                   </div>
                 </div>
 
@@ -2220,7 +2261,7 @@ export default function Home() {
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-3 pt-[1em]">
-                    <Link href="/photos" className="contact-btn" draggable={false}>see all photos<ArrowUpRight /></Link>
+                    <InkLink href="/photos" label="see all photos" />
                   </div>
                 </div>
 
@@ -2244,7 +2285,7 @@ export default function Home() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-3 pt-[1em]">
-                    <Link href="/videos" className="contact-btn" draggable={false}>see videos<ArrowUpRight /></Link>
+                    <InkLink href="/videos" label="see videos" />
                   </div>
                 </div>}
 
@@ -2254,7 +2295,7 @@ export default function Home() {
                   {HOME_PROJECTS.length === 0 ? (
                     <p className="mt-[0.5em] text-neutral-400" style={scrText}>coming soon</p>
                   ) : (
-                    <ul className="mt-[1em] min-h-0 flex-1 divide-y divide-white/10 overflow-hidden border-y border-white/10" style={scrText}>
+                    <ul className="mt-[1em] min-h-0 flex-1 divide-y divide-white/10 overflow-hidden border-t border-white/10" style={scrText}>
                       {HOME_PROJECTS.map((pj, i) => (
                         <li key={i}>
                           <Link href={pj.href} draggable={false} className="group flex items-baseline gap-[1em] py-[0.7em]">
@@ -2270,7 +2311,7 @@ export default function Home() {
                     </ul>
                   )}
                   <div className="mt-auto flex flex-wrap gap-3 pt-[1em]">
-                    <Link href="/projects" className="contact-btn" draggable={false}>see projects<ArrowUpRight /></Link>
+                    <InkLink href="/projects" label="see projects" />
                   </div>
                 </div>
 
@@ -2278,18 +2319,20 @@ export default function Home() {
                 <div ref={(el) => { screenPageEls.current[pageNo("contact")] = el; }} role="group" aria-roledescription="slide" aria-label={`${pageNo("contact") + 1} of ${SCREEN_PAGES.length}: contact`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
                   {/* on computers: the title, words and button on the left, the details down the right.
                       On phones it's all one column, with the button at the bottom */}
-                  <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_1fr_auto] md:grid-cols-[2fr_3fr] md:grid-rows-[1fr_auto] md:gap-x-[3em]">
+                  <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_1fr_auto] md:grid-cols-[1fr_1fr] md:grid-rows-[1fr_auto] md:gap-x-[4em]">
                     <div className="flex min-h-0 flex-col md:col-start-1 md:row-start-1">
                       <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{CONTACT_TITLE}</h2>
-                      <p className="mt-[0.6em] leading-snug text-neutral-300" style={{ fontSize: "clamp(0.9rem, 3.2cqmin, 1.75rem)" }}>{CONTACT_TEXT}</p>
+                      <p className="mt-[0.6em] text-balance leading-snug text-neutral-300" style={{ fontSize: "clamp(1rem, 4cqmin, 2.15rem)" }}>{CONTACT_TEXT}</p>
                       <LiveStatus />
                       <ShutterPad />
                     </div>
-                    <dl className="my-[1.2em] flex min-h-0 flex-col justify-between divide-y divide-white/10 border-y border-white/10 md:col-start-2 md:row-span-2 md:row-start-1 md:my-0" style={{ fontSize: "clamp(0.75rem, 2.5cqmin, 1.3rem)" }}>
+                    {/* each detail: a small grey line saying what it is, with the answer underneath in normal writing.
+                        They sit together in the middle of the right side */}
+                    <dl className="my-[1.2em] flex min-h-0 flex-col justify-center gap-[1.25em] md:col-start-2 md:row-span-2 md:row-start-1 md:my-0" style={{ fontSize: "clamp(0.95rem, 3.6cqmin, 2rem)" }}>
                       {CONTACT_MORE.map((row, i) => (
-                        <div key={i} className="grid flex-1 grid-cols-[7.5em_1fr] items-center gap-x-[1em] py-[0.5em]">
-                          <dt className="font-semibold text-white">{row.title}</dt>
-                          <dd className="leading-snug text-neutral-400">
+                        <div key={i}>
+                          <dt className="text-[0.62em]" style={{ color: `rgba(${SCREEN_INK},.6)` }}>{row.title}</dt>
+                          <dd className="mt-[0.2em] leading-snug text-white">
                             {row.links
                               ? row.links.map((l, j) => (
                                   <span key={l.href}>
@@ -2303,7 +2346,7 @@ export default function Home() {
                       ))}
                     </dl>
                     <div className="flex flex-wrap items-end gap-3 md:col-start-1 md:row-start-2">
-                      <Link href="/contact" className="contact-btn" draggable={false}>contact me<ArrowUpRight /></Link>
+                      <InkLink href="/contact" label="contact me" />
                     </div>
                   </div>
                 </div>
@@ -2373,6 +2416,7 @@ export default function Home() {
 
       <footer className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 py-6 font-mono text-sm lowercase text-neutral-800">
         <span>© 2026 ethan wang</span>
+        <LastUpdated />
         {/* your resume page (app/resume/page.tsx) */}
         <Link href="/resume" className="border-b border-neutral-300 transition-colors hover:border-neutral-500 hover:text-neutral-800">résumé</Link>
         <Link href="/contact" className="border-b border-neutral-300 transition-colors hover:border-neutral-500 hover:text-neutral-800">contact me</Link>
