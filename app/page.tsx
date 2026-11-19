@@ -12,11 +12,11 @@ const ABOUT_TITLE = "who am i?";
 // Each line in quotes is one paragraph. This is the short intro at the top, like the "about" on linkedin.
 // Anything in [square brackets] is a placeholder: swap it for your own words (and drop the brackets).
 const ABOUT_TEXT = [
-  "i'm ethan, a student in toronto. i'm a photographer and do engineering things for fun: i shoot events, street and sports, and i build small electronics projects to learn hardware and code.",
+  "hi! i'm ethan wang, a student in toronto. i'm a photographer and do engineering things for fun: i shoot events, street and sports, and i build small electronics projects to learn hardware and code.",
 ];
 
-// a word in ABOUT_TEXT that gets written and circled in blue, like with a marker, when the "who am i" page shows ("" = none)
-const ABOUT_CIRCLE = "ethan";
+// words in ABOUT_TEXT that get circled in blue, like with a marker, when the "who am i" page shows ("" = none)
+const ABOUT_CIRCLE = "ethan wang";
 
 // ---- The rest of your about me: edit these ----
 // These show under the intro on the first page of the camera's screen, as short sections in two columns.
@@ -123,7 +123,7 @@ const BLUE = "100,159,255";       // r,g,b of the blue (taken from your new swat
 // the "Contact me" button: dark blue-tinted box, blue border, monospace text
 // the marker circle: drawn round its word over about a second, each time the "who am i" page comes up
 const MARKER_CSS = `
-.marker { position: relative; display: inline-block; white-space: nowrap; }
+.marker { position: relative; display: inline-block; white-space: nowrap; isolation: isolate; margin: 0 0.3em; }
 .marker svg { position: absolute; left: -0.45em; right: -0.45em; top: -0.32em; bottom: -0.38em; width: calc(100% + 0.9em); height: calc(100% + 0.7em); overflow: visible; pointer-events: none; }
 .marker path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset .1s linear; }
 .marker.drawn path { stroke-dashoffset: 0; transition: stroke-dashoffset 1s cubic-bezier(.55,.1,.35,1) .35s; }
@@ -440,8 +440,8 @@ function LogoDots() {
 
 /* ---------- The camera ---------- */
 
-const CAMERA_TURN_SCROLL = 120;             // how much scrolling it takes to turn round and zoom in on the screen, in % of the window's height
-const CAMERA_TURN_WHEEL = 1.6;              // how far each flick of the wheel or trackpad goes while the camera turns round to the screen (lower = more resistance)
+const CAMERA_TURN_SCROLL = 100;             // how much scrolling it takes to turn round and zoom in on the screen, in % of the window's height
+const CAMERA_TURN_WHEEL = 2.4;              // how far each flick of the wheel or trackpad goes while the camera turns round to the screen (lower = more resistance)
 const CAMERA_PAGE_SCROLL = 170;             // how much scrolling each page on the screen takes, in % of the window's height (more = harder to scroll past one by accident)
 const CAMERA_SCREEN_WHEEL = 2.2;            // how far each flick of the wheel or trackpad goes while you're on the screen (the rest of the page uses LENIS_WHEEL; lower = slower)
 const CAMERA_START_SIZE = 0.62;             // how big the whole camera is at the start (1 = as big as fits)
@@ -464,6 +464,8 @@ const CAMERA_TILT = 0;                      // how much you look down on it at t
 const CAMERA_SPIN = 0.45;                   // at the start you can drag the camera round to look at it from any side: degrees it turns per pixel dragged
 const CAMERA_MOUSE = 6;                     // how much it leans to follow the mouse at the start, in degrees (0 = not at all)
 const CAMERA_SPIN_UNTIL = 0.48;              // you can still drag the camera round until it has zoomed this far towards its screen (0 = only before any scrolling, 1 = right up to the screen)
+const CAMERA_TURN_SNAP_FROM = 0.72;         // the last part of the zoom (from this far through it, 0 to 1) snaps to the screen or back to here when you stop in it
+const CAMERA_TURN_SNAP = 0.5;               // how long that snap takes, in seconds
 const CAMERA_SNAP = 0.55;                   // when you stop scrolling between two pages, it glides to the nearest one in this many seconds (0 = off)
 const CAMERA_DOTS = "235,235,235";          // r,g,b of the little dots on the camera's back screen (soft white)
 const CAMERA_DOTS_LIT = "255,255,255";      // r,g,b of a dot once the pointer has passed over it (bright white)
@@ -478,8 +480,8 @@ const CAMERA_APERTURE_BLADES = 7;           // how many blades the aperture insi
 // ---- your W logo behind the camera, made of dots that light up where the pointer passes (like the camera's screen) ----
 const LOGO_SIZE = 0.78;            // how tall the logo is, compared to the window (it also always fits the width)
 const LOGO_DOT_GAP = 4.5;          // how far apart its dots are, in px (lower = more, finer dots)
-const LOGO_DOT_SIZE = 1.3;         // how wide each dot is, in px (it grows a little when lit)
-const LOGO_DOT_FAINT = 0.3;        // how visible the dots are before the pointer passes over them (0 = hidden until lit)
+const LOGO_DOT_SIZE = 1.45;        // how wide each dot is, in px (it grows a little when lit)
+const LOGO_DOT_FAINT = 0.42;       // how visible the dots are before the pointer passes over them (0 = hidden until lit)
 const LOGO_BRUSH = 0.05;           // how big the patch that lights up under the pointer is, compared to the window
 const LOGO_INK = "17,17,17";       // r,g,b of the black parts of the W
 const LOGO_BLUE = "31,95,217";     // r,g,b of the blue part of the W
@@ -1641,7 +1643,24 @@ export default function Home() {
     // a page you asked for (by swiping, the dots or the arrow keys) that the scrolling is on its way to (-1 = none)
     let forced = -1;
     let lastScroll = performance.now(), snapping = false, snapAt = 0; // when the page last moved, and whether it is gliding to a stop
-    const onScroll = () => { if (!snapping) lastScroll = performance.now(); };
+    // where the latest scroll started from, to tell which way you were heading when it stopped
+    let gestureFrom = window.scrollY, restY = window.scrollY;
+    // how fast the page is moving (px a second, + = down), and when the wheel or trackpad was last used
+    let scrollVel = 0, prevY = window.scrollY, lastWheel = 0;
+    const onScroll = () => {
+      if (!snapping) {
+        const t = performance.now();
+        if (t - lastScroll > 250) gestureFrom = restY; // a new scroll after a pause: it started where the page was resting
+        lastScroll = t;
+      }
+      restY = window.scrollY;
+    };
+    // scrolling or touching during a glide hands control straight back to you (the glide just stops where it is)
+    const onInput = (e: Event) => {
+      const t = performance.now();
+      if (snapping) { snapping = false; forced = -1; gestureFrom = window.scrollY; lastScroll = t; }
+      if (e.type === "wheel") lastWheel = t;
+    };
     const size = () => {
       const r = cv.getBoundingClientRect();
       dpr = Math.min(CAMERA_SHARPNESS, window.devicePixelRatio || 1);
@@ -1654,13 +1673,21 @@ export default function Home() {
       const br = box.getBoundingClientRect();
       return window.scrollY + br.top + (T + (i / n) * (1 - T)) * (br.height - h);
     };
+    // glides pick up at the speed the page is already moving and ease gently to a stop, so there's no jolt
+    // where the scrolling hands over to the glide
     const glide = (y: number, secs: number) => {
       const l = lenisRef.current;
       snapping = true;
       snapAt = performance.now();
       const done = () => { snapping = false; forced = -1; lastScroll = performance.now(); };
-      if (l) l.scrollTo(y, { duration: secs, onComplete: done });
-      else { window.scrollTo(0, y); done(); }
+      if (!l) { window.scrollTo(0, y); done(); return; }
+      const dist = y - l.animatedScroll;
+      if (Math.abs(dist) < 1) { done(); return; }
+      // already heading there fast: a shorter glide, so it doesn't brake and then speed up again
+      if (scrollVel * dist > 0) secs = clamp((2 * Math.abs(dist)) / Math.abs(scrollVel), 0.25, secs);
+      const m = clamp((scrollVel * secs) / dist, -0.8, 2); // the starting speed, as a share of the glide's average speed
+      const easing = (t: number) => m * (t * t * t - 2 * t * t + t) + 3 * t * t - 2 * t * t * t;
+      l.scrollTo(y, { duration: secs, easing, onComplete: done });
     };
     const goTo = (i: number) => {
       const j = clamp(i, 0, n - 1);
@@ -1757,6 +1784,8 @@ export default function Home() {
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("wheel", onInput, { passive: true });
+    window.addEventListener("touchstart", onInput, { passive: true });
     window.addEventListener("keydown", onKey);
     cv.addEventListener("pointerdown", onDown);
     scr.addEventListener("pointerdown", onScrDown);
@@ -1772,6 +1801,11 @@ export default function Home() {
       last = now;
       const br = box.getBoundingClientRect();
       const p = clamp(-br.top / Math.max(1, br.height - h), 0, 1);
+      if (dt > 0) {
+        const y = window.scrollY;
+        scrollVel += ((y - prevY) / dt - scrollVel) * (1 - Math.exp(-dt * 30));
+        prevY = y;
+      }
       ps += (p - ps) * (1 - Math.exp(-dt * 16)); // smooth out the scrolling a touch (the smooth scrolling already does most of it)
       ex += (mx - ex) * (1 - Math.exp(-dt * 3));
       ey += (my - ey) * (1 - Math.exp(-dt * 3));
@@ -1850,6 +1884,22 @@ export default function Home() {
       if (CAMERA_SNAP > 0 && l && !snapping && !spinning && !swipe && !l.isTouching && !l.isScrolling && now - lastScroll > 200) {
         const pu = clamp((p - T) / (1 - T), 0, 1) * n, pk = Math.floor(pu), pf = pu - pk;
         if (p > T && p < 1 && pk < n - 1 && pf > 0.6) glide(scrollFor(pf < 0.8 ? pk + 0.5 : pk + 1.05), CAMERA_SNAP);
+      }
+      // the last stretch of the zoom (where the screen fades in) never rests half way: stop scrolling in it and it
+      // carries on the way you were going: scrolling in, it finishes onto the full screen view; scrolling out, it backs
+      // up to the zoomed-in camera just before it.
+      // Everywhere else in the turn, the scrolling is left alone
+      // (with a wheel or trackpad it doesn't wait for the scrolling to stop first: once you let go, it takes over
+      // from where the scrolling is coasting to, at the speed it's going, so it flows straight on)
+      const coasting = l?.isScrolling === "smooth" && lastWheel > 0 && now - lastWheel > 120;
+      const still = !l?.isScrolling && now - lastScroll > 160;
+      if (CAMERA_SNAP > 0 && l && !snapping && !spinning && !swipe && !l.isTouching && (coasting || still)) {
+        const top = window.scrollY + br.top, span = T * (br.height - h); // where the turn starts, and how long it is
+        const from = CAMERA_TURN_SNAP_FROM, rest = l.targetScroll, turned = (rest - top) / span;
+        if (br.top <= 1 && turned > from + 0.01 && turned < 0.995) {
+          const toScreen = Math.abs(scrollVel) > 40 ? scrollVel > 0 : rest >= gestureFrom;
+          glide(toScreen ? scrollFor(0.02) : top + from * span, CAMERA_TURN_SNAP);
+        }
       }
 
       // the screen's box: hidden until the camera has turned round and zoomed in
@@ -1989,6 +2039,8 @@ export default function Home() {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("wheel", onInput);
+      window.removeEventListener("touchstart", onInput);
       window.removeEventListener("keydown", onKey);
       cv.removeEventListener("pointerdown", onDown);
       scr.removeEventListener("pointerdown", onScrDown);
@@ -2080,11 +2132,7 @@ export default function Home() {
               <div ref={screenTrackRef} className="flex h-full will-change-transform">
                 {/* who am i */}
                 <div ref={(el) => { screenPageEls.current[pageNo("who am i")] = el; }} role="group" aria-roledescription="slide" aria-label={`${pageNo("who am i") + 1} of ${SCREEN_PAGES.length}: who am i`} className="flex h-full w-full shrink-0 flex-col overflow-hidden" style={scrPad}>
-                  {/* the title, with the résumé button on the right */}
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{ABOUT_TITLE}</h2>
-                    <Link href="/resume" className="contact-btn shrink-0" draggable={false}>résumé<ArrowUpRight /></Link>
-                  </div>
+                  <h2 className="font-bold leading-[1.02] tracking-tight" style={scrTitle}>{ABOUT_TITLE}</h2>
                   <div className="mt-[0.6em] space-y-[0.3em] leading-snug text-neutral-300" style={scrText}>
                     {ABOUT_TEXT.map((paragraph, i) => {
                       // colour ABOUT_CIRCLE (the first time it comes up) blue and circle it in blue, like with a marker
@@ -2131,6 +2179,10 @@ export default function Home() {
                         ))}
                       </div>
                     ))}
+                  </div>
+                  {/* the résumé button, bottom left like the other pages */}
+                  <div className="flex flex-wrap gap-3 pt-[1em]">
+                    <Link href="/resume" className="contact-btn" draggable={false}>résumé<ArrowUpRight /></Link>
                   </div>
                 </div>
 
